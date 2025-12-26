@@ -111,11 +111,11 @@ class TierManager:
         if age < 0:
             # Future content - treat as hot when it airs
             return Tier.HOT
-        elif age <= self.config.tiers.hot_days:
+        elif age <= (self.config.tiers.hot.max_days or 90):
             return Tier.HOT
-        elif age <= self.config.tiers.warm_days:
+        elif age <= (self.config.tiers.warm.max_days or 365):
             return Tier.WARM
-        elif age <= self.config.tiers.cool_days:
+        elif age <= (self.config.tiers.cool.max_days or 1095):
             return Tier.COOL
         else:
             return Tier.COLD
