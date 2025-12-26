@@ -217,18 +217,20 @@ class MachinarrCore:
         for name, client in self.sonarr_clients.items():
             try:
                 missing = client.get_missing_episodes()
+                self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
                 for ep in missing[:100]:  # Limit per instance
                     items.append(self.tier_manager.classify_episode(ep, {}, name))
-            except:
-                pass
+            except Exception as e:
+                self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
         
         for name, client in self.radarr_clients.items():
             try:
                 missing = client.get_missing_movies()
+                self.log.info(f"Radarr ({name}): Found {len(missing)} missing movies")
                 for movie in missing[:100]:
                     items.append(self.tier_manager.classify_movie(movie, name))
-            except:
-                pass
+            except Exception as e:
+                self.log.error(f"Radarr ({name}) missing movies error: {e}")
         
         return items
     
