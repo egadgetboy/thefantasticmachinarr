@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9q</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9r</div>
 </div>
 <script>
 // Theme management
@@ -1181,6 +1181,12 @@ function applyPacing(searches, interval) {
     document.getElementById('set-per-cycle').value = searches;
     document.getElementById('set-interval').value = interval;
     updatePacingCalc();
+    
+    // Highlight selected preset
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+        btn.style.border = '2px solid transparent';
+    });
+    event.currentTarget.style.border = '2px solid var(--accent)';
 }
 
 function updatePacingCalc() {
