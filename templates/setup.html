@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.8b</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.8c</div>
 </div>
 <script>
 // Theme management
@@ -599,6 +599,28 @@ const instances = { sonarr: [{id:1,on:true}], radarr: [{id:1,on:true}], sabnzbd:
 let counters = { sonarr:1, radarr:1, sabnzbd:1 };
 let baseUrl = '';
 let existingConfig = null;
+
+// Capture current form values into instances array before navigation
+function captureCurrentValues() {
+    // Capture service instance values
+    ['sonarr', 'radarr', 'sabnzbd'].forEach(svc => {
+        instances[svc].forEach((inst, i) => {
+            const id = inst.id;
+            const urlEl = document.getElementById(`${svc}-${id}-url`);
+            const keyEl = document.getElementById(`${svc}-${id}-key`);
+            const nameEl = document.getElementById(`${svc}-${id}-name`);
+            if (urlEl) inst.url = urlEl.value;
+            if (keyEl) inst.api_key = keyEl.value;
+            if (nameEl) inst.name = nameEl.value;
+        });
+    });
+    
+    // Capture base URL
+    const baseUrlEl = document.getElementById('base-url');
+    if (baseUrlEl && baseUrlEl.value) {
+        baseUrl = baseUrlEl.value.replace(/\/+$/, '');
+    }
+}
 
 // Load existing config if available
 async function loadExistingConfig() {
@@ -1231,6 +1253,9 @@ function gatherConfig() {
 // Auto-save current progress (without marking setup_complete)
 async function autoSave() {
     try {
+        // Capture current form values into memory first
+        captureCurrentValues();
+        
         const cfg = gatherConfig();
         cfg.setup_complete = false; // Don't mark complete until Finish
         await fetch('/api/setup/complete', {
@@ -1245,6 +1270,9 @@ async function autoSave() {
 }
 
 async function next() {
+    // Capture current values before doing anything
+    captureCurrentValues();
+    
     // Auto-save progress before moving to next step
     await autoSave();
     
@@ -1269,6 +1297,9 @@ async function next() {
 }
 
 async function back() {
+    // Capture current values before going back
+    captureCurrentValues();
+    
     // Auto-save progress before going back
     await autoSave();
     
