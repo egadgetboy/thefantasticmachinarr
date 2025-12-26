@@ -128,6 +128,9 @@ class TierManager:
         if air_date_str:
             try:
                 air_date = datetime.fromisoformat(air_date_str.replace('Z', '+00:00'))
+                # Strip timezone for comparison
+                if air_date.tzinfo:
+                    air_date = air_date.replace(tzinfo=None)
             except:
                 pass
         
@@ -174,6 +177,9 @@ class TierManager:
             if date_str:
                 try:
                     parsed = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                    # Strip timezone for comparison
+                    if parsed.tzinfo:
+                        parsed = parsed.replace(tzinfo=None)
                     if not air_date or parsed < air_date:
                         air_date = parsed
                 except:
