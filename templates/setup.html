@@ -81,7 +81,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.2a</div>
+    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.3</div>
 </div>
 <script>
 const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Settings', 'Complete'];
@@ -115,18 +115,64 @@ function stepWelcome() {
     <div class="step active">
         <h2>👋 Welcome!</h2>
         <p class="desc">The Fantastic Machinarr helps Sonarr and Radarr find content they can't find on their own.</p>
-        <div class="tiers">
-            <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-name">Hot</div><div class="tier-desc">Hourly</div></div>
-            <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-name">Warm</div><div class="tier-desc">Every 6hr</div></div>
-            <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-name">Cool</div><div class="tier-desc">Daily</div></div>
-            <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-name">Cold</div><div class="tier-desc">Weekly</div></div>
-        </div>
+        
         <div class="field" style="margin-top: 20px;">
             <label>🌐 Server Base URL</label>
             <input type="text" id="base-url" placeholder="http://192.168.1.100" value="${baseUrl}" onchange="updateBaseUrl(this.value)">
             <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Enter your server IP/hostname. This will prefill Sonarr, Radarr, and SABnzbd URLs.</div>
         </div>
-        <div class="info"><strong>Features:</strong> Tier-based searching, stuck queue resolution, manual intervention options, API rate limiting, email notifications.</div>
+        
+        <h3 style="margin-top: 24px; margin-bottom: 12px;">🎯 Search Tier Configuration</h3>
+        <p class="desc">TFM prioritizes searches based on content age. Newer content is searched more frequently since it's more likely to be available. Adjust intervals based on your indexer limits.</p>
+        
+        <div class="tiers">
+            <div class="tier">
+                <div class="tier-emoji">🔥</div>
+                <div class="tier-name">Hot</div>
+                <div class="tier-desc">0-7 days old</div>
+                <select id="tier-hot" style="margin-top: 8px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                    <option value="30">Every 30 min</option>
+                    <option value="60" selected>Every hour</option>
+                    <option value="120">Every 2 hours</option>
+                    <option value="180">Every 3 hours</option>
+                </select>
+            </div>
+            <div class="tier">
+                <div class="tier-emoji">☀️</div>
+                <div class="tier-name">Warm</div>
+                <div class="tier-desc">8-30 days old</div>
+                <select id="tier-warm" style="margin-top: 8px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                    <option value="180">Every 3 hours</option>
+                    <option value="360" selected>Every 6 hours</option>
+                    <option value="720">Every 12 hours</option>
+                    <option value="1440">Daily</option>
+                </select>
+            </div>
+            <div class="tier">
+                <div class="tier-emoji">❄️</div>
+                <div class="tier-name">Cool</div>
+                <div class="tier-desc">31-90 days old</div>
+                <select id="tier-cool" style="margin-top: 8px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                    <option value="720">Every 12 hours</option>
+                    <option value="1440" selected>Daily</option>
+                    <option value="2880">Every 2 days</option>
+                    <option value="4320">Every 3 days</option>
+                </select>
+            </div>
+            <div class="tier">
+                <div class="tier-emoji">🧊</div>
+                <div class="tier-name">Cold</div>
+                <div class="tier-desc">90+ days old</div>
+                <select id="tier-cold" style="margin-top: 8px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
+                    <option value="4320">Every 3 days</option>
+                    <option value="10080" selected>Weekly</option>
+                    <option value="20160">Every 2 weeks</option>
+                    <option value="43200">Monthly</option>
+                </select>
+            </div>
+        </div>
+        
+        <div class="info"><strong>💡 Tip:</strong> If you have limited API calls with your indexers, use longer intervals. Hot content is most likely to be found, so prioritize those searches.</div>
     </div>`;
 }
 
@@ -299,6 +345,26 @@ function gatherConfig() {
             }
         });
     });
+    
+    // Tier intervals (in minutes)
+    cfg.tiers = {
+        hot: {
+            max_age_days: 7,
+            interval_minutes: parseInt(document.getElementById('tier-hot')?.value) || 60
+        },
+        warm: {
+            max_age_days: 30,
+            interval_minutes: parseInt(document.getElementById('tier-warm')?.value) || 360
+        },
+        cool: {
+            max_age_days: 90,
+            interval_minutes: parseInt(document.getElementById('tier-cool')?.value) || 1440
+        },
+        cold: {
+            max_age_days: null,
+            interval_minutes: parseInt(document.getElementById('tier-cold')?.value) || 10080
+        }
+    };
     
     // Auto-resolution
     cfg.auto_resolution = {
