@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9f</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9g</div>
 </div>
 <script>
 // Theme management
@@ -1301,8 +1301,9 @@ function gatherConfig() {
             const key = keyEl ? keyEl.value : (inst.api_key || '');
             const name = nameEl ? nameEl.value : (inst.name || `${svc} ${inst.id}`);
             
-            if (inst.on && url && key) {
-                cfg[svc + '_instances'].push({ url, api_key: key, name, enabled: true });
+            // Save all instances that have URL and key, regardless of enabled state
+            if (url && key) {
+                cfg[svc + '_instances'].push({ url, api_key: key, name, enabled: inst.on });
             }
         });
     });
