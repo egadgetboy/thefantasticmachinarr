@@ -211,40 +211,79 @@ class MachinarrCore:
         }
     
     def _get_all_missing(self) -> List:
-        """Get all missing items from all instances."""
+        """Get all missing items AND upgrades from all instances."""
         items = []
         
+        # Missing episodes
         for name, client in self.sonarr_clients.items():
             try:
                 missing = client.get_missing_episodes()
                 self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
                 for ep in missing[:100]:  # Limit per instance
-                    items.append(self.tier_manager.classify_episode(ep, {}, name))
+                    item = self.tier_manager.classify_episode(ep, {}, name)
+                    item.search_type = 'missing'
+                    items.append(item)
             except Exception as e:
                 self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
         
+        # Upgrade episodes (cutoff unmet)
+        for name, client in self.sonarr_clients.items():
+            try:
+                upgrades = client.get_cutoff_unmet()
+                self.log.info(f"Sonarr ({name}): Found {len(upgrades)} episodes needing upgrade")
+                for ep in upgrades[:100]:  # Limit per instance
+                    item = self.tier_manager.classify_episode(ep, {}, name)
+                    item.search_type = 'upgrade'
+                    items.append(item)
+            except Exception as e:
+                self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
+        
+        # Missing movies
         for name, client in self.radarr_clients.items():
             try:
                 missing = client.get_missing_movies()
                 self.log.info(f"Radarr ({name}): Found {len(missing)} missing movies")
                 for movie in missing[:100]:
-                    items.append(self.tier_manager.classify_movie(movie, name))
+                    item = self.tier_manager.classify_movie(movie, name)
+                    item.search_type = 'missing'
+                    items.append(item)
             except Exception as e:
                 self.log.error(f"Radarr ({name}) missing movies error: {e}")
+        
+        # Upgrade movies (cutoff unmet)
+        for name, client in self.radarr_clients.items():
+            try:
+                upgrades = client.get_cutoff_unmet()
+                self.log.info(f"Radarr ({name}): Found {len(upgrades)} movies needing upgrade")
+                for movie in upgrades[:100]:
+                    item = self.tier_manager.classify_movie(movie, name)
+                    item.search_type = 'upgrade'
+                    items.append(item)
+            except Exception as e:
+                self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
         
         return items
     
     def get_missing_items(self) -> Dict[str, Any]:
-        """Get missing items organized by tier."""
+        """Get missing items and upgrades organized by tier."""
         items = self._get_all_missing()
         
         by_tier = {'hot': [], 'warm': [], 'cool': [], 'cold': []}
+        missing_count = 0
+        upgrade_count = 0
+        
         for item in items:
             by_tier[item.tier.value].append(item.to_dict())
+            if item.search_type == 'missing':
+                missing_count += 1
+            else:
+                upgrade_count += 1
         
         return {
             'by_tier': by_tier,
             'total': len(items),
+            'missing_count': missing_count,
+            'upgrade_count': upgrade_count,
         }
     
     def get_queue_status(self) -> Dict[str, Any]:
