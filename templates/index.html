@@ -500,6 +500,86 @@
         .log-level.ERROR { background: var(--error-bg); color: var(--error); }
         .log-level.DEBUG { background: rgba(156,163,175,0.15); color: #9ca3af; }
         
+        /* Compact row for tier + storage */
+        .compact-row {
+            display: flex;
+            gap: 16px;
+        }
+        
+        .compact-row .panel {
+            margin-bottom: 0;
+        }
+        
+        /* Data Tables */
+        .data-table-wrap {
+            overflow-x: auto;
+            overflow-y: auto;
+        }
+        
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        
+        .data-table th {
+            text-align: left;
+            padding: 10px 12px;
+            background: var(--bg3);
+            color: var(--text2);
+            font-weight: 600;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 1;
+        }
+        
+        .data-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+        
+        .data-table tr:hover td {
+            background: var(--bg-hover);
+        }
+        
+        .data-table .col-time { width: 140px; color: var(--text3); font-size: 12px; white-space: nowrap; }
+        .data-table .col-type { width: 90px; }
+        .data-table .col-source { width: 80px; }
+        .data-table .col-tier { width: 70px; text-align: center; }
+        .data-table .col-status { width: 80px; text-align: center; }
+        .data-table .col-action { width: 100px; text-align: right; }
+        .data-table .col-title { min-width: 200px; }
+        .data-table .col-issue { min-width: 150px; color: var(--text2); font-size: 12px; }
+        
+        .data-table .title-main { font-weight: 500; color: var(--text); }
+        .data-table .title-ep { color: var(--text2); font-size: 12px; margin-top: 2px; }
+        
+        .badge {
+            display: inline-block;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-success { background: rgba(34,197,94,0.15); color: #22c55e; }
+        .badge-error { background: var(--error-bg); color: var(--error); }
+        .badge-warn { background: var(--warn-bg); color: var(--warn); }
+        .badge-info { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .badge-hot { background: var(--error-bg); color: var(--error); }
+        .badge-warm { background: var(--warn-bg); color: var(--warn); }
+        .badge-cool { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .badge-cold { background: var(--accent-glow); color: var(--accent); }
+        .badge-sonarr { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .badge-radarr { background: rgba(249,115,22,0.15); color: #f97316; }
+        .badge-missing { background: var(--error-bg); color: var(--error); }
+        .badge-upgrade { background: rgba(139,92,246,0.15); color: #8b5cf6; }
+        
         /* Storage */
         .storage-bar { margin-bottom: 18px; }
         .storage-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
@@ -734,78 +814,85 @@
     </div>
     
     <main>
-        <!-- Recent Searches - Full Width -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🔍 Recent Searches</span>
-                <button class="btn btn-sm btn-sec" onclick="runSearch()">Run Now</button>
-            </div>
-            <div class="panel-body flush" id="search-list" style="max-height:200px">
-                <div class="empty"><div class="empty-icon">🔎</div><p>No searches yet</p></div>
-            </div>
-        </div>
-        
-        <!-- Recent Finds - Full Width -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🎉 Recent Finds</span>
-                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
-            </div>
-            <div class="panel-body flush" id="finds-list" style="max-height:200px">
-                <div class="empty"><div class="empty-icon">🎯</div><p>No finds yet</p></div>
-            </div>
-        </div>
-        
-        <!-- Missing Content by Tier + Storage side by side -->
-        <div class="panel-row">
-            <div class="panel half">
+        <!-- Row 1: Tier Summary + Storage (compact) -->
+        <div class="panel-row compact-row">
+            <div class="panel" style="flex:2">
                 <div class="panel-head">
-                    <span class="panel-title">Missing Content by Tier</span>
+                    <span class="panel-title">📊 Content Summary</span>
                     <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
                 </div>
-                <div class="panel-body">
+                <div class="panel-body" style="padding: 16px;">
                     <div class="tiers">
                         <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div></div>
                         <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div></div>
                         <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
                         <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
                     </div>
-                    <div id="tier-info" style="font-size: 11px; color: var(--text3); margin-top: 12px; text-align: center;"></div>
                 </div>
             </div>
-            <div class="panel half">
+            <div class="panel" style="flex:1">
                 <div class="panel-head">
                     <span class="panel-title">💾 Storage</span>
                 </div>
-                <div class="panel-body" id="storage-list">
+                <div class="panel-body" id="storage-list" style="padding: 12px;">
                     <div class="spinner"></div>
                 </div>
             </div>
         </div>
         
-        <!-- Queue Issues and Manual Intervention side by side -->
-        <div class="panel-row">
-            <div class="panel half">
-                <div class="panel-head">
-                    <span class="panel-title">⚠️ Queue Issues</span>
-                    <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
+        <!-- Row 2: Recent Searches (full width table) -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🔍 Recent Searches</span>
+                <button class="btn btn-sm btn-pri" onclick="runSearch()">Run Now</button>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="search-list" style="max-height:220px">
+                    <div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>
                 </div>
-                <div class="panel-body flush" id="stuck-list" style="max-height:350px">
+            </div>
+        </div>
+        
+        <!-- Row 3: Recent Finds (full width table) -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🎉 Recent Finds</span>
+                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="finds-list" style="max-height:220px">
+                    <div class="empty"><div class="empty-icon">🔍</div><p>No finds yet - TFM is working on it!</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Row 4: Queue Issues (full width table) -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">⚠️ Queue Issues</span>
+                <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="stuck-list" style="max-height:250px">
                     <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
                 </div>
             </div>
-            <div class="panel half">
-                <div class="panel-head">
-                    <span class="panel-title">🖐️ Manual Intervention</span>
-                    <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
-                </div>
-                <div class="panel-body flush" id="intervention-list" style="max-height:350px">
+        </div>
+        
+        <!-- Row 5: Manual Intervention (full width table) -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🖐️ Manual Intervention</span>
+                <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="intervention-list" style="max-height:250px">
                     <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
                 </div>
             </div>
         </div>
         
-        <!-- Debug Logs -->
+        <!-- Row 6: Debug Logs -->
         <div class="panel full-width">
             <div class="panel-head">
                 <span class="panel-title">📋 Debug Logs</span>
@@ -1153,17 +1240,37 @@
                 return;
             }
             
-            el.innerHTML = data.stuck_items.slice(0, 20).map(item => `
-                <div class="item">
-                    <div class="item-icon">⚠️</div>
-                    <div class="item-info">
-                        <div class="item-title">${esc(item.title)}</div>
-                        <div class="item-meta">${item.issues.join(', ')} • ${item.stuck_minutes}m stuck</div>
-                    </div>
-                    ${item.can_auto_resolve ? '<span class="item-badge" style="background:rgba(34,197,94,0.2);color:#22c55e">Auto</span>' : ''}
-                    <button class="btn btn-sm btn-sec" onclick="resolveItem('${item.source}',${item.queue_id})">Resolve</button>
-                </div>
-            `).join('');
+            el.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Stuck For</th>
+                            <th class="col-source">Source</th>
+                            <th class="col-title">Title</th>
+                            <th class="col-issue">Issue</th>
+                            <th class="col-action">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.stuck_items.slice(0, 20).map(item => `
+                            <tr>
+                                <td class="col-time">${item.stuck_minutes}m</td>
+                                <td class="col-source"><span class="badge badge-${item.source}">${item.source}</span></td>
+                                <td class="col-title">
+                                    <div class="title-main">${esc(item.title)}</div>
+                                </td>
+                                <td class="col-issue">
+                                    <span class="badge badge-error">${item.issues.join(', ')}</span>
+                                    ${item.can_auto_resolve ? '<span class="badge badge-success" style="margin-left:4px">Auto</span>' : ''}
+                                </td>
+                                <td class="col-action">
+                                    <button class="btn btn-sm btn-sec" onclick="resolveItem('${item.source}',${item.queue_id})">Resolve</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
         }
         
         async function loadInterventions() {
@@ -1176,16 +1283,35 @@
                 return;
             }
             
-            el.innerHTML = data.items.slice(0, 20).map(item => `
-                <div class="item">
-                    <div class="item-icon">🖐️</div>
-                    <div class="item-info">
-                        <div class="item-title">${esc(item.title)}</div>
-                        <div class="item-meta">${esc(item.reason)}</div>
-                    </div>
-                    <button class="btn btn-sm btn-pri" onclick="showIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
-                </div>
-            `).join('');
+            el.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-source">Source</th>
+                            <th class="col-title">Title</th>
+                            <th class="col-issue">Why Intervention Needed</th>
+                            <th class="col-action">Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.items.slice(0, 20).map(item => `
+                            <tr>
+                                <td class="col-source"><span class="badge badge-${item.source}">${item.source}</span></td>
+                                <td class="col-title">
+                                    <div class="title-main">${esc(item.title)}</div>
+                                </td>
+                                <td class="col-issue">
+                                    <span class="badge badge-warn">${esc(item.reason)}</span>
+                                    ${item.details ? '<div style="font-size:11px;color:var(--text3);margin-top:4px">' + esc(JSON.stringify(item.details).substring(0,80)) + '</div>' : ''}
+                                </td>
+                                <td class="col-action">
+                                    <button class="btn btn-sm btn-pri" onclick="showIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
+                                </td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
         }
         
         async function loadStorage() {
@@ -1267,34 +1393,39 @@
                 return;
             }
             
-            const typeIcons = {
-                'auto': '🤖',
-                'manual': '🖐️',
-                'rss': '📡',
-                'search': '🔎'
-            };
-            
             const typeLabels = {
-                'auto': 'Auto-resolved',
-                'manual': 'Manual intervention',
-                'rss': 'RSS sync',
-                'search': 'Scheduled search'
+                'auto': '🤖 Auto',
+                'manual': '🖐️ Manual',
+                'rss': '📡 RSS',
+                'search': '🔎 Search'
             };
             
-            el.innerHTML = data.finds.reverse().map(f => `
-                <div class="item">
-                    <div class="item-icon">🎉</div>
-                    <div class="item-info">
-                        <div class="item-title">${esc(f.title)}</div>
-                        <div class="item-meta">
-                            ${typeIcons[f.resolution_type] || '✅'} ${typeLabels[f.resolution_type] || f.resolution_type}
-                            ${f.resolution_detail ? ' • ' + esc(f.resolution_detail) : ''}
-                            • ${fmt(f.timestamp)}
-                        </div>
-                    </div>
-                    <span class="item-badge" style="background:rgba(34,197,94,0.2);color:#22c55e">${f.source}</span>
-                </div>
-            `).join('');
+            el.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Time</th>
+                            <th class="col-type">How Found</th>
+                            <th class="col-source">Source</th>
+                            <th class="col-title">Title</th>
+                            <th class="col-issue">Details</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.finds.reverse().map(f => `
+                            <tr>
+                                <td class="col-time">${fmt(f.timestamp)}</td>
+                                <td class="col-type">${typeLabels[f.resolution_type] || '✅ ' + f.resolution_type}</td>
+                                <td class="col-source"><span class="badge badge-${f.source}">${f.source}</span></td>
+                                <td class="col-title">
+                                    <div class="title-main">${esc(f.title)}</div>
+                                </td>
+                                <td class="col-issue">${f.resolution_detail ? esc(f.resolution_detail) : '-'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
         }
         
         async function loadSearches() {
@@ -1306,15 +1437,34 @@
                 return;
             }
             
-            el.innerHTML = data.searches.reverse().map(s => `
-                <div class="item">
-                    <div class="item-icon">${s.success ? '✅' : '❌'}</div>
-                    <div class="item-info">
-                        <div class="item-title">${esc(s.title)}</div>
-                        <div class="item-meta">${s.tier_emoji} ${s.tier} • ${s.source} • ${fmt(s.timestamp)}</div>
-                    </div>
-                </div>
-            `).join('');
+            el.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-time">Time</th>
+                            <th class="col-type">Type</th>
+                            <th class="col-source">Source</th>
+                            <th class="col-title">Title</th>
+                            <th class="col-tier">Tier</th>
+                            <th class="col-status">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.searches.reverse().map(s => `
+                            <tr>
+                                <td class="col-time">${fmt(s.timestamp)}</td>
+                                <td class="col-type"><span class="badge badge-${s.search_type || 'missing'}">${s.search_type || 'missing'}</span></td>
+                                <td class="col-source"><span class="badge badge-${s.source}">${s.source}</span></td>
+                                <td class="col-title">
+                                    <div class="title-main">${esc(s.title)}</div>
+                                </td>
+                                <td class="col-tier"><span class="badge badge-${s.tier}">${s.tier_emoji} ${s.tier}</span></td>
+                                <td class="col-status">${s.success ? '<span class="badge badge-success">✓ OK</span>' : '<span class="badge badge-error">✗ Fail</span>'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
         }
         
         async function loadLogs() {
@@ -1543,6 +1693,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.15a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.16</div>
 </body>
 </html>
