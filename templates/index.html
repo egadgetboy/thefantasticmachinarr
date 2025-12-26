@@ -580,6 +580,42 @@
         .badge-missing { background: var(--error-bg); color: var(--error); }
         .badge-upgrade { background: rgba(139,92,246,0.15); color: #8b5cf6; }
         
+        /* Pagination */
+        .pagination {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+            padding: 12px;
+            background: var(--bg3);
+            border-top: 1px solid var(--border);
+        }
+        
+        .page-info {
+            font-size: 12px;
+            color: var(--text2);
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        /* Auto-resolve countdown */
+        .countdown {
+            font-size: 11px;
+            color: var(--text3);
+            background: var(--bg);
+            padding: 2px 6px;
+            border-radius: 4px;
+            margin-left: 6px;
+        }
+        
+        .countdown.soon {
+            background: rgba(34,197,94,0.15);
+            color: #22c55e;
+        }
+        
         /* Storage */
         .storage-bar { margin-bottom: 18px; }
         .storage-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
@@ -1090,6 +1126,48 @@
         const savedTheme = localStorage.getItem('tfm-theme') || 'dark';
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.querySelector('.theme-btn').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+        
+        // Pagination state - store up to 500 items, show 10 per page
+        const PAGE_SIZE = 10;
+        const MAX_ITEMS = 500;
+        const paginationState = {
+            searches: { items: [], page: 0 },
+            finds: { items: [], page: 0 },
+            queue: { items: [], page: 0 },
+            interventions: { items: [], page: 0 }
+        };
+        
+        function renderPagination(containerId, state, renderFn) {
+            const totalPages = Math.ceil(state.items.length / PAGE_SIZE);
+            const start = state.page * PAGE_SIZE;
+            const end = start + PAGE_SIZE;
+            const pageItems = state.items.slice(start, end);
+            
+            const paginationHtml = totalPages > 1 ? `
+                <div class="pagination">
+                    <button class="btn btn-sm btn-sec" onclick="pageNav('${containerId}', -1)" ${state.page === 0 ? 'disabled' : ''}>← Prev</button>
+                    <span class="page-info">Page ${state.page + 1} of ${totalPages} (${state.items.length} total)</span>
+                    <button class="btn btn-sm btn-sec" onclick="pageNav('${containerId}', 1)" ${state.page >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+                </div>
+            ` : '';
+            
+            return { pageItems, paginationHtml };
+        }
+        
+        function pageNav(containerId, direction) {
+            const stateKey = containerId.replace('-list', '').replace('stuck', 'queue').replace('intervention', 'interventions');
+            const state = paginationState[stateKey];
+            if (!state) return;
+            
+            const totalPages = Math.ceil(state.items.length / PAGE_SIZE);
+            state.page = Math.max(0, Math.min(totalPages - 1, state.page + direction));
+            
+            // Re-render the appropriate list
+            if (stateKey === 'searches') renderSearchesPage();
+            else if (stateKey === 'finds') renderFindsPage();
+            else if (stateKey === 'queue') renderQueuePage();
+            else if (stateKey === 'interventions') renderInterventionsPage();
+        }
     
         async function api(endpoint, method = 'GET', data = null) {
             const opts = { method, headers: {'Content-Type': 'application/json'} };
@@ -1237,6 +1315,22 @@
             
             if (!data.stuck_items?.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>';
+                paginationState.queue.items = [];
+                return;
+            }
+            
+            paginationState.queue.items = data.stuck_items.slice(0, MAX_ITEMS);
+            paginationState.queue.page = 0;
+            renderQueuePage();
+        }
+        
+        function renderQueuePage() {
+            const el = document.getElementById('stuck-list');
+            const state = paginationState.queue;
+            const { pageItems, paginationHtml } = renderPagination('stuck-list', state, null);
+            
+            if (!pageItems.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>';
                 return;
             }
             
@@ -1244,7 +1338,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th class="col-time">Stuck For</th>
+                            <th class="col-time">Stuck</th>
                             <th class="col-source">Source</th>
                             <th class="col-title">Title</th>
                             <th class="col-issue">Issue</th>
@@ -1252,7 +1346,13 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.stuck_items.slice(0, 20).map(item => `
+                        ${pageItems.map(item => {
+                            const autoResolveHtml = item.can_auto_resolve 
+                                ? (item.auto_resolve_in_minutes !== null && item.auto_resolve_in_minutes > 0
+                                    ? `<span class="countdown ${item.auto_resolve_in_minutes <= 5 ? 'soon' : ''}">⏱️ ${item.auto_resolve_in_minutes}m</span>`
+                                    : '<span class="countdown soon">⏱️ Now!</span>')
+                                : '';
+                            return `
                             <tr>
                                 <td class="col-time">${item.stuck_minutes}m</td>
                                 <td class="col-source"><span class="badge badge-${item.source}">${item.source}</span></td>
@@ -1262,14 +1362,16 @@
                                 <td class="col-issue">
                                     <span class="badge badge-error">${item.issues.join(', ')}</span>
                                     ${item.can_auto_resolve ? '<span class="badge badge-success" style="margin-left:4px">Auto</span>' : ''}
+                                    ${autoResolveHtml}
                                 </td>
                                 <td class="col-action">
                                     <button class="btn btn-sm btn-sec" onclick="resolveItem('${item.source}',${item.queue_id})">Resolve</button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
+                ${paginationHtml}
             `;
         }
         
@@ -1279,6 +1381,22 @@
             document.getElementById('intervention-count').textContent = `${data.count || 0} items`;
             
             if (!data.items?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>';
+                paginationState.interventions.items = [];
+                return;
+            }
+            
+            paginationState.interventions.items = data.items.slice(0, MAX_ITEMS);
+            paginationState.interventions.page = 0;
+            renderInterventionsPage();
+        }
+        
+        function renderInterventionsPage() {
+            const el = document.getElementById('intervention-list');
+            const state = paginationState.interventions;
+            const { pageItems, paginationHtml } = renderPagination('intervention-list', state, null);
+            
+            if (!pageItems.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>';
                 return;
             }
@@ -1294,7 +1412,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.items.slice(0, 20).map(item => `
+                        ${pageItems.map(item => `
                             <tr>
                                 <td class="col-source"><span class="badge badge-${item.source}">${item.source}</span></td>
                                 <td class="col-title">
@@ -1311,6 +1429,7 @@
                         `).join('')}
                     </tbody>
                 </table>
+                ${paginationHtml}
             `;
         }
         
@@ -1384,7 +1503,7 @@
         }
         
         async function loadFinds() {
-            const data = await api('finds?limit=30');
+            const data = await api('finds?limit=500');
             const el = document.getElementById('finds-list');
             document.getElementById('finds-count').textContent = `${data.finds?.length || 0} items`;
             
@@ -1393,12 +1512,28 @@
                 return;
             }
             
+            // Store items (newest first)
+            paginationState.finds.items = data.finds.reverse().slice(0, MAX_ITEMS);
+            paginationState.finds.page = 0;
+            renderFindsPage();
+        }
+        
+        function renderFindsPage() {
+            const el = document.getElementById('finds-list');
+            const state = paginationState.finds;
+            const { pageItems, paginationHtml } = renderPagination('finds-list', state, null);
+            
             const typeLabels = {
                 'auto': '🤖 Auto',
                 'manual': '🖐️ Manual',
                 'rss': '📡 RSS',
                 'search': '🔎 Search'
             };
+            
+            if (!pageItems.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>No finds yet</p></div>';
+                return;
+            }
             
             el.innerHTML = `
                 <table class="data-table">
@@ -1412,7 +1547,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.finds.reverse().map(f => `
+                        ${pageItems.map(f => `
                             <tr>
                                 <td class="col-time">${fmt(f.timestamp)}</td>
                                 <td class="col-type">${typeLabels[f.resolution_type] || '✅ ' + f.resolution_type}</td>
@@ -1425,14 +1560,31 @@
                         `).join('')}
                     </tbody>
                 </table>
+                ${paginationHtml}
             `;
         }
         
         async function loadSearches() {
-            const data = await api('searches?limit=20');
+            const data = await api('searches?limit=500');
             const el = document.getElementById('search-list');
             
             if (!data.searches?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>';
+                return;
+            }
+            
+            // Store items (newest first) and reset to page 0 on fresh load
+            paginationState.searches.items = data.searches.reverse().slice(0, MAX_ITEMS);
+            paginationState.searches.page = 0;
+            renderSearchesPage();
+        }
+        
+        function renderSearchesPage() {
+            const el = document.getElementById('search-list');
+            const state = paginationState.searches;
+            const { pageItems, paginationHtml } = renderPagination('search-list', state, null);
+            
+            if (!pageItems.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>';
                 return;
             }
@@ -1450,7 +1602,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${data.searches.reverse().map(s => `
+                        ${pageItems.map(s => `
                             <tr>
                                 <td class="col-time">${fmt(s.timestamp)}</td>
                                 <td class="col-type"><span class="badge badge-${s.search_type || 'missing'}">${s.search_type || 'missing'}</span></td>
@@ -1464,6 +1616,7 @@
                         `).join('')}
                     </tbody>
                 </table>
+                ${paginationHtml}
             `;
         }
         
@@ -1693,6 +1846,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.16</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.16a</div>
 </body>
 </html>
