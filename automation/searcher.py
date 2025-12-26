@@ -19,9 +19,16 @@ class SearchResult:
     success: bool
     message: str
     timestamp: datetime = field(default_factory=datetime.utcnow)
+    search_type: str = 'missing'  # 'missing' or 'upgrade'
+    attempt_number: int = 1
+    max_attempts: int = 1
+    cooldown_minutes: int = 0
+    next_search_at: Optional[datetime] = None
+    lifecycle_state: str = 'searched'  # 'searching', 'searched', 'cooldown', 'escalating', 'needs_attention', 'found'
     
     def to_dict(self) -> Dict[str, Any]:
-        return {
+        result = {
+            'id': self.item.id,
             'title': self.item.title,
             'source': self.item.source,
             'instance_name': self.item.instance_name,
@@ -30,7 +37,20 @@ class SearchResult:
             'success': self.success,
             'message': self.message,
             'timestamp': self.timestamp.isoformat(),
+            'search_type': self.search_type,
+            'attempt_number': self.attempt_number,
+            'max_attempts': self.max_attempts,
+            'cooldown_minutes': self.cooldown_minutes,
+            'next_search_at': self.next_search_at.isoformat() if self.next_search_at else None,
+            'lifecycle_state': self.lifecycle_state,
+            # Episode-specific fields
+            'season_number': self.item.season_number,
+            'episode_number': self.item.episode_number,
+            'formatted_code': self.item.formatted_code,
+            'air_date': self.item.air_date.isoformat() if self.item.air_date else None,
+            'age_days': self.item.age_days,
         }
+        return result
 
 
 class SmartSearcher:
@@ -558,11 +578,34 @@ class SmartSearcher:
                      sonarr_clients: Dict, 
                      radarr_clients: Dict) -> SearchResult:
         """Search for a specific item."""
+        tier_config = self._get_tier_config(item.tier)
+        max_attempts = tier_config['max_attempts']
+        cooldown = tier_config['cooldown']
+        escalate_to = tier_config['escalate_to']
+        
+        # Determine lifecycle state based on attempt count
+        attempt_num = (item.search_count or 0) + 1
+        
+        if attempt_num >= max_attempts:
+            if escalate_to == 'manual':
+                lifecycle = 'needs_attention'
+            else:
+                lifecycle = 'escalating'
+                cooldown = escalate_to  # Use escalated cooldown
+        else:
+            lifecycle = 'cooldown'
+        
+        next_search = datetime.utcnow() + timedelta(minutes=cooldown)
+        
         try:
             if item.source == 'sonarr':
                 client = sonarr_clients.get(item.instance_name)
                 if not client:
-                    return SearchResult(item, False, "Client not found")
+                    return SearchResult(item, False, "Client not found",
+                                      search_type=item.search_type,
+                                      attempt_number=attempt_num,
+                                      max_attempts=max_attempts,
+                                      lifecycle_state='error')
                 
                 # Prefer series search if configured
                 if self.config.search.prefer_series_over_episode and item.series_id:
@@ -574,7 +617,13 @@ class SmartSearcher:
                         self.searched_series[series_key] = datetime.utcnow()
                         self.api_hits_today += 1
                         self.tier_manager.record_search(item)
-                        return SearchResult(item, True, "Series search triggered")
+                        return SearchResult(item, True, "Series search triggered",
+                                          search_type=item.search_type,
+                                          attempt_number=attempt_num,
+                                          max_attempts=max_attempts,
+                                          cooldown_minutes=cooldown,
+                                          next_search_at=next_search,
+                                          lifecycle_state=lifecycle)
                 
                 # Episode search
                 self.log.info(f"Searching episode: {item.title}")
@@ -584,18 +633,32 @@ class SmartSearcher:
             elif item.source == 'radarr':
                 client = radarr_clients.get(item.instance_name)
                 if not client:
-                    return SearchResult(item, False, "Client not found")
+                    return SearchResult(item, False, "Client not found",
+                                      search_type=item.search_type,
+                                      attempt_number=attempt_num,
+                                      max_attempts=max_attempts,
+                                      lifecycle_state='error')
                 
                 self.log.info(f"Searching movie: {item.title}")
                 client.search_movie(item.id)
                 self.api_hits_today += 1
             
             self.tier_manager.record_search(item)
-            return SearchResult(item, True, "Search triggered")
+            return SearchResult(item, True, "Search triggered",
+                              search_type=item.search_type,
+                              attempt_number=attempt_num,
+                              max_attempts=max_attempts,
+                              cooldown_minutes=cooldown,
+                              next_search_at=next_search,
+                              lifecycle_state=lifecycle)
             
         except Exception as e:
             self.log.error(f"Search failed for {item.title}: {e}")
-            return SearchResult(item, False, str(e))
+            return SearchResult(item, False, str(e),
+                              search_type=item.search_type,
+                              attempt_number=attempt_num,
+                              max_attempts=max_attempts,
+                              lifecycle_state='error')
     
     def search_single(self, source: str, item_id: int,
                       sonarr_clients: Dict, radarr_clients: Dict) -> Dict:

@@ -183,17 +183,24 @@ class MachinarrCore:
             if source in finds_by_source:
                 finds_by_source[source] += 1
         
+        # Get missing/upgrade data with TRUE counts
+        missing_data = self._get_all_missing(include_items=False)
+        
         scoreboard = {
             'finds_today': self.searcher.finds_today,
             'finds_total': self.searcher.finds_total,
             'api_hits_today': self.searcher.api_hits_today,
             'api_limit': self.config.search.daily_api_limit,
             'finds_by_source': finds_by_source,
+            'missing_episodes': missing_data['counts']['sonarr_missing'],
+            'missing_movies': missing_data['counts']['radarr_missing'],
+            'upgrade_episodes': missing_data['counts']['sonarr_upgrade'],
+            'upgrade_movies': missing_data['counts']['radarr_upgrade'],
         }
         
-        # Get tier stats
-        missing_items = self._get_all_missing()
-        tier_stats = self.tier_manager.get_tier_stats(missing_items)
+        # Tier stats now come from the comprehensive count
+        tier_stats = missing_data['tier_counts']
+        tier_stats['total'] = missing_data['total_missing']
         
         # Scheduler info
         scheduler_info = None
@@ -210,19 +217,43 @@ class MachinarrCore:
             'scheduler': scheduler_info,
         }
     
-    def _get_all_missing(self) -> List:
-        """Get all missing items AND upgrades from all instances."""
+    def _get_all_missing(self, include_items: bool = True, limit_per_instance: int = 100) -> Dict[str, Any]:
+        """Get all missing items AND upgrades from all instances.
+        
+        Returns dict with:
+        - items: List of TieredItem (limited for display)
+        - counts: True counts by source and type
+        - tier_counts: True counts by tier and source
+        """
         items = []
+        counts = {
+            'sonarr_missing': 0,
+            'sonarr_upgrade': 0,
+            'radarr_missing': 0,
+            'radarr_upgrade': 0,
+        }
+        tier_counts = {
+            'hot': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'warm': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cool': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cold': {'sonarr': 0, 'radarr': 0, 'total': 0},
+        }
         
         # Missing episodes
         for name, client in self.sonarr_clients.items():
             try:
                 missing = client.get_missing_episodes()
+                counts['sonarr_missing'] += len(missing)
                 self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
-                for ep in missing[:100]:  # Limit per instance
+                
+                # Count ALL items by tier, but only classify limited set for display
+                for i, ep in enumerate(missing):
                     item = self.tier_manager.classify_episode(ep, {}, name)
                     item.search_type = 'missing'
-                    items.append(item)
+                    tier_counts[item.tier.value]['sonarr'] += 1
+                    tier_counts[item.tier.value]['total'] += 1
+                    if include_items and i < limit_per_instance:
+                        items.append(item)
             except Exception as e:
                 self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
         
@@ -230,11 +261,15 @@ class MachinarrCore:
         for name, client in self.sonarr_clients.items():
             try:
                 upgrades = client.get_cutoff_unmet()
+                counts['sonarr_upgrade'] += len(upgrades)
                 self.log.info(f"Sonarr ({name}): Found {len(upgrades)} episodes needing upgrade")
-                for ep in upgrades[:100]:  # Limit per instance
+                
+                for i, ep in enumerate(upgrades):
                     item = self.tier_manager.classify_episode(ep, {}, name)
                     item.search_type = 'upgrade'
-                    items.append(item)
+                    # Note: Upgrades don't add to tier counts (they already have the content)
+                    if include_items and i < limit_per_instance:
+                        items.append(item)
             except Exception as e:
                 self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
         
@@ -242,11 +277,16 @@ class MachinarrCore:
         for name, client in self.radarr_clients.items():
             try:
                 missing = client.get_missing_movies()
+                counts['radarr_missing'] += len(missing)
                 self.log.info(f"Radarr ({name}): Found {len(missing)} missing movies")
-                for movie in missing[:100]:
+                
+                for i, movie in enumerate(missing):
                     item = self.tier_manager.classify_movie(movie, name)
                     item.search_type = 'missing'
-                    items.append(item)
+                    tier_counts[item.tier.value]['radarr'] += 1
+                    tier_counts[item.tier.value]['total'] += 1
+                    if include_items and i < limit_per_instance:
+                        items.append(item)
             except Exception as e:
                 self.log.error(f"Radarr ({name}) missing movies error: {e}")
         
@@ -254,19 +294,29 @@ class MachinarrCore:
         for name, client in self.radarr_clients.items():
             try:
                 upgrades = client.get_cutoff_unmet()
+                counts['radarr_upgrade'] += len(upgrades)
                 self.log.info(f"Radarr ({name}): Found {len(upgrades)} movies needing upgrade")
-                for movie in upgrades[:100]:
+                
+                for i, movie in enumerate(upgrades):
                     item = self.tier_manager.classify_movie(movie, name)
                     item.search_type = 'upgrade'
-                    items.append(item)
+                    if include_items and i < limit_per_instance:
+                        items.append(item)
             except Exception as e:
                 self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
         
-        return items
+        return {
+            'items': items,
+            'counts': counts,
+            'tier_counts': tier_counts,
+            'total_missing': counts['sonarr_missing'] + counts['radarr_missing'],
+            'total_upgrades': counts['sonarr_upgrade'] + counts['radarr_upgrade'],
+        }
     
     def get_missing_items(self) -> Dict[str, Any]:
         """Get missing items and upgrades organized by tier."""
-        items = self._get_all_missing()
+        missing_data = self._get_all_missing(include_items=True)
+        items = missing_data['items']
         
         by_tier = {'hot': [], 'warm': [], 'cool': [], 'cold': []}
         missing_count = 0
@@ -284,6 +334,8 @@ class MachinarrCore:
             'total': len(items),
             'missing_count': missing_count,
             'upgrade_count': upgrade_count,
+            'true_counts': missing_data['counts'],
+            'tier_counts': missing_data['tier_counts'],
         }
     
     def get_queue_status(self) -> Dict[str, Any]:

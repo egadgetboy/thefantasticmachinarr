@@ -191,16 +191,15 @@
             border-left: 4px solid var(--accent);
         }
         
-        /* Main layout */
+        /* Main layout - all full width rows */
         main {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
             padding: 24px 28px;
         }
         
         @media (max-width: 1024px) {
-            main { grid-template-columns: 1fr; }
             .scoreboard { grid-template-columns: repeat(2, 1fr); }
         }
         
@@ -400,6 +399,65 @@
         .tier-emoji { font-size: 28px; }
         .tier-count { font-size: 26px; font-weight: 700; margin: 6px 0; }
         .tier-name { font-size: 11px; color: var(--text2); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
+        .tier-desc { font-size: 10px; color: var(--text3); margin-top: 4px; }
+        .tier-breakdown {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+            font-size: 10px;
+            color: var(--text2);
+        }
+        .tier-breakdown span { display: flex; align-items: center; gap: 4px; }
+        
+        /* Lifecycle states */
+        .lifecycle-state {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 500;
+        }
+        .lifecycle-state.searching { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .lifecycle-state.cooldown { background: var(--bg3); color: var(--text2); }
+        .lifecycle-state.escalating { background: var(--warn-bg); color: var(--warn); }
+        .lifecycle-state.needs_attention { background: var(--error-bg); color: var(--error); }
+        .lifecycle-state.found { background: var(--success-bg); color: var(--success); }
+        .lifecycle-state.error { background: var(--error-bg); color: var(--error); }
+        
+        /* Search filters */
+        .search-filters {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .search-filters input[type="text"] {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            min-width: 200px;
+        }
+        .search-filters input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+        .search-filters select {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+            cursor: pointer;
+        }
         
         /* Items list */
         .item {
@@ -876,23 +934,74 @@
                     Episodes and movies waiting to be found, grouped by age
                 </div>
                 <div class="tiers">
-                    <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div><div class="tier-desc">0-7 days</div></div>
-                    <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div><div class="tier-desc">7-30 days</div></div>
-                    <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div><div class="tier-desc">30-180 days</div></div>
-                    <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div><div class="tier-desc">180+ days</div></div>
+                    <div class="tier">
+                        <div class="tier-emoji">🔥</div>
+                        <div class="tier-count" id="tier-hot">-</div>
+                        <div class="tier-name">Hot</div>
+                        <div class="tier-desc">0-90 days</div>
+                        <div class="tier-breakdown">
+                            <span>📺 <span id="tier-hot-sonarr">0</span></span>
+                            <span>🎬 <span id="tier-hot-radarr">0</span></span>
+                        </div>
+                    </div>
+                    <div class="tier">
+                        <div class="tier-emoji">☀️</div>
+                        <div class="tier-count" id="tier-warm">-</div>
+                        <div class="tier-name">Warm</div>
+                        <div class="tier-desc">90-365 days</div>
+                        <div class="tier-breakdown">
+                            <span>📺 <span id="tier-warm-sonarr">0</span></span>
+                            <span>🎬 <span id="tier-warm-radarr">0</span></span>
+                        </div>
+                    </div>
+                    <div class="tier">
+                        <div class="tier-emoji">❄️</div>
+                        <div class="tier-count" id="tier-cool">-</div>
+                        <div class="tier-name">Cool</div>
+                        <div class="tier-desc">1-3 years</div>
+                        <div class="tier-breakdown">
+                            <span>📺 <span id="tier-cool-sonarr">0</span></span>
+                            <span>🎬 <span id="tier-cool-radarr">0</span></span>
+                        </div>
+                    </div>
+                    <div class="tier">
+                        <div class="tier-emoji">🧊</div>
+                        <div class="tier-count" id="tier-cold">-</div>
+                        <div class="tier-name">Cold</div>
+                        <div class="tier-desc">3+ years</div>
+                        <div class="tier-breakdown">
+                            <span>📺 <span id="tier-cold-sonarr">0</span></span>
+                            <span>🎬 <span id="tier-cold-radarr">0</span></span>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
         
-        <!-- Row 2: Recent Searches (full width table) -->
+        <!-- Row 2: Search Activity (full width table with filters) -->
         <div class="panel">
             <div class="panel-head">
-                <span class="panel-title">🔍 Recent Searches</span>
-                <button class="btn btn-sm btn-pri" onclick="runSearch()">Run Now</button>
+                <span class="panel-title">🔄 Search Activity</span>
+                <div style="display:flex;gap:12px;align-items:center">
+                    <input type="text" id="search-filter-text" placeholder="Search by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
+                    <select id="search-filter-tier" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterSearchActivity()">
+                        <option value="">All Tiers</option>
+                        <option value="hot">🔥 Hot</option>
+                        <option value="warm">☀️ Warm</option>
+                        <option value="cool">❄️ Cool</option>
+                        <option value="cold">🧊 Cold</option>
+                    </select>
+                    <select id="search-filter-source" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterSearchActivity()">
+                        <option value="">All Sources</option>
+                        <option value="sonarr">📺 Sonarr</option>
+                        <option value="radarr">🎬 Radarr</option>
+                    </select>
+                    <button class="btn btn-sm btn-pri" onclick="runSearch()">Run Now</button>
+                </div>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="search-list" style="max-height:220px">
-                    <div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>
+                <div class="data-table-wrap" id="search-list" style="max-height:280px">
+                    <div class="empty"><div class="empty-icon">⏳</div><p>No search activity yet</p></div>
                 </div>
             </div>
         </div>
@@ -1218,10 +1327,27 @@
                 updateStatusIndicator(data.scoreboard, data.scheduler);
             }
             if (data.tiers) {
-                document.getElementById('tier-hot').textContent = data.tiers.hot?.count ?? 0;
-                document.getElementById('tier-warm').textContent = data.tiers.warm?.count ?? 0;
-                document.getElementById('tier-cool').textContent = data.tiers.cool?.count ?? 0;
-                document.getElementById('tier-cold').textContent = data.tiers.cold?.count ?? 0;
+                // Update tier totals
+                const tiers = data.tiers;
+                document.getElementById('tier-hot').textContent = tiers.hot?.total ?? 0;
+                document.getElementById('tier-warm').textContent = tiers.warm?.total ?? 0;
+                document.getElementById('tier-cool').textContent = tiers.cool?.total ?? 0;
+                document.getElementById('tier-cold').textContent = tiers.cold?.total ?? 0;
+                
+                // Update tier breakdowns by source
+                document.getElementById('tier-hot-sonarr').textContent = tiers.hot?.sonarr ?? 0;
+                document.getElementById('tier-hot-radarr').textContent = tiers.hot?.radarr ?? 0;
+                document.getElementById('tier-warm-sonarr').textContent = tiers.warm?.sonarr ?? 0;
+                document.getElementById('tier-warm-radarr').textContent = tiers.warm?.radarr ?? 0;
+                document.getElementById('tier-cool-sonarr').textContent = tiers.cool?.sonarr ?? 0;
+                document.getElementById('tier-cool-radarr').textContent = tiers.cool?.radarr ?? 0;
+                document.getElementById('tier-cold-sonarr').textContent = tiers.cold?.sonarr ?? 0;
+                document.getElementById('tier-cold-radarr').textContent = tiers.cold?.radarr ?? 0;
+                
+                // Update total
+                const total = (tiers.hot?.total ?? 0) + (tiers.warm?.total ?? 0) + 
+                             (tiers.cool?.total ?? 0) + (tiers.cold?.total ?? 0);
+                document.getElementById('tier-total').textContent = `${total.toLocaleString()} missing items`;
             }
         }
         
@@ -1610,7 +1736,7 @@
             const el = document.getElementById('search-list');
             
             if (!data.searches?.length) {
-                el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>';
+                el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No search activity yet</p></div>';
                 return;
             }
             
@@ -1620,13 +1746,50 @@
             renderSearchesPage();
         }
         
-        function renderSearchesPage() {
+        function filterSearchActivity() {
+            const textFilter = document.getElementById('search-filter-text').value.toLowerCase();
+            const tierFilter = document.getElementById('search-filter-tier').value;
+            const sourceFilter = document.getElementById('search-filter-source').value;
+            
+            // Re-filter from original items
+            paginationState.searches.page = 0;
+            renderSearchesPage(textFilter, tierFilter, sourceFilter);
+        }
+        
+        function getLifecycleDisplay(s) {
+            const state = s.lifecycle_state || 'searched';
+            const stateMap = {
+                'searching': { label: '🔄 Searching', class: 'searching' },
+                'searched': { label: '🔍 Searched', class: 'cooldown' },
+                'cooldown': { label: `⏳ Cooldown ${s.cooldown_minutes ? Math.round(s.cooldown_minutes/60) + 'h' : ''}`, class: 'cooldown' },
+                'escalating': { label: `⚠️ Escalating (${s.attempt_number}/${s.max_attempts})`, class: 'escalating' },
+                'needs_attention': { label: '🖐️ Needs Attention', class: 'needs_attention' },
+                'found': { label: '✅ Found!', class: 'found' },
+                'error': { label: '❌ Error', class: 'error' },
+            };
+            const display = stateMap[state] || stateMap['searched'];
+            return `<span class="lifecycle-state ${display.class}">${display.label}</span>`;
+        }
+        
+        function renderSearchesPage(textFilter = '', tierFilter = '', sourceFilter = '') {
             const el = document.getElementById('search-list');
-            const state = paginationState.searches;
+            let items = paginationState.searches.items;
+            
+            // Apply filters
+            if (textFilter || tierFilter || sourceFilter) {
+                items = items.filter(s => {
+                    if (textFilter && !s.title.toLowerCase().includes(textFilter)) return false;
+                    if (tierFilter && s.tier !== tierFilter) return false;
+                    if (sourceFilter && s.source !== sourceFilter) return false;
+                    return true;
+                });
+            }
+            
+            const state = { ...paginationState.searches, items };
             const { pageItems, paginationHtml } = renderPagination('search-list', state, null);
             
             if (!pageItems.length) {
-                el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>';
+                el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>No matching search activity</p></div>';
                 return;
             }
             
@@ -1634,31 +1797,63 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th class="col-time">Time</th>
-                            <th class="col-type">Type</th>
+                            <th class="col-time" style="cursor:pointer" onclick="sortSearches('timestamp')">Time</th>
                             <th class="col-source">Source</th>
-                            <th class="col-title">Title</th>
-                            <th class="col-tier">Tier</th>
-                            <th class="col-status">Result</th>
+                            <th class="col-title" style="cursor:pointer" onclick="sortSearches('title')">Title</th>
+                            <th class="col-episode">Episode</th>
+                            <th class="col-tier" style="cursor:pointer" onclick="sortSearches('tier')">Tier</th>
+                            <th class="col-status">Status</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${pageItems.map(s => `
+                        ${pageItems.map(s => {
+                            const episodeCode = s.formatted_code || '-';
+                            const yearMatch = s.title.match(/\((\d{4})\)/);
+                            const year = yearMatch ? yearMatch[1] : '';
+                            return `
                             <tr>
                                 <td class="col-time">${fmt(s.timestamp)}</td>
-                                <td class="col-type"><span class="badge badge-${s.search_type || 'missing'}">${s.search_type || 'missing'}</span></td>
-                                <td class="col-source"><span class="badge badge-${s.source}">${s.source}</span></td>
+                                <td class="col-source"><span class="badge badge-${s.source}">${s.source === 'sonarr' ? '📺' : '🎬'} ${s.source}</span></td>
                                 <td class="col-title">
                                     <div class="title-main">${esc(s.title)}</div>
+                                    ${year ? `<div class="title-year" style="font-size:11px;color:var(--text3)">${year}</div>` : ''}
                                 </td>
+                                <td class="col-episode" style="font-family:monospace;font-size:12px">${episodeCode}</td>
                                 <td class="col-tier"><span class="badge badge-${s.tier}">${s.tier_emoji} ${s.tier}</span></td>
-                                <td class="col-status">${s.success ? '<span class="badge badge-info">🔍 Searched</span>' : '<span class="badge badge-error">✗ Failed</span>'}</td>
+                                <td class="col-status">${getLifecycleDisplay(s)}</td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
                 ${paginationHtml}
             `;
+        }
+        
+        let searchSortField = 'timestamp';
+        let searchSortAsc = false;
+        
+        function sortSearches(field) {
+            if (searchSortField === field) {
+                searchSortAsc = !searchSortAsc;
+            } else {
+                searchSortField = field;
+                searchSortAsc = true;
+            }
+            
+            paginationState.searches.items.sort((a, b) => {
+                let va = a[field] || '';
+                let vb = b[field] || '';
+                if (field === 'timestamp') {
+                    va = new Date(va);
+                    vb = new Date(vb);
+                }
+                if (va < vb) return searchSortAsc ? -1 : 1;
+                if (va > vb) return searchSortAsc ? 1 : -1;
+                return 0;
+            });
+            
+            paginationState.searches.page = 0;
+            filterSearchActivity();
         }
         
         async function loadLogs() {
@@ -1887,6 +2082,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.18</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.19</div>
 </body>
 </html>
