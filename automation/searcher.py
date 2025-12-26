@@ -73,7 +73,7 @@ class SmartSearcher:
         return True, "OK"
     
     def _select_items_for_search(self, all_items: List[TieredItem]) -> List[TieredItem]:
-        """Select items for this search cycle based on tier distribution."""
+        """Select items for this search cycle based on tier distribution and cooldowns."""
         if not all_items:
             return []
         
@@ -87,9 +87,34 @@ class SmartSearcher:
         if total_to_search <= 0:
             return []
         
+        # Get tier cooldown intervals from config
+        tier_cooldowns = {
+            Tier.HOT: self.config.tiers.hot.interval_minutes or 60,
+            Tier.WARM: self.config.tiers.warm.interval_minutes or 360,
+            Tier.COOL: self.config.tiers.cool.interval_minutes or 1440,
+            Tier.COLD: self.config.tiers.cold.interval_minutes or 10080,
+        }
+        
+        # Filter out items still in cooldown
+        now = datetime.utcnow()
+        eligible_items = []
+        skipped_cooldown = 0
+        
+        for item in all_items:
+            if item.last_searched:
+                cooldown_minutes = tier_cooldowns[item.tier]
+                time_since_search = (now - item.last_searched).total_seconds() / 60
+                if time_since_search < cooldown_minutes:
+                    skipped_cooldown += 1
+                    continue
+            eligible_items.append(item)
+        
+        if skipped_cooldown > 0:
+            self.log.debug(f"Skipped {skipped_cooldown} items still in cooldown")
+        
         # Group by tier
         by_tier = {tier: [] for tier in Tier}
-        for item in all_items:
+        for item in eligible_items:
             by_tier[item.tier].append(item)
         
         # Calculate how many from each tier
