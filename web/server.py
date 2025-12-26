@@ -142,6 +142,30 @@ class WebServer:
         @self.app.route('/api/email/test', methods=['POST'])
         def api_test_email():
             return jsonify(self.core.test_email())
+        
+        # ============ Settings ============
+        @self.app.route('/api/settings', methods=['GET'])
+        def api_get_settings():
+            return jsonify({
+                'search': {
+                    'daily_api_limit': self.config.search.get('daily_api_limit', 500) if hasattr(self.config, 'search') and self.config.search else 500,
+                    'searches_per_cycle': self.config.search.get('searches_per_cycle', 10) if hasattr(self.config, 'search') and self.config.search else 10,
+                    'cycle_interval_minutes': self.config.search.get('cycle_interval_minutes', 60) if hasattr(self.config, 'search') and self.config.search else 60,
+                }
+            })
+        
+        @self.app.route('/api/settings', methods=['POST'])
+        def api_save_settings():
+            data = request.get_json() or {}
+            try:
+                if 'search' in data:
+                    if not hasattr(self.config, 'search') or not self.config.search:
+                        self.config.search = {}
+                    self.config.search.update(data['search'])
+                self.config.save()
+                return jsonify({'success': True})
+            except Exception as e:
+                return jsonify({'success': False, 'message': str(e)})
     
     def run(self, host: str = '0.0.0.0', port: int = 8080, debug: bool = False):
         """Start the server."""
