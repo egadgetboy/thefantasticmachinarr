@@ -589,11 +589,17 @@
             padding: 12px;
             background: var(--bg3);
             border-top: 1px solid var(--border);
+            position: sticky;
+            bottom: 0;
+            flex-shrink: 0;
+            min-height: 44px;
         }
         
         .page-info {
             font-size: 12px;
             color: var(--text2);
+            min-width: 160px;
+            text-align: center;
         }
         
         .pagination button:disabled {
@@ -859,28 +865,21 @@
     </div>
     
     <main>
-        <!-- Row 1: Tier Summary + Storage (compact) -->
-        <div class="panel-row compact-row">
-            <div class="panel" style="flex:2">
-                <div class="panel-head">
-                    <span class="panel-title">📊 Content Summary</span>
-                    <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
-                </div>
-                <div class="panel-body" style="padding: 16px;">
-                    <div class="tiers">
-                        <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div></div>
-                        <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div></div>
-                        <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
-                        <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
-                    </div>
-                </div>
+        <!-- Row 1: Missing Content by Tier -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🎯 Missing Content by Tier</span>
+                <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
             </div>
-            <div class="panel" style="flex:1">
-                <div class="panel-head">
-                    <span class="panel-title">💾 Storage</span>
+            <div class="panel-body" style="padding: 16px;">
+                <div style="font-size: 12px; color: var(--text3); margin-bottom: 12px; text-align: center;">
+                    Episodes and movies waiting to be found, grouped by age
                 </div>
-                <div class="panel-body" id="storage-list" style="padding: 12px;">
-                    <div class="spinner"></div>
+                <div class="tiers">
+                    <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div><div class="tier-desc">0-7 days</div></div>
+                    <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div><div class="tier-desc">7-30 days</div></div>
+                    <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div><div class="tier-desc">30-180 days</div></div>
+                    <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div><div class="tier-desc">180+ days</div></div>
                 </div>
             </div>
         </div>
@@ -1361,6 +1360,12 @@
                                     ? `<span class="countdown ${item.auto_resolve_in_minutes <= 5 ? 'soon' : ''}">⏱️ ${item.auto_resolve_in_minutes}m</span>`
                                     : '<span class="countdown soon">⏱️ Now!</span>')
                                 : '';
+                            
+                            // Show issues, or fall back to tracked_status/status
+                            let issueText = item.issues && item.issues.length > 0 
+                                ? item.issues.join(', ').replace(/_/g, ' ')
+                                : item.tracked_status || item.status || 'downloading';
+                            
                             return `
                             <tr>
                                 <td class="col-time">${item.stuck_minutes}m</td>
@@ -1369,7 +1374,7 @@
                                     <div class="title-main">${esc(item.title)}</div>
                                 </td>
                                 <td class="col-issue">
-                                    <span class="badge badge-error">${item.issues.join(', ')}</span>
+                                    <span class="badge badge-warn">${esc(issueText)}</span>
                                     ${item.can_auto_resolve ? '<span class="badge badge-success" style="margin-left:4px">Auto</span>' : ''}
                                     ${autoResolveHtml}
                                 </td>
@@ -1634,7 +1639,7 @@
                             <th class="col-source">Source</th>
                             <th class="col-title">Title</th>
                             <th class="col-tier">Tier</th>
-                            <th class="col-status">Status</th>
+                            <th class="col-status">Result</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -1647,7 +1652,7 @@
                                     <div class="title-main">${esc(s.title)}</div>
                                 </td>
                                 <td class="col-tier"><span class="badge badge-${s.tier}">${s.tier_emoji} ${s.tier}</span></td>
-                                <td class="col-status">${s.success ? '<span class="badge badge-success">✓ OK</span>' : '<span class="badge badge-error">✗ Fail</span>'}</td>
+                                <td class="col-status">${s.success ? '<span class="badge badge-info">🔍 Searched</span>' : '<span class="badge badge-error">✗ Failed</span>'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -1870,7 +1875,7 @@
         loadDashboard();
         loadQueue();
         loadInterventions();
-        loadStorage();
+        // loadStorage(); // Disabled - storage panel removed
         loadFinds();
         loadSearches();
         loadLogs();
@@ -1882,6 +1887,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.17a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.18</div>
 </body>
 </html>
