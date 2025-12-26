@@ -4,7 +4,7 @@ A companion tool for Sonarr and Radarr that resolves stuck items,
 continuously searches for missing content, and provides manual intervention options.
 """
 
-__version__ = "1.0.8b"
+__version__ = "1.0.8c"
 __app_name__ = "The Fantastic Machinarr"
 
 from .config import Config
