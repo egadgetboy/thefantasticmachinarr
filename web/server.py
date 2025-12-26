@@ -146,12 +146,19 @@ class WebServer:
         # ============ Settings ============
         @self.app.route('/api/settings', methods=['GET'])
         def api_get_settings():
+            cfg = self.config.to_dict() if hasattr(self.config, 'to_dict') else {}
             return jsonify({
-                'search': {
-                    'daily_api_limit': self.config.search.get('daily_api_limit', 500) if hasattr(self.config, 'search') and self.config.search else 500,
-                    'searches_per_cycle': self.config.search.get('searches_per_cycle', 10) if hasattr(self.config, 'search') and self.config.search else 10,
-                    'cycle_interval_minutes': self.config.search.get('cycle_interval_minutes', 60) if hasattr(self.config, 'search') and self.config.search else 60,
-                }
+                'search': cfg.get('search', {
+                    'daily_api_limit': 500,
+                    'searches_per_cycle': 10,
+                    'cycle_interval_minutes': 60,
+                }),
+                'tiers': cfg.get('tiers', {
+                    'hot': {'min_days': 0, 'max_days': 90, 'interval_minutes': 60},
+                    'warm': {'min_days': 90, 'max_days': 365, 'interval_minutes': 360},
+                    'cool': {'min_days': 365, 'max_days': 1095, 'interval_minutes': 1440},
+                    'cold': {'min_days': 1095, 'max_days': None, 'interval_minutes': 10080},
+                })
             })
         
         @self.app.route('/api/settings', methods=['POST'])
@@ -162,6 +169,10 @@ class WebServer:
                     if not hasattr(self.config, 'search') or not self.config.search:
                         self.config.search = {}
                     self.config.search.update(data['search'])
+                if 'tiers' in data:
+                    if not hasattr(self.config, 'tiers') or not self.config.tiers:
+                        self.config.tiers = {}
+                    self.config.tiers.update(data['tiers'])
                 self.config.save()
                 return jsonify({'success': True})
             except Exception as e:
