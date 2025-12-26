@@ -23,8 +23,12 @@ class StuckItem:
     first_detected: datetime
     can_auto_resolve: bool = False
     auto_resolve_action: Optional[str] = None  # 'blocklist_retry', 'remove', etc
+    auto_resolve_wait_minutes: int = 30  # From config
     
     def to_dict(self) -> Dict[str, Any]:
+        stuck_minutes = int((datetime.utcnow() - self.first_detected).total_seconds() / 60)
+        auto_resolve_in = max(0, self.auto_resolve_wait_minutes - stuck_minutes) if self.can_auto_resolve else None
+        
         return {
             'queue_id': self.queue_id,
             'title': self.title,
@@ -35,9 +39,10 @@ class StuckItem:
             'issues': self.issues,
             'messages': self.messages,
             'first_detected': self.first_detected.isoformat(),
-            'stuck_minutes': int((datetime.utcnow() - self.first_detected).total_seconds() / 60),
+            'stuck_minutes': stuck_minutes,
             'can_auto_resolve': self.can_auto_resolve,
             'auto_resolve_action': self.auto_resolve_action,
+            'auto_resolve_in_minutes': auto_resolve_in,
         }
 
 
@@ -124,6 +129,7 @@ class QueueMonitor:
                 issues=parsed['issues'],
                 messages=parsed['messages'],
                 first_detected=datetime.utcnow(),
+                auto_resolve_wait_minutes=self.config.auto_resolution.wait_minutes_before_action,
             )
             self.stuck_items[key] = stuck
         
