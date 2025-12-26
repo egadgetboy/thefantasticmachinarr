@@ -798,18 +798,25 @@
             
             <div class="settings-field">
                 <label>📊 Daily API Limit</label>
-                <input type="number" id="settings-api-limit" value="500" min="50" max="50000">
+                <input type="number" id="settings-api-limit" value="500" min="50" max="50000" onchange="updateSettingsPacingPresets()">
                 <div class="hint">TFM spreads searches throughout the day to stay within this limit.</div>
+            </div>
+            
+            <div style="margin-bottom: 16px;">
+                <label style="font-size: 13px; font-weight: 600; display: block; margin-bottom: 8px;">⚡ Pacing Presets</label>
+                <div id="settings-pacing-presets" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px;">
+                    <!-- Populated by JS -->
+                </div>
             </div>
             
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
                 <div class="settings-field" style="margin-bottom: 0;">
                     <label>🔍 Searches Per Cycle</label>
-                    <input type="number" id="settings-per-cycle" value="10" min="1" max="50">
+                    <input type="number" id="settings-per-cycle" value="10" min="1" max="5000">
                 </div>
                 <div class="settings-field" style="margin-bottom: 0;">
                     <label>⏱️ Cycle Interval (min)</label>
-                    <input type="number" id="settings-interval" value="60" min="15" max="360">
+                    <input type="number" id="settings-interval" value="60" min="5" max="360">
                 </div>
             </div>
             
@@ -1358,7 +1365,50 @@
                 document.getElementById('settings-quiet-end').value = data.quiet_hours.end_hour ?? 7;
             }
             updateThemeButtons();
+            updateSettingsPacingPresets();
             document.getElementById('settings-modal').classList.add('show');
+        }
+        
+        function updateSettingsPacingPresets() {
+            const apiLimit = parseInt(document.getElementById('settings-api-limit').value) || 500;
+            const currentSearches = parseInt(document.getElementById('settings-per-cycle').value) || 10;
+            const currentInterval = parseInt(document.getElementById('settings-interval').value) || 60;
+            
+            // Calculate presets based on API limit
+            const steady = { searches: Math.round(apiLimit / 24), interval: 60, hours: 24 };
+            const fast = { searches: Math.round(apiLimit / 12), interval: 60, hours: 12 };
+            const faster = { searches: Math.round(apiLimit / 6), interval: 60, hours: 6 };
+            const blazing = { searches: Math.round(apiLimit / 6), interval: 30, hours: 3 };
+            
+            const presets = [
+                { name: 'Steady', emoji: '🐢', ...steady, recommended: true },
+                { name: 'Fast', emoji: '🐇', ...fast },
+                { name: 'Faster', emoji: '🚀', ...faster },
+                { name: 'Blazing', emoji: '⚡', ...blazing }
+            ];
+            
+            const container = document.getElementById('settings-pacing-presets');
+            container.innerHTML = presets.map(p => {
+                const isSelected = currentSearches === p.searches && currentInterval === p.interval;
+                return `
+                    <div onclick="applySettingsPacing(${p.searches}, ${p.interval})" 
+                         style="background: var(--bg3); padding: 10px 8px; border-radius: 8px; cursor: pointer; 
+                                border: 2px solid ${isSelected ? 'var(--accent)' : 'transparent'}; text-align: center;
+                                transition: all 0.2s;">
+                        <div style="font-size: 16px;">${p.emoji}</div>
+                        <div style="font-weight: 500; font-size: 12px; margin: 2px 0;">${p.name}</div>
+                        <div style="color: var(--text3); font-size: 10px;">${p.searches} / ${p.interval} min</div>
+                        <div style="color: var(--text3); font-size: 10px;">${p.hours} hours</div>
+                        ${p.recommended ? '<div style="color: var(--success); font-size: 9px; margin-top: 2px;">✓ Recommended</div>' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function applySettingsPacing(searches, interval) {
+            document.getElementById('settings-per-cycle').value = searches;
+            document.getElementById('settings-interval').value = interval;
+            updateSettingsPacingPresets();
         }
         
         function closeSettingsModal() {
@@ -1431,6 +1481,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.10</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.11</div>
 </body>
 </html>
