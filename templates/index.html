@@ -630,7 +630,7 @@
     
     <!-- Settings Modal -->
     <div class="modal" id="settings-modal">
-        <div class="modal-content" style="max-width: 520px;">
+        <div class="modal-content" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
             <h3>⚙️ Settings</h3>
             
             <div class="settings-field">
@@ -647,19 +647,85 @@
                 <div class="hint">TFM spreads searches throughout the day to stay within this limit.</div>
             </div>
             
-            <div class="settings-field">
-                <label>🔍 Searches Per Cycle</label>
-                <input type="number" id="settings-per-cycle" value="10" min="1" max="50">
-                <div class="hint">How many items to search each cycle.</div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+                <div class="settings-field" style="margin-bottom: 0;">
+                    <label>🔍 Searches Per Cycle</label>
+                    <input type="number" id="settings-per-cycle" value="10" min="1" max="50">
+                </div>
+                <div class="settings-field" style="margin-bottom: 0;">
+                    <label>⏱️ Cycle Interval (min)</label>
+                    <input type="number" id="settings-interval" value="60" min="15" max="360">
+                </div>
             </div>
             
-            <div class="settings-field">
-                <label>⏱️ Cycle Interval (minutes)</label>
-                <input type="number" id="settings-interval" value="60" min="15" max="360">
-                <div class="hint">Time between search cycles.</div>
+            <h4 style="margin: 24px 0 12px; font-size: 14px;">🎯 Search Tier Configuration</h4>
+            <div class="hint" style="margin-bottom: 12px;">Define age ranges (in days) and search frequency for each tier.</div>
+            
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;">
+                <div style="background: var(--bg3); padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 24px;">🔥</div>
+                    <div style="font-weight: 600; margin: 4px 0;">Hot</div>
+                    <div style="display: flex; gap: 4px; margin: 8px 0;">
+                        <input type="number" id="settings-hot-min" value="0" min="0" style="width: 50%; padding: 6px; font-size: 11px;" disabled>
+                        <input type="number" id="settings-hot-max" value="90" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                    </div>
+                    <div style="font-size: 10px; color: var(--text3);">days old</div>
+                    <select id="settings-hot-interval" style="width: 100%; padding: 6px; margin-top: 8px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        <option value="30">30 min</option>
+                        <option value="60" selected>1 hour</option>
+                        <option value="120">2 hours</option>
+                        <option value="180">3 hours</option>
+                        <option value="360">6 hours</option>
+                    </select>
+                </div>
+                <div style="background: var(--bg3); padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 24px;">☀️</div>
+                    <div style="font-weight: 600; margin: 4px 0;">Warm</div>
+                    <div style="display: flex; gap: 4px; margin: 8px 0;">
+                        <input type="number" id="settings-warm-min" value="90" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                        <input type="number" id="settings-warm-max" value="365" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                    </div>
+                    <div style="font-size: 10px; color: var(--text3);">days old</div>
+                    <select id="settings-warm-interval" style="width: 100%; padding: 6px; margin-top: 8px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        <option value="180">3 hours</option>
+                        <option value="360" selected>6 hours</option>
+                        <option value="720">12 hours</option>
+                        <option value="1440">Daily</option>
+                    </select>
+                </div>
+                <div style="background: var(--bg3); padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 24px;">❄️</div>
+                    <div style="font-weight: 600; margin: 4px 0;">Cool</div>
+                    <div style="display: flex; gap: 4px; margin: 8px 0;">
+                        <input type="number" id="settings-cool-min" value="365" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                        <input type="number" id="settings-cool-max" value="1095" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                    </div>
+                    <div style="font-size: 10px; color: var(--text3);">days old</div>
+                    <select id="settings-cool-interval" style="width: 100%; padding: 6px; margin-top: 8px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        <option value="720">12 hours</option>
+                        <option value="1440" selected>Daily</option>
+                        <option value="2880">2 days</option>
+                        <option value="4320">3 days</option>
+                    </select>
+                </div>
+                <div style="background: var(--bg3); padding: 12px; border-radius: 10px; text-align: center;">
+                    <div style="font-size: 24px;">🧊</div>
+                    <div style="font-weight: 600; margin: 4px 0;">Cold</div>
+                    <div style="display: flex; gap: 4px; margin: 8px 0;">
+                        <input type="number" id="settings-cold-min" value="1095" min="1" style="width: 50%; padding: 6px; font-size: 11px;">
+                        <input type="text" value="∞" style="width: 50%; padding: 6px; font-size: 11px; text-align: center;" disabled>
+                    </div>
+                    <div style="font-size: 10px; color: var(--text3);">days old</div>
+                    <select id="settings-cold-interval" style="width: 100%; padding: 6px; margin-top: 8px; font-size: 11px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        <option value="4320">3 days</option>
+                        <option value="10080" selected>Weekly</option>
+                        <option value="20160">2 weeks</option>
+                        <option value="43200">Monthly</option>
+                    </select>
+                </div>
             </div>
             
-            <div class="modal-actions">
+            <div class="modal-actions" style="margin-top: 24px;">
                 <button class="btn btn-sec" onclick="closeSettingsModal()">Cancel</button>
                 <button class="btn btn-pri" onclick="saveSettings()">Save Settings</button>
             </div>
@@ -939,6 +1005,22 @@
                 document.getElementById('settings-per-cycle').value = data.search.searches_per_cycle || 10;
                 document.getElementById('settings-interval').value = data.search.cycle_interval_minutes || 60;
             }
+            if (data.tiers) {
+                // Hot
+                document.getElementById('settings-hot-max').value = data.tiers.hot?.max_days || 90;
+                document.getElementById('settings-hot-interval').value = data.tiers.hot?.interval_minutes || 60;
+                // Warm
+                document.getElementById('settings-warm-min').value = data.tiers.warm?.min_days || 90;
+                document.getElementById('settings-warm-max').value = data.tiers.warm?.max_days || 365;
+                document.getElementById('settings-warm-interval').value = data.tiers.warm?.interval_minutes || 360;
+                // Cool
+                document.getElementById('settings-cool-min').value = data.tiers.cool?.min_days || 365;
+                document.getElementById('settings-cool-max').value = data.tiers.cool?.max_days || 1095;
+                document.getElementById('settings-cool-interval').value = data.tiers.cool?.interval_minutes || 1440;
+                // Cold
+                document.getElementById('settings-cold-min').value = data.tiers.cold?.min_days || 1095;
+                document.getElementById('settings-cold-interval').value = data.tiers.cold?.interval_minutes || 10080;
+            }
             updateThemeButtons();
             document.getElementById('settings-modal').classList.add('show');
         }
@@ -953,6 +1035,28 @@
                     daily_api_limit: parseInt(document.getElementById('settings-api-limit').value) || 500,
                     searches_per_cycle: parseInt(document.getElementById('settings-per-cycle').value) || 10,
                     cycle_interval_minutes: parseInt(document.getElementById('settings-interval').value) || 60
+                },
+                tiers: {
+                    hot: {
+                        min_days: 0,
+                        max_days: parseInt(document.getElementById('settings-hot-max').value) || 90,
+                        interval_minutes: parseInt(document.getElementById('settings-hot-interval').value) || 60
+                    },
+                    warm: {
+                        min_days: parseInt(document.getElementById('settings-warm-min').value) || 90,
+                        max_days: parseInt(document.getElementById('settings-warm-max').value) || 365,
+                        interval_minutes: parseInt(document.getElementById('settings-warm-interval').value) || 360
+                    },
+                    cool: {
+                        min_days: parseInt(document.getElementById('settings-cool-min').value) || 365,
+                        max_days: parseInt(document.getElementById('settings-cool-max').value) || 1095,
+                        interval_minutes: parseInt(document.getElementById('settings-cool-interval').value) || 1440
+                    },
+                    cold: {
+                        min_days: parseInt(document.getElementById('settings-cold-min').value) || 1095,
+                        max_days: null,
+                        interval_minutes: parseInt(document.getElementById('settings-cold-interval').value) || 10080
+                    }
                 }
             };
             const result = await api('settings', 'POST', settings);
@@ -986,6 +1090,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.5</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.6</div>
 </body>
 </html>
