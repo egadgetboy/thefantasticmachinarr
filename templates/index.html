@@ -1,121 +1,513 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>The Fantastic Machinarr</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
     <style>
-        :root { --bg: #0f172a; --bg2: #1e293b; --bg3: #334155; --text: #f8fafc; --text2: #94a3b8; --accent: #8b5cf6; --success: #22c55e; --warn: #f59e0b; --error: #ef4444; --border: #475569; }
+        /* Theme Variables */
+        :root {
+            --transition: 0.2s ease;
+        }
+        
+        [data-theme="dark"] {
+            --bg: #0c0f1a;
+            --bg2: #151928;
+            --bg3: #1e2538;
+            --bg-hover: #252d42;
+            --text: #f0f2f5;
+            --text2: #8b92a5;
+            --text3: #5c6478;
+            --accent: #6366f1;
+            --accent-hover: #818cf8;
+            --accent-glow: rgba(99, 102, 241, 0.3);
+            --success: #10b981;
+            --success-bg: rgba(16, 185, 129, 0.15);
+            --warn: #f59e0b;
+            --warn-bg: rgba(245, 158, 11, 0.15);
+            --error: #ef4444;
+            --error-bg: rgba(239, 68, 68, 0.15);
+            --border: #2a3246;
+            --border-focus: #6366f1;
+            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+            --glow: 0 0 20px rgba(99, 102, 241, 0.15);
+        }
+        
+        [data-theme="light"] {
+            --bg: #f8f9fb;
+            --bg2: #ffffff;
+            --bg3: #f0f1f4;
+            --bg-hover: #e8e9ed;
+            --text: #1a1d26;
+            --text2: #5c6478;
+            --text3: #8b92a5;
+            --accent: #4f46e5;
+            --accent-hover: #6366f1;
+            --accent-glow: rgba(79, 70, 229, 0.2);
+            --success: #059669;
+            --success-bg: rgba(5, 150, 105, 0.12);
+            --warn: #d97706;
+            --warn-bg: rgba(217, 119, 6, 0.12);
+            --error: #dc2626;
+            --error-bg: rgba(220, 38, 38, 0.12);
+            --border: #e2e4e9;
+            --border-focus: #4f46e5;
+            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+            --glow: 0 0 20px rgba(79, 70, 229, 0.08);
+        }
+        
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            transition: background var(--transition), color var(--transition);
+        }
         
         /* Header */
-        header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
-        .logo { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 600; }
-        .status-dots { display: flex; gap: 10px; }
-        .dot { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg3); border-radius: 20px; font-size: 12px; }
-        .dot-ind { width: 8px; height: 8px; border-radius: 50%; background: var(--text2); }
-        .dot-ind.on { background: var(--success); }
-        .dot-ind.off { background: var(--error); }
+        header {
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            transition: all var(--transition);
+        }
+        
+        .logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 20px;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+        
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+        
+        .status-dots {
+            display: flex;
+            gap: 10px;
+        }
+        
+        .dot {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: var(--bg3);
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            border: 1px solid var(--border);
+            transition: all var(--transition);
+        }
+        
+        .dot-ind {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--text3);
+        }
+        
+        .dot-ind.on {
+            background: var(--success);
+            box-shadow: 0 0 8px var(--success);
+        }
+        
+        .dot-ind.off {
+            background: var(--error);
+        }
+        
+        .theme-btn, .settings-btn {
+            background: var(--bg3);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 10px 14px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all var(--transition);
+            color: var(--text);
+        }
+        
+        .theme-btn:hover, .settings-btn:hover {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
         
         /* Scoreboard */
-        .scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 24px; background: var(--bg2); border-bottom: 1px solid var(--border); }
-        .score-card { background: var(--bg3); border-radius: 10px; padding: 16px; text-align: center; }
-        .score-val { font-size: 32px; font-weight: 700; }
-        .score-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
-        .score-card.hot { border-left: 4px solid #ef4444; }
-        .score-card.api { border-left: 4px solid var(--accent); }
+        .scoreboard {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 24px 28px;
+            background: var(--bg2);
+            border-bottom: 1px solid var(--border);
+        }
+        
+        .score-card {
+            background: var(--bg3);
+            border-radius: 14px;
+            padding: 20px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all var(--transition);
+        }
+        
+        .score-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: var(--card-shadow);
+        }
+        
+        .score-val {
+            font-size: 36px;
+            font-weight: 700;
+            letter-spacing: -1px;
+        }
+        
+        .score-label {
+            font-size: 12px;
+            color: var(--text2);
+            margin-top: 6px;
+            font-weight: 500;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .score-card.hot {
+            border-left: 4px solid var(--error);
+        }
+        
+        .score-card.api {
+            border-left: 4px solid var(--accent);
+        }
         
         /* Main layout */
-        main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px 24px; }
-        @media (max-width: 1024px) { main { grid-template-columns: 1fr; } }
+        main {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 24px 28px;
+        }
+        
+        @media (max-width: 1024px) {
+            main { grid-template-columns: 1fr; }
+            .scoreboard { grid-template-columns: repeat(2, 1fr); }
+        }
         
         /* Panels */
-        .panel { background: var(--bg2); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
-        .panel-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
-        .panel-title { font-weight: 600; }
-        .panel-body { padding: 16px; max-height: 400px; overflow-y: auto; }
+        .panel {
+            background: var(--bg2);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            transition: all var(--transition);
+        }
+        
+        .panel:hover {
+            box-shadow: var(--card-shadow);
+        }
+        
+        .panel-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: var(--bg3);
+        }
+        
+        .panel-title {
+            font-weight: 600;
+            font-size: 15px;
+            letter-spacing: -0.2px;
+        }
+        
+        .panel-body {
+            padding: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
         .panel-body.flush { padding: 0; }
         
+        .panel-body::-webkit-scrollbar {
+            width: 6px;
+        }
+        
+        .panel-body::-webkit-scrollbar-track {
+            background: var(--bg3);
+        }
+        
+        .panel-body::-webkit-scrollbar-thumb {
+            background: var(--border);
+            border-radius: 3px;
+        }
+        
         /* Tiers */
-        .tiers { display: flex; gap: 12px; flex-wrap: wrap; }
-        .tier { flex: 1; min-width: 80px; background: var(--bg3); padding: 14px; border-radius: 8px; text-align: center; }
-        .tier-emoji { font-size: 24px; }
-        .tier-count { font-size: 22px; font-weight: 700; margin: 4px 0; }
-        .tier-name { font-size: 11px; color: var(--text2); text-transform: uppercase; }
+        .tiers {
+            display: flex;
+            gap: 14px;
+            flex-wrap: wrap;
+        }
+        
+        .tier {
+            flex: 1;
+            min-width: 90px;
+            background: var(--bg3);
+            padding: 18px 14px;
+            border-radius: 12px;
+            text-align: center;
+            border: 1px solid var(--border);
+            transition: all var(--transition);
+        }
+        
+        .tier:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+        
+        .tier-emoji { font-size: 28px; }
+        .tier-count { font-size: 26px; font-weight: 700; margin: 6px 0; }
+        .tier-name { font-size: 11px; color: var(--text2); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px; }
         
         /* Items list */
-        .item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 12px; }
+        .item {
+            display: flex;
+            align-items: center;
+            padding: 14px 18px;
+            border-bottom: 1px solid var(--border);
+            gap: 14px;
+            transition: all var(--transition);
+        }
+        
         .item:last-child { border: none; }
-        .item:hover { background: var(--bg3); }
-        .item-icon { font-size: 20px; }
+        .item:hover { background: var(--bg-hover); }
+        
+        .item-icon { font-size: 22px; }
         .item-info { flex: 1; min-width: 0; }
         .item-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .item-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
-        .item-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
-        .item-badge.hot { background: rgba(239,68,68,0.2); color: #ef4444; }
-        .item-badge.warm { background: rgba(249,115,22,0.2); color: #f97316; }
-        .item-badge.cool { background: rgba(59,130,246,0.2); color: #3b82f6; }
-        .item-badge.cold { background: rgba(99,102,241,0.2); color: #6366f1; }
-        .item-badge.issue { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .item-meta { font-size: 12px; color: var(--text2); margin-top: 3px; }
+        
+        .item-badge {
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .item-badge.hot { background: var(--error-bg); color: var(--error); }
+        .item-badge.warm { background: var(--warn-bg); color: var(--warn); }
+        .item-badge.cool { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .item-badge.cold { background: var(--accent-glow); color: var(--accent); }
+        .item-badge.issue { background: var(--error-bg); color: var(--error); }
         
         /* Buttons */
-        .btn { padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; }
-        .btn-sm { padding: 5px 10px; font-size: 12px; }
-        .btn-pri { background: var(--accent); color: #fff; }
-        .btn-sec { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
-        .btn:hover { opacity: 0.9; }
+        .btn {
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            transition: all var(--transition);
+        }
+        
+        .btn-sm { padding: 6px 12px; font-size: 12px; border-radius: 8px; }
+        
+        .btn-pri {
+            background: var(--accent);
+            color: #fff;
+        }
+        
+        .btn-pri:hover {
+            background: var(--accent-hover);
+            box-shadow: 0 4px 12px var(--accent-glow);
+        }
+        
+        .btn-sec {
+            background: var(--bg);
+            color: var(--text);
+            border: 1px solid var(--border);
+        }
+        
+        .btn-sec:hover {
+            background: var(--bg-hover);
+            border-color: var(--text3);
+        }
         
         /* Empty state */
-        .empty { text-align: center; padding: 40px 20px; color: var(--text2); }
-        .empty-icon { font-size: 40px; margin-bottom: 12px; }
+        .empty {
+            text-align: center;
+            padding: 50px 24px;
+            color: var(--text2);
+        }
+        
+        .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
         
         /* Logs */
-        .log { padding: 8px 12px; font-family: monospace; font-size: 12px; border-bottom: 1px solid var(--border); }
-        .log:hover { background: var(--bg3); }
-        .log-time { color: var(--text2); margin-right: 8px; }
-        .log-level { padding: 1px 5px; border-radius: 3px; font-size: 10px; margin-right: 6px; }
-        .log-level.INFO { background: rgba(59,130,246,0.2); color: #3b82f6; }
-        .log-level.WARNING { background: rgba(245,158,11,0.2); color: #f59e0b; }
-        .log-level.ERROR { background: rgba(239,68,68,0.2); color: #ef4444; }
-        .log-level.DEBUG { background: rgba(156,163,175,0.2); color: #9ca3af; }
+        .log {
+            padding: 10px 14px;
+            font-family: 'SF Mono', 'Fira Code', monospace;
+            font-size: 12px;
+            border-bottom: 1px solid var(--border);
+            transition: all var(--transition);
+        }
+        
+        .log:hover { background: var(--bg-hover); }
+        .log-time { color: var(--text3); margin-right: 10px; }
+        
+        .log-level {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+            margin-right: 8px;
+        }
+        
+        .log-level.INFO { background: rgba(59,130,246,0.15); color: #3b82f6; }
+        .log-level.WARNING { background: var(--warn-bg); color: var(--warn); }
+        .log-level.ERROR { background: var(--error-bg); color: var(--error); }
+        .log-level.DEBUG { background: rgba(156,163,175,0.15); color: #9ca3af; }
         
         /* Storage */
-        .storage-bar { margin-bottom: 16px; }
-        .storage-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
-        .storage-path { font-family: monospace; }
-        .bar { height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
-        .bar-fill { height: 100%; background: var(--success); }
+        .storage-bar { margin-bottom: 18px; }
+        .storage-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
+        .storage-path { font-family: monospace; color: var(--text2); }
+        
+        .bar {
+            height: 10px;
+            background: var(--bg3);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        
+        .bar-fill {
+            height: 100%;
+            background: var(--success);
+            border-radius: 5px;
+            transition: width 0.5s ease;
+        }
+        
         .bar-fill.warn { background: var(--warn); }
         .bar-fill.crit { background: var(--error); }
         
-        /* Intervention modal */
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 100; }
+        /* Modals */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(4px);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+        
         .modal.show { display: flex; }
-        .modal-content { background: var(--bg2); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
-        .modal h3 { margin-bottom: 16px; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        
+        .modal-content {
+            background: var(--bg2);
+            border-radius: 16px;
+            padding: 28px;
+            max-width: 520px;
+            width: 90%;
+            border: 1px solid var(--border);
+            box-shadow: var(--card-shadow);
+        }
+        
+        .modal h3 {
+            margin-bottom: 16px;
+            font-size: 18px;
+            font-weight: 600;
+        }
+        
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 24px;
+        }
+        
         .modal-actions .btn { flex: 1; }
         
+        /* Settings modal inputs */
+        .settings-field {
+            margin-bottom: 18px;
+        }
+        
+        .settings-field label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 13px;
+            font-weight: 500;
+        }
+        
+        .settings-field input {
+            width: 100%;
+            padding: 12px 14px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text);
+            font-size: 14px;
+            transition: all var(--transition);
+        }
+        
+        .settings-field input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px var(--accent-glow);
+        }
+        
+        .settings-field .hint {
+            font-size: 12px;
+            color: var(--text3);
+            margin-top: 6px;
+        }
+        
         /* Spinner */
-        .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin: 24px auto;
+        }
+        
         @keyframes spin { to { transform: rotate(360deg); } }
         
         /* Full width panel */
         .full-width { grid-column: 1 / -1; }
         
-        /* Settings link */
-        .settings-link { color: var(--text2); text-decoration: none; font-size: 20px; }
-        .settings-link:hover { color: var(--text); }
+        /* Version footer */
+        .version-footer {
+            text-align: center;
+            padding: 16px;
+            font-size: 11px;
+            color: var(--text3);
+            border-top: 1px solid var(--border);
+            background: var(--bg2);
+        }
     </style>
 </head>
 <body>
     <header>
         <div class="logo"><span>🎬</span> The Fantastic Machinarr</div>
-        <div style="display:flex;align-items:center;gap:16px">
+        <div class="header-right">
             <div class="status-dots" id="status-dots"></div>
-            <a href="#" class="settings-link" onclick="openSettingsModal(); return false;">⚙️</a>
+            <button class="theme-btn" onclick="toggleTheme()" title="Toggle theme">🌙</button>
+            <button class="settings-btn" onclick="openSettingsModal()" title="Settings">⚙️</button>
         </div>
     </header>
     
@@ -238,36 +630,77 @@
     
     <!-- Settings Modal -->
     <div class="modal" id="settings-modal">
-        <div class="modal-content" style="max-width: 500px;">
+        <div class="modal-content" style="max-width: 520px;">
             <h3>⚙️ Settings</h3>
-            <div style="margin: 20px 0;">
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">📊 Daily API Limit</label>
-                    <input type="number" id="settings-api-limit" value="500" min="50" max="50000" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">TFM spreads searches throughout the day to stay within this limit.</div>
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">🔍 Searches Per Cycle</label>
-                    <input type="number" id="settings-per-cycle" value="10" min="1" max="50" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">How many items to search each cycle.</div>
-                </div>
-                <div style="margin-bottom: 16px;">
-                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">⏱️ Cycle Interval (minutes)</label>
-                    <input type="number" id="settings-interval" value="60" min="15" max="360" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Time between search cycles.</div>
+            
+            <div class="settings-field">
+                <label>🎨 Theme</label>
+                <div style="display: flex; gap: 10px;">
+                    <button class="btn btn-sec" id="theme-dark-btn" onclick="setTheme('dark')" style="flex:1;">🌙 Dark</button>
+                    <button class="btn btn-sec" id="theme-light-btn" onclick="setTheme('light')" style="flex:1;">☀️ Light</button>
                 </div>
             </div>
-            <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
+            
+            <div class="settings-field">
+                <label>📊 Daily API Limit</label>
+                <input type="number" id="settings-api-limit" value="500" min="50" max="50000">
+                <div class="hint">TFM spreads searches throughout the day to stay within this limit.</div>
+            </div>
+            
+            <div class="settings-field">
+                <label>🔍 Searches Per Cycle</label>
+                <input type="number" id="settings-per-cycle" value="10" min="1" max="50">
+                <div class="hint">How many items to search each cycle.</div>
+            </div>
+            
+            <div class="settings-field">
+                <label>⏱️ Cycle Interval (minutes)</label>
+                <input type="number" id="settings-interval" value="60" min="15" max="360">
+                <div class="hint">Time between search cycles.</div>
+            </div>
+            
+            <div class="modal-actions">
                 <button class="btn btn-sec" onclick="closeSettingsModal()">Cancel</button>
                 <button class="btn btn-pri" onclick="saveSettings()">Save Settings</button>
             </div>
-            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); text-align: center;">
-                <a href="/setup" style="color: var(--text2); font-size: 13px;">Run Setup Wizard Again →</a>
+            
+            <div style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); text-align: center;">
+                <a href="/setup" style="color: var(--text2); font-size: 13px; text-decoration: none;">Run Setup Wizard Again →</a>
             </div>
         </div>
     </div>
     
     <script>
+        // Theme management
+        function toggleTheme() {
+            const current = document.documentElement.getAttribute('data-theme');
+            setTheme(current === 'dark' ? 'light' : 'dark');
+        }
+        
+        function setTheme(theme) {
+            document.documentElement.setAttribute('data-theme', theme);
+            localStorage.setItem('tfm-theme', theme);
+            document.querySelector('.theme-btn').textContent = theme === 'dark' ? '🌙' : '☀️';
+            updateThemeButtons();
+        }
+        
+        function updateThemeButtons() {
+            const theme = document.documentElement.getAttribute('data-theme');
+            const darkBtn = document.getElementById('theme-dark-btn');
+            const lightBtn = document.getElementById('theme-light-btn');
+            if (darkBtn && lightBtn) {
+                darkBtn.style.background = theme === 'dark' ? 'var(--accent)' : '';
+                darkBtn.style.color = theme === 'dark' ? '#fff' : '';
+                lightBtn.style.background = theme === 'light' ? 'var(--accent)' : '';
+                lightBtn.style.color = theme === 'light' ? '#fff' : '';
+            }
+        }
+        
+        // Load saved theme
+        const savedTheme = localStorage.getItem('tfm-theme') || 'dark';
+        document.documentElement.setAttribute('data-theme', savedTheme);
+        document.querySelector('.theme-btn').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
+    
         async function api(endpoint, method = 'GET', data = null) {
             const opts = { method, headers: {'Content-Type': 'application/json'} };
             if (data) opts.body = JSON.stringify(data);
@@ -506,6 +939,7 @@
                 document.getElementById('settings-per-cycle').value = data.search.searches_per_cycle || 10;
                 document.getElementById('settings-interval').value = data.search.cycle_interval_minutes || 60;
             }
+            updateThemeButtons();
             document.getElementById('settings-modal').classList.add('show');
         }
         
@@ -552,6 +986,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div style="text-align: center; padding: 12px; font-size: 11px; color: #64748b; border-top: 1px solid #334155; margin-top: 20px;">The Fantastic Machinarr v1.0.4a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.5</div>
 </body>
 </html>
