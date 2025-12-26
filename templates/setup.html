@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9d</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9e</div>
 </div>
 <script>
 // Theme management
@@ -1179,17 +1179,28 @@ function updatePacingCalc() {
     
     const callsPerHour = searches * (60 / interval);
     const hoursToExhaust = apiLimit / callsPerHour;
+    const daysToExhaust = hoursToExhaust / 24;
     
     const el = document.getElementById('calc-result');
     if (el) {
         let message = '';
-        if (hoursToExhaust >= 24) {
-            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls over ~${Math.round(hoursToExhaust)} hours <span style="color: var(--success);">✓ Lasts all day</span>`;
-        } else if (hoursToExhaust >= 1) {
-            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls exhausted in ~${Math.round(hoursToExhaust)} hours <span style="color: var(--warn);">Then TFM rests</span>`;
+        if (hoursToExhaust <= 24) {
+            // Burns within a day
+            if (hoursToExhaust >= 1) {
+                message = `${searches} searches every ${interval} min = budget lasts ~${Math.round(hoursToExhaust)} hours <span style="color: var(--warn);">Then TFM rests until tomorrow</span>`;
+            } else {
+                const minutes = Math.round(hoursToExhaust * 60);
+                message = `${searches} searches every ${interval} min = budget lasts ~${minutes} minutes <span style="color: var(--warn);">Very aggressive!</span>`;
+            }
+        } else if (daysToExhaust <= 1.5) {
+            // Close to 24 hours - this is the sweet spot
+            message = `${searches} searches every ${interval} min = budget lasts ~24 hours <span style="color: var(--success);">✓ Perfect daily spread</span>`;
+        } else if (daysToExhaust <= 7) {
+            // Under-utilizing but not by much
+            message = `${searches} searches every ${interval} min = budget lasts ~${Math.round(daysToExhaust)} days <span style="color: var(--text3);">— Could search more often</span>`;
         } else {
-            const minutes = Math.round(hoursToExhaust * 60);
-            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls exhausted in ~${minutes} minutes <span style="color: var(--warn);">Very aggressive!</span>`;
+            // Significantly under-utilizing
+            message = `${searches} searches every ${interval} min = budget lasts ~${Math.round(daysToExhaust)} days <span style="color: var(--text3);">— You could search much more aggressively</span>`;
         }
         el.innerHTML = message;
     }
