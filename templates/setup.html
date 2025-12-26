@@ -81,7 +81,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.4</div>
+    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.4a</div>
 </div>
 <script>
 const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Settings', 'Complete'];
@@ -134,9 +134,9 @@ function stepWelcome() {
         
         <div class="info" style="margin-top: 12px;">
             <strong>💡 How to determine your limit:</strong><br><br>
-            <strong>Single indexer:</strong> Check your indexer's dashboard or account page for "API calls" or "API limit" — common limits are 1000, 2000, or 5000/day.<br><br>
-            <strong>Multiple indexers:</strong> Use your <em>lowest limited</em> indexer as a guide. For example, if you have indexers with limits of 5000, 2000, unlimited, unlimited, unlimited, and 1000 — use 1000 or slightly below to be safe. "Unlimited" indexers still appreciate conservative usage.<br><br>
-            <strong>When in doubt:</strong> Start with 500. You can increase later if your indexers allow more.
+            <strong>Single indexer:</strong> Check your indexer's dashboard for "API calls" or "API limit" — common limits are 1000, 2000, or 5000/day.<br><br>
+            <strong>Multiple indexers:</strong> You can be more aggressive! Add up your limited indexers and estimate ~2000/day for each "unlimited" one. Example: if you have 5000 + 2000 + 1000 + 3 unlimited → try 8000-14000. If one indexer hits its limit, TFM continues with the others. Temp bans are brief (usually 1-24 hours) and not permanent.<br><br>
+            <strong>When in doubt:</strong> Start with 500-1000 and increase over time. You can adjust this later in Settings.
         </div>
         
         <h3 style="margin-top: 24px; margin-bottom: 8px;">🎯 Search Tier Configuration</h3>
@@ -264,17 +264,25 @@ function stepAutoRes() {
 function stepSettings() {
     return `
     <div class="step active">
-        <h2>⚙️ Search Settings</h2>
-        <p class="desc">Configure API limits and search behavior.</p>
+        <h2>⚙️ Additional Settings</h2>
+        <p class="desc">Fine-tune search behavior and notifications.</p>
+        
+        <h3 style="margin: 0 0 12px;">🔍 Search Behavior</h3>
         <div class="row">
-            <div class="field"><label>Daily API Limit</label><input type="number" id="set-api-limit" value="500" min="50" max="2000"></div>
-            <div class="field"><label>Searches Per Cycle</label><input type="number" id="set-per-cycle" value="10" min="1" max="50"></div>
+            <div class="field">
+                <label>Searches Per Cycle</label>
+                <input type="number" id="set-per-cycle" value="10" min="1" max="50">
+                <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">How many items to search each cycle</div>
+            </div>
+            <div class="field">
+                <label>Cycle Interval (minutes)</label>
+                <input type="number" id="set-interval" value="60" min="15" max="360">
+                <div style="font-size: 11px; color: var(--text2); margin-top: 4px;">Time between search cycles</div>
+            </div>
         </div>
-        <div class="row">
-            <div class="field"><label>Cycle Interval (minutes)</label><input type="number" id="set-interval" value="60" min="15" max="360"></div>
-            <div class="field">&nbsp;</div>
-        </div>
-        <h3 style="margin:20px 0 10px">📧 Email Notifications (Optional)</h3>
+        
+        <h3 style="margin: 20px 0 12px;">📧 Email Notifications (Optional)</h3>
+        <p class="desc" style="margin-bottom: 12px;">Get notified about new finds, issues needing attention, and storage warnings.</p>
         <div class="row">
             <div class="field"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
             <div class="field"><label>SMTP Port</label><input type="number" id="email-port" value="587"></div>
