@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9j</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9k</div>
 </div>
 <script>
 // Theme management
@@ -807,11 +807,10 @@ function applyExistingConfig() {
         if (document.getElementById('ar-wait')) document.getElementById('ar-wait').value = ar.wait_minutes_before_action || 30;
     }
     
-    // Search settings
-    if (cfg.search) {
-        if (document.getElementById('set-per-cycle')) document.getElementById('set-per-cycle').value = cfg.search.searches_per_cycle || 10;
-        if (document.getElementById('set-interval')) document.getElementById('set-interval').value = cfg.search.cycle_interval_minutes || 30;
-        // Update the calculation display
+    // Search settings - DO NOT apply saved values here
+    // stepSettings() calculates defaults based on API limit
+    // Just update the calculation display
+    if (document.getElementById('set-per-cycle')) {
         if (typeof updatePacingCalc === 'function') updatePacingCalc();
     }
     
