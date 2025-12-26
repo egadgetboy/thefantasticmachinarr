@@ -652,6 +652,47 @@
             border-top: 1px solid var(--border);
             background: var(--bg2);
         }
+        
+        /* Activity Status Bar */
+        .activity-bar {
+            background: var(--bg3);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 24px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text2);
+        }
+        
+        .activity-icon {
+            font-size: 16px;
+        }
+        
+        .activity-text {
+            font-weight: 500;
+            color: var(--text);
+        }
+        
+        .activity-detail {
+            color: var(--text3);
+            font-size: 12px;
+        }
+        
+        .activity-bar.searching {
+            background: linear-gradient(90deg, var(--bg3), rgba(99, 102, 241, 0.1), var(--bg3));
+            background-size: 200% 100%;
+            animation: searching-pulse 2s ease-in-out infinite;
+        }
+        
+        .activity-bar.finding {
+            background: rgba(34, 197, 94, 0.1);
+        }
+        
+        @keyframes searching-pulse {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
     </style>
 </head>
 <body>
@@ -683,6 +724,13 @@
             <div class="score-val" id="status-indicator">⏳</div>
             <div class="score-label" id="status-text">Initializing...</div>
         </div>
+    </div>
+    
+    <!-- Real-time Activity Status Bar -->
+    <div class="activity-bar" id="activity-bar">
+        <span class="activity-icon" id="activity-icon">💤</span>
+        <span class="activity-text" id="activity-text">Idle</span>
+        <span class="activity-detail" id="activity-detail"></span>
     </div>
     
     <main>
@@ -1023,6 +1071,7 @@
                 midnight.setHours(24, 0, 0, 0);
                 const hoursUntilReset = Math.ceil((midnight - now) / (1000 * 60 * 60));
                 text.textContent = `Resets in ${hoursUntilReset}h`;
+                updateActivityBar('sleeping', 'API limit reached', `Resets at midnight (${hoursUntilReset}h)`);
                 return;
             }
             
@@ -1043,10 +1092,12 @@
                         card.className = 'score-card status active';
                         indicator.textContent = '🔍';
                         text.textContent = 'Searching...';
+                        updateActivityBar('searching', 'Running search cycle', 'Checking for missing content and upgrades...');
                     } else {
                         card.className = 'score-card status';
                         indicator.textContent = '⏱️';
                         text.textContent = `Next: ${minsUntil}m`;
+                        updateActivityBar('idle', 'Waiting for next cycle', `Next search in ${minsUntil} minutes`);
                     }
                     return;
                 }
@@ -1056,6 +1107,40 @@
             card.className = 'score-card status active';
             indicator.textContent = '✅';
             text.textContent = 'Active';
+            updateActivityBar('idle', 'Ready', 'Scheduler active');
+        }
+        
+        function updateActivityBar(state, mainText, detail) {
+            const bar = document.getElementById('activity-bar');
+            const icon = document.getElementById('activity-icon');
+            const text = document.getElementById('activity-text');
+            const detailEl = document.getElementById('activity-detail');
+            
+            bar.className = 'activity-bar';
+            
+            switch(state) {
+                case 'searching':
+                    bar.classList.add('searching');
+                    icon.textContent = '🔍';
+                    break;
+                case 'finding':
+                    bar.classList.add('finding');
+                    icon.textContent = '🎉';
+                    break;
+                case 'sleeping':
+                    icon.textContent = '💤';
+                    break;
+                case 'checking':
+                    icon.textContent = '📡';
+                    break;
+                case 'idle':
+                default:
+                    icon.textContent = '⏳';
+                    break;
+            }
+            
+            text.textContent = mainText || 'Idle';
+            detailEl.textContent = detail || '';
         }
         
         async function loadQueue() {
@@ -1256,10 +1341,18 @@
             btn.disabled = true;
             btn.textContent = 'Searching...';
             
+            updateActivityBar('searching', 'Manual search triggered', 'Searching for missing content and upgrades...');
+            
             const data = await api('search', 'POST', {type: 'cycle'});
             
             btn.disabled = false;
             btn.textContent = '🔍 Run Search';
+            
+            if (data.searched > 0) {
+                updateActivityBar('finding', `Searched ${data.searched} items`, `${data.successful || 0} searches triggered successfully`);
+            } else {
+                updateActivityBar('idle', 'Search complete', 'No items needed searching');
+            }
             
             alert(`Searched ${data.searched || 0} items`);
             loadDashboard();
@@ -1450,6 +1543,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.15</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.15a</div>
 </body>
 </html>
