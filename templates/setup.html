@@ -87,6 +87,7 @@ const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Set
 let step = 0;
 const instances = { sonarr: [{id:1,on:true}], radarr: [{id:1,on:true}], sabnzbd: [{id:1,on:false}] };
 let counters = { sonarr:1, radarr:1, sabnzbd:1 };
+let baseUrl = '';
 
 function renderSteps() {
     document.getElementById('steps').innerHTML = STEPS.map((_, i) => 
@@ -119,17 +120,36 @@ function stepWelcome() {
             <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-name">Cool</div><div class="tier-desc">Daily</div></div>
             <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-name">Cold</div><div class="tier-desc">Weekly</div></div>
         </div>
+        <div class="field" style="margin-top: 20px;">
+            <label>🌐 Server Base URL</label>
+            <input type="text" id="base-url" placeholder="http://192.168.1.100" value="${baseUrl}" onchange="updateBaseUrl(this.value)">
+            <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Enter your server IP/hostname. This will prefill Sonarr, Radarr, and SABnzbd URLs.</div>
+        </div>
         <div class="info"><strong>Features:</strong> Tier-based searching, stuck queue resolution, manual intervention options, API rate limiting, email notifications.</div>
     </div>`;
+}
+
+function updateBaseUrl(val) {
+    baseUrl = val.replace(/\/+$/, ''); // Remove trailing slashes
+}
+
+function getDefaultUrl(svc) {
+    const ports = {sonarr:'8989', radarr:'7878', sabnzbd:'8080'};
+    if (baseUrl) {
+        return `${baseUrl}:${ports[svc]}`;
+    }
+    return '';
 }
 
 function stepService(svc, icon, desc) {
     const name = svc.charAt(0).toUpperCase() + svc.slice(1);
     const ports = {sonarr:'8989', radarr:'7878', sabnzbd:'8080'};
+    const defaultUrl = getDefaultUrl(svc);
     let html = `<div class="step active"><h2>${icon} ${name}</h2><p class="desc">Configure your ${name} instance(s) for ${desc}.</p><div id="${svc}-list">`;
     
     instances[svc].forEach((inst, i) => {
         const badge = i === 0 ? 'Primary' : `Instance ${inst.id}`;
+        const urlValue = i === 0 && defaultUrl ? defaultUrl : '';
         html += `
         <div class="svc" data-id="${svc}-${inst.id}">
             <div class="svc-head">
@@ -141,9 +161,9 @@ function stepService(svc, icon, desc) {
             </div>
             <div class="fields ${inst.on?'show':''}" id="fields-${svc}-${inst.id}">
                 <div class="row">
-                    <div class="field"><label>URL</label><input type="text" id="${svc}-${inst.id}-url" placeholder="http://192.168.1.100:${ports[svc]}"></div>
+                    <div class="field"><label>URL</label><input type="text" id="${svc}-${inst.id}-url" placeholder="http://192.168.1.100:${ports[svc]}" value="${urlValue}"></div>
                     <div class="field"><label>API Key</label><input type="password" id="${svc}-${inst.id}-key" placeholder="Your API key"></div>
-                </div>
+                </div>`;
                 <div class="field"><label>Name (optional)</label><input type="text" id="${svc}-${inst.id}-name" placeholder="e.g., ${name} 4K"></div>
                 <button class="test-btn" onclick="testSvc('${svc}',${inst.id},this)">Test Connection</button>
             </div>
