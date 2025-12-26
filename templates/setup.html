@@ -81,7 +81,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.2</div>
+    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.3</div>
 </div>
 <script>
 const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Settings', 'Complete'];
@@ -164,7 +164,7 @@ function stepService(svc, icon, desc) {
                 <div class="row">
                     <div class="field"><label>URL</label><input type="text" id="${svc}-${inst.id}-url" placeholder="http://192.168.1.100:${ports[svc]}" value="${urlValue}"></div>
                     <div class="field"><label>API Key</label><input type="password" id="${svc}-${inst.id}-key" placeholder="Your API key"></div>
-                </div>`;
+                </div>
                 <div class="field"><label>Name (optional)</label><input type="text" id="${svc}-${inst.id}-name" placeholder="e.g., ${name} 4K"></div>
                 <button class="test-btn" onclick="testSvc('${svc}',${inst.id},this)">Test Connection</button>
             </div>
