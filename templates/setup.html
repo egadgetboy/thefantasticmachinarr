@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9o</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9p</div>
 </div>
 <script>
 // Theme management
@@ -1084,17 +1084,17 @@ function stepSettings() {
         <h2>⚙️ Search Pacing</h2>
         <p class="desc">Control how TFM uses your ${apiLimit.toLocaleString()} daily API calls.</p>
         
-        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--warn-bg); border-color: var(--warn);">
-            <strong>👇 Choose a pacing preset below</strong> to set how quickly TFM burns through your daily API budget.
+        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--success-bg); border-color: var(--success);">
+            <strong>💡 Recommendation:</strong> Start with <strong>Steady</strong> — it spreads your API budget evenly over 24 hours for continuous searching. You can change this anytime in Settings.
         </div>
         
         <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 0 0 16px; font-size: 12px;">
-            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Pacing Presets</div>
-            <p style="color: var(--text2); margin-bottom: 10px;">Higher searches or shorter intervals = faster API usage. Choose how quickly to burn through your ${apiLimit.toLocaleString()} daily budget:</p>
+            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Choose Your Pacing</div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
                 <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid var(--success); text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
                     <div style="font-weight: 500; margin-bottom: 4px;">🐢 Steady</div>
                     <div style="color: var(--text3); font-size: 11px;">${defaultSearches} / ${defaultInterval} min<br>24 hours</div>
+                    <div style="color: var(--success); font-size: 10px; margin-top: 4px;">✓ Recommended</div>
                 </div>
                 <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${agg1Searches}, ${agg1Interval})">
                     <div style="font-weight: 500; margin-bottom: 4px;">🐇 Fast</div>
@@ -1109,19 +1109,22 @@ function stepSettings() {
                     <div style="color: var(--text3); font-size: 11px;">${agg3Searches} / ${agg3Interval} min<br>${agg3Hours} hours</div>
                 </div>
             </div>
+            <div style="margin-top: 12px; padding: 10px; background: var(--bg); border-radius: 6px; font-size: 11px; color: var(--text2);">
+                <strong>Why choose aggressive?</strong> Faster options burn through your daily API budget quickly — great if you want intensive searching during certain hours, then let TFM rest. However, once the budget is exhausted, no more searches until the next day.
+            </div>
         </div>
         
         <div class="row">
             <div class="field">
                 <label>Searches Per Cycle</label>
-                <input type="number" id="set-per-cycle" placeholder="Select a preset" min="1" max="5000" autocomplete="off">
+                <input type="number" id="set-per-cycle" placeholder="Select a preset above" min="1" max="5000" autocomplete="off">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
                     Items searched each cycle
                 </div>
             </div>
             <div class="field">
                 <label>Cycle Interval (minutes)</label>
-                <input type="number" id="set-interval" placeholder="Select a preset" min="5" max="360" autocomplete="off">
+                <input type="number" id="set-interval" placeholder="Select a preset above" min="5" max="360" autocomplete="off">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
                     Time between cycles
                 </div>
