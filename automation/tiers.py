@@ -61,6 +61,7 @@ class TieredItem:
     episode_title: Optional[str] = None
     last_searched: Optional[datetime] = None
     search_count: int = 0
+    search_type: str = 'missing'  # 'missing' or 'upgrade'
     
     def to_dict(self) -> Dict[str, Any]:
         return {
@@ -73,6 +74,7 @@ class TieredItem:
             'tier_color': self.tier.color,
             'age_days': self.age_days,
             'air_date': self.air_date.isoformat() if self.air_date else None,
+            'search_type': self.search_type,
             'series_id': self.series_id,
             'season_number': self.season_number,
             'episode_number': self.episode_number,
