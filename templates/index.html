@@ -616,6 +616,15 @@
             color: #22c55e;
         }
         
+        /* Urgent intervention rows */
+        .data-table tr.urgent-row td {
+            background: rgba(239,68,68,0.05);
+        }
+        
+        .data-table tr.urgent-row:hover td {
+            background: rgba(239,68,68,0.1);
+        }
+        
         /* Storage */
         .storage-bar { margin-bottom: 18px; }
         .storage-head { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
@@ -1378,7 +1387,19 @@
         async function loadInterventions() {
             const data = await api('interventions');
             const el = document.getElementById('intervention-list');
-            document.getElementById('intervention-count').textContent = `${data.count || 0} items`;
+            
+            // Show breakdown of urgent vs long-missing
+            const urgentCount = data.urgent_count || 0;
+            const longMissingCount = data.long_missing_count || 0;
+            let countText = `${data.count || 0} items`;
+            if (urgentCount > 0 && longMissingCount > 0) {
+                countText = `${urgentCount} urgent, ${longMissingCount} long-missing`;
+            } else if (urgentCount > 0) {
+                countText = `${urgentCount} urgent`;
+            } else if (longMissingCount > 0) {
+                countText = `${longMissingCount} long-missing`;
+            }
+            document.getElementById('intervention-count').textContent = countText;
             
             if (!data.items?.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>';
@@ -1405,6 +1426,7 @@
                 <table class="data-table">
                     <thead>
                         <tr>
+                            <th class="col-type">Type</th>
                             <th class="col-source">Source</th>
                             <th class="col-title">Title</th>
                             <th class="col-issue">Why Intervention Needed</th>
@@ -1412,21 +1434,35 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${pageItems.map(item => `
-                            <tr>
+                        ${pageItems.map(item => {
+                            const isUrgent = item.urgency === 'high';
+                            const isLongMissing = item.intervention_type === 'long_missing';
+                            const typeIcon = isLongMissing ? '📅' : (isUrgent ? '🚨' : '⚠️');
+                            const typeBadge = isLongMissing ? 'badge-info' : 'badge-error';
+                            const typeLabel = isLongMissing 
+                                ? `${item.details?.months_missing || '?'}+ months` 
+                                : 'Search Failed';
+                            const tierInfo = item.details?.tier_emoji ? `${item.details.tier_emoji} ${item.details.tier}` : '';
+                            
+                            return `
+                            <tr class="${isUrgent ? 'urgent-row' : ''}">
+                                <td class="col-type">
+                                    <span class="badge ${typeBadge}">${typeIcon} ${typeLabel}</span>
+                                </td>
                                 <td class="col-source"><span class="badge badge-${item.source}">${item.source}</span></td>
                                 <td class="col-title">
                                     <div class="title-main">${esc(item.title)}</div>
+                                    ${tierInfo ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">' + tierInfo + '</div>' : ''}
                                 </td>
                                 <td class="col-issue">
-                                    <span class="badge badge-warn">${esc(item.reason)}</span>
-                                    ${item.details ? '<div style="font-size:11px;color:var(--text3);margin-top:4px">' + esc(JSON.stringify(item.details).substring(0,80)) + '</div>' : ''}
+                                    <div style="font-size:12px;color:var(--text2)">${esc(item.reason)}</div>
+                                    ${item.details?.search_count ? '<div style="font-size:11px;color:var(--text3);margin-top:2px">Searched ' + item.details.search_count + ' times</div>' : ''}
                                 </td>
                                 <td class="col-action">
-                                    <button class="btn btn-sm btn-pri" onclick="showIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
+                                    <button class="btn btn-sm ${isUrgent ? 'btn-pri' : 'btn-sec'}" onclick="showIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
                                 </td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
                 ${paginationHtml}
@@ -1846,6 +1882,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.17</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.17a</div>
 </body>
 </html>
