@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>The Fantastic Machinarr</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+    <style>
+        :root { --bg: #0f172a; --bg2: #1e293b; --bg3: #334155; --text: #f8fafc; --text2: #94a3b8; --accent: #8b5cf6; --success: #22c55e; --warn: #f59e0b; --error: #ef4444; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+        
+        /* Header */
+        header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+        .logo { display: flex; align-items: center; gap: 12px; font-size: 20px; font-weight: 600; }
+        .status-dots { display: flex; gap: 10px; }
+        .dot { display: flex; align-items: center; gap: 6px; padding: 6px 12px; background: var(--bg3); border-radius: 20px; font-size: 12px; }
+        .dot-ind { width: 8px; height: 8px; border-radius: 50%; background: var(--text2); }
+        .dot-ind.on { background: var(--success); }
+        .dot-ind.off { background: var(--error); }
+        
+        /* Scoreboard */
+        .scoreboard { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; padding: 20px 24px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+        .score-card { background: var(--bg3); border-radius: 10px; padding: 16px; text-align: center; }
+        .score-val { font-size: 32px; font-weight: 700; }
+        .score-label { font-size: 12px; color: var(--text2); margin-top: 4px; }
+        .score-card.hot { border-left: 4px solid #ef4444; }
+        .score-card.api { border-left: 4px solid var(--accent); }
+        
+        /* Main layout */
+        main { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; padding: 20px 24px; }
+        @media (max-width: 1024px) { main { grid-template-columns: 1fr; } }
+        
+        /* Panels */
+        .panel { background: var(--bg2); border-radius: 12px; border: 1px solid var(--border); overflow: hidden; }
+        .panel-head { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+        .panel-title { font-weight: 600; }
+        .panel-body { padding: 16px; max-height: 400px; overflow-y: auto; }
+        .panel-body.flush { padding: 0; }
+        
+        /* Tiers */
+        .tiers { display: flex; gap: 12px; flex-wrap: wrap; }
+        .tier { flex: 1; min-width: 80px; background: var(--bg3); padding: 14px; border-radius: 8px; text-align: center; }
+        .tier-emoji { font-size: 24px; }
+        .tier-count { font-size: 22px; font-weight: 700; margin: 4px 0; }
+        .tier-name { font-size: 11px; color: var(--text2); text-transform: uppercase; }
+        
+        /* Items list */
+        .item { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); gap: 12px; }
+        .item:last-child { border: none; }
+        .item:hover { background: var(--bg3); }
+        .item-icon { font-size: 20px; }
+        .item-info { flex: 1; min-width: 0; }
+        .item-title { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .item-meta { font-size: 12px; color: var(--text2); margin-top: 2px; }
+        .item-badge { padding: 3px 8px; border-radius: 10px; font-size: 11px; font-weight: 500; }
+        .item-badge.hot { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .item-badge.warm { background: rgba(249,115,22,0.2); color: #f97316; }
+        .item-badge.cool { background: rgba(59,130,246,0.2); color: #3b82f6; }
+        .item-badge.cold { background: rgba(99,102,241,0.2); color: #6366f1; }
+        .item-badge.issue { background: rgba(239,68,68,0.2); color: #ef4444; }
+        
+        /* Buttons */
+        .btn { padding: 8px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; border: none; }
+        .btn-sm { padding: 5px 10px; font-size: 12px; }
+        .btn-pri { background: var(--accent); color: #fff; }
+        .btn-sec { background: var(--bg3); color: var(--text); border: 1px solid var(--border); }
+        .btn:hover { opacity: 0.9; }
+        
+        /* Empty state */
+        .empty { text-align: center; padding: 40px 20px; color: var(--text2); }
+        .empty-icon { font-size: 40px; margin-bottom: 12px; }
+        
+        /* Logs */
+        .log { padding: 8px 12px; font-family: monospace; font-size: 12px; border-bottom: 1px solid var(--border); }
+        .log:hover { background: var(--bg3); }
+        .log-time { color: var(--text2); margin-right: 8px; }
+        .log-level { padding: 1px 5px; border-radius: 3px; font-size: 10px; margin-right: 6px; }
+        .log-level.INFO { background: rgba(59,130,246,0.2); color: #3b82f6; }
+        .log-level.WARNING { background: rgba(245,158,11,0.2); color: #f59e0b; }
+        .log-level.ERROR { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .log-level.DEBUG { background: rgba(156,163,175,0.2); color: #9ca3af; }
+        
+        /* Storage */
+        .storage-bar { margin-bottom: 16px; }
+        .storage-head { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+        .storage-path { font-family: monospace; }
+        .bar { height: 8px; background: var(--bg3); border-radius: 4px; overflow: hidden; }
+        .bar-fill { height: 100%; background: var(--success); }
+        .bar-fill.warn { background: var(--warn); }
+        .bar-fill.crit { background: var(--error); }
+        
+        /* Intervention modal */
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; justify-content: center; align-items: center; z-index: 100; }
+        .modal.show { display: flex; }
+        .modal-content { background: var(--bg2); border-radius: 12px; padding: 24px; max-width: 500px; width: 90%; }
+        .modal h3 { margin-bottom: 16px; }
+        .modal-actions { display: flex; gap: 10px; margin-top: 20px; }
+        .modal-actions .btn { flex: 1; }
+        
+        /* Spinner */
+        .spinner { width: 24px; height: 24px; border: 3px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; margin: 20px auto; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* Full width panel */
+        .full-width { grid-column: 1 / -1; }
+        
+        /* Settings link */
+        .settings-link { color: var(--text2); text-decoration: none; font-size: 20px; }
+        .settings-link:hover { color: var(--text); }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="logo"><span>🎬</span> The Fantastic Machinarr</div>
+        <div style="display:flex;align-items:center;gap:16px">
+            <div class="status-dots" id="status-dots"></div>
+            <a href="/setup" class="settings-link">⚙️</a>
+        </div>
+    </header>
+    
+    <div class="scoreboard">
+        <div class="score-card hot">
+            <div class="score-val" id="finds-today">0</div>
+            <div class="score-label">Finds Today</div>
+        </div>
+        <div class="score-card">
+            <div class="score-val" id="finds-total">0</div>
+            <div class="score-label">Total Finds</div>
+        </div>
+        <div class="score-card api">
+            <div class="score-val" id="api-used">0</div>
+            <div class="score-label">API Hits Today</div>
+        </div>
+        <div class="score-card">
+            <div class="score-val" id="api-limit">500</div>
+            <div class="score-label">Daily Limit</div>
+        </div>
+    </div>
+    
+    <main>
+        <!-- Tier Summary -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">Missing Content by Tier</span>
+                <button class="btn btn-sm btn-sec" onclick="runSearch()">🔍 Run Search</button>
+            </div>
+            <div class="panel-body">
+                <div class="tiers">
+                    <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div></div>
+                    <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div></div>
+                    <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
+                    <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Stuck Queue Items -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">⚠️ Queue Issues</span>
+                <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush" id="stuck-list">
+                <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
+            </div>
+        </div>
+        
+        <!-- Manual Interventions -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🖐️ Manual Intervention</span>
+                <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush" id="intervention-list">
+                <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
+            </div>
+        </div>
+        
+        <!-- Storage -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">💾 Storage</span>
+            </div>
+            <div class="panel-body" id="storage-list">
+                <div class="spinner"></div>
+            </div>
+        </div>
+        
+        <!-- Recent Finds - Separate Prominent Pane -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🎉 Recent Finds</span>
+                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush" id="finds-list" style="max-height:350px">
+                <div class="empty"><div class="empty-icon">🔍</div><p>No finds yet - TFM is working on it!</p></div>
+            </div>
+        </div>
+        
+        <!-- Recent Searches -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🔎 Recent Searches</span>
+            </div>
+            <div class="panel-body flush" id="search-list" style="max-height:350px">
+                <div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>
+            </div>
+        </div>
+        
+        <!-- Debug Logs -->
+        <div class="panel full-width">
+            <div class="panel-head">
+                <span class="panel-title">📋 Debug Logs</span>
+                <select id="log-filter" onchange="loadLogs()" style="background:var(--bg3);border:1px solid var(--border);color:var(--text);padding:5px 10px;border-radius:4px">
+                    <option value="">All</option>
+                    <option value="ERROR">Errors</option>
+                    <option value="WARNING">Warnings</option>
+                    <option value="INFO">Info</option>
+                    <option value="DEBUG">Debug</option>
+                </select>
+            </div>
+            <div class="panel-body flush" id="log-list" style="max-height:300px">
+                <div class="spinner"></div>
+            </div>
+        </div>
+    </main>
+    
+    <!-- Intervention Modal -->
+    <div class="modal" id="modal">
+        <div class="modal-content">
+            <h3 id="modal-title">Manual Intervention</h3>
+            <p id="modal-desc"></p>
+            <div id="modal-details"></div>
+            <div class="modal-actions" id="modal-actions"></div>
+        </div>
+    </div>
+    
+    <script>
+        async function api(endpoint, method = 'GET', data = null) {
+            const opts = { method, headers: {'Content-Type': 'application/json'} };
+            if (data) opts.body = JSON.stringify(data);
+            const r = await fetch('/api/' + endpoint, opts);
+            return r.json();
+        }
+        
+        function esc(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+        function fmt(iso) { try { return new Date(iso).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}); } catch { return ''; } }
+        
+        async function loadStatus() {
+            const data = await api('status');
+            const dots = document.getElementById('status-dots');
+            let html = '';
+            for (const [key, svc] of Object.entries(data.services || {})) {
+                html += `<div class="dot"><span class="dot-ind ${svc.connected ? 'on' : 'off'}"></span>${svc.name}</div>`;
+            }
+            dots.innerHTML = html;
+        }
+        
+        async function loadDashboard() {
+            const data = await api('dashboard');
+            if (data.scoreboard) {
+                document.getElementById('finds-today').textContent = data.scoreboard.finds_today;
+                document.getElementById('finds-total').textContent = data.scoreboard.finds_total;
+                document.getElementById('api-used').textContent = data.scoreboard.api_hits_today;
+                document.getElementById('api-limit').textContent = data.scoreboard.api_limit;
+            }
+            if (data.tiers) {
+                document.getElementById('tier-hot').textContent = data.tiers.hot?.count ?? 0;
+                document.getElementById('tier-warm').textContent = data.tiers.warm?.count ?? 0;
+                document.getElementById('tier-cool').textContent = data.tiers.cool?.count ?? 0;
+                document.getElementById('tier-cold').textContent = data.tiers.cold?.count ?? 0;
+            }
+        }
+        
+        async function loadQueue() {
+            const data = await api('queue');
+            const el = document.getElementById('stuck-list');
+            document.getElementById('stuck-count').textContent = `${data.total_stuck || 0} items`;
+            
+            if (!data.stuck_items?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>';
+                return;
+            }
+            
+            el.innerHTML = data.stuck_items.slice(0, 20).map(item => `
+                <div class="item">
+                    <div class="item-icon">⚠️</div>
+                    <div class="item-info">
+                        <div class="item-title">${esc(item.title)}</div>
+                        <div class="item-meta">${item.issues.join(', ')} • ${item.stuck_minutes}m stuck</div>
+                    </div>
+                    ${item.can_auto_resolve ? '<span class="item-badge" style="background:rgba(34,197,94,0.2);color:#22c55e">Auto</span>' : ''}
+                    <button class="btn btn-sm btn-sec" onclick="resolveItem('${item.source}',${item.queue_id})">Resolve</button>
+                </div>
+            `).join('');
+        }
+        
+        async function loadInterventions() {
+            const data = await api('interventions');
+            const el = document.getElementById('intervention-list');
+            document.getElementById('intervention-count').textContent = `${data.count || 0} items`;
+            
+            if (!data.items?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>';
+                return;
+            }
+            
+            el.innerHTML = data.items.slice(0, 20).map(item => `
+                <div class="item">
+                    <div class="item-icon">🖐️</div>
+                    <div class="item-info">
+                        <div class="item-title">${esc(item.title)}</div>
+                        <div class="item-meta">${esc(item.reason)}</div>
+                    </div>
+                    <button class="btn btn-sm btn-pri" onclick="showIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
+                </div>
+            `).join('');
+        }
+        
+        async function loadStorage() {
+            const data = await api('storage');
+            const el = document.getElementById('storage-list');
+            
+            if (!data.paths?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">💾</div><p>No storage info</p></div>';
+                return;
+            }
+            
+            el.innerHTML = data.paths.map(p => {
+                const pct = 100 - (p.free_gb / (p.free_gb + 100)) * 100; // Rough estimate
+                const cls = pct > 90 ? 'crit' : pct > 75 ? 'warn' : '';
+                return `
+                <div class="storage-bar">
+                    <div class="storage-head">
+                        <span class="storage-path">${esc(p.path)}</span>
+                        <span>${p.free_gb} GB free</span>
+                    </div>
+                    <div class="bar"><div class="bar-fill ${cls}" style="width:${100-pct}%"></div></div>
+                </div>`;
+            }).join('');
+        }
+        
+        async function loadFinds() {
+            const data = await api('finds?limit=30');
+            const el = document.getElementById('finds-list');
+            document.getElementById('finds-count').textContent = `${data.finds?.length || 0} items`;
+            
+            if (!data.finds?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>No finds yet - TFM is working on it!</p></div>';
+                return;
+            }
+            
+            const typeIcons = {
+                'auto': '🤖',
+                'manual': '🖐️',
+                'rss': '📡',
+                'search': '🔎'
+            };
+            
+            const typeLabels = {
+                'auto': 'Auto-resolved',
+                'manual': 'Manual intervention',
+                'rss': 'RSS sync',
+                'search': 'Scheduled search'
+            };
+            
+            el.innerHTML = data.finds.reverse().map(f => `
+                <div class="item">
+                    <div class="item-icon">🎉</div>
+                    <div class="item-info">
+                        <div class="item-title">${esc(f.title)}</div>
+                        <div class="item-meta">
+                            ${typeIcons[f.resolution_type] || '✅'} ${typeLabels[f.resolution_type] || f.resolution_type}
+                            ${f.resolution_detail ? ' • ' + esc(f.resolution_detail) : ''}
+                            • ${fmt(f.timestamp)}
+                        </div>
+                    </div>
+                    <span class="item-badge" style="background:rgba(34,197,94,0.2);color:#22c55e">${f.source}</span>
+                </div>
+            `).join('');
+        }
+        
+        async function loadSearches() {
+            const data = await api('searches?limit=20');
+            const el = document.getElementById('search-list');
+            
+            if (!data.searches?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>';
+                return;
+            }
+            
+            el.innerHTML = data.searches.reverse().map(s => `
+                <div class="item">
+                    <div class="item-icon">${s.success ? '✅' : '❌'}</div>
+                    <div class="item-info">
+                        <div class="item-title">${esc(s.title)}</div>
+                        <div class="item-meta">${s.tier_emoji} ${s.tier} • ${s.source} • ${fmt(s.timestamp)}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        async function loadLogs() {
+            const level = document.getElementById('log-filter').value;
+            const data = await api('logs?limit=100' + (level ? '&level=' + level : ''));
+            const el = document.getElementById('log-list');
+            
+            if (!data.logs?.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><p>No logs</p></div>';
+                return;
+            }
+            
+            el.innerHTML = data.logs.reverse().map(l => `
+                <div class="log">
+                    <span class="log-time">${fmt(l.timestamp)}</span>
+                    <span class="log-level ${l.level}">${l.level}</span>
+                    ${esc(l.message)}
+                </div>
+            `).join('');
+        }
+        
+        async function runSearch() {
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = 'Searching...';
+            
+            const data = await api('search', 'POST', {type: 'cycle'});
+            
+            btn.disabled = false;
+            btn.textContent = '🔍 Run Search';
+            
+            alert(`Searched ${data.searched || 0} items`);
+            loadDashboard();
+            loadSearches();
+        }
+        
+        async function resolveItem(source, queueId) {
+            const data = await api('resolve', 'POST', {source, queue_id: queueId, action: 'blocklist_retry'});
+            if (data.success) {
+                loadQueue();
+            } else {
+                alert('Failed: ' + data.message);
+            }
+        }
+        
+        function showIntervention(item) {
+            document.getElementById('modal-title').textContent = item.title;
+            document.getElementById('modal-desc').textContent = item.reason;
+            document.getElementById('modal-details').innerHTML = `<p style="color:var(--text2);font-size:13px;margin-top:10px">${JSON.stringify(item.details)}</p>`;
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <button class="btn btn-sec" onclick="dismissIntervention('${item.source}',${item.id},'${item.intervention_type}')">Dismiss</button>
+                <button class="btn btn-pri" onclick="closeModal()">Close</button>
+            `;
+            
+            document.getElementById('modal').classList.add('show');
+        }
+        
+        async function dismissIntervention(source, id, type) {
+            await api('intervention/dismiss', 'POST', {source, id, type});
+            closeModal();
+            loadInterventions();
+        }
+        
+        function closeModal() {
+            document.getElementById('modal').classList.remove('show');
+        }
+        
+        // Initial load
+        loadStatus();
+        loadDashboard();
+        loadQueue();
+        loadInterventions();
+        loadStorage();
+        loadFinds();
+        loadSearches();
+        loadLogs();
+        
+        // Refresh periodically
+        setInterval(loadStatus, 30000);
+        setInterval(loadDashboard, 60000);
+        setInterval(loadQueue, 60000);
+        setInterval(loadFinds, 60000);
+        setInterval(loadLogs, 30000);
+    </script>
+</body>
+</html>
