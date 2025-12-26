@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9b</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9c</div>
 </div>
 <script>
 // Theme management
@@ -1041,50 +1041,49 @@ function stepSettings() {
     // Get API limit from existingConfig (since the Welcome page DOM doesn't exist here)
     const apiLimit = existingConfig?.search?.daily_api_limit || parseInt(document.getElementById('api-limit')?.value) || 500;
     
-    // Calculate optimal settings for 24-hour spread
-    // Target: spread API calls evenly over 24 hours
-    // Formula: calls/day = (searches_per_cycle * 60 / interval) * 24
-    // We want calls/day ≈ apiLimit
+    // Default: Spread API limit evenly over 24 hours with 60-minute intervals
+    // searches_per_cycle = apiLimit / 24 (number of 60-min cycles in a day)
+    const defaultInterval = 60;
+    const defaultSearches = Math.round(apiLimit / 24);
     
-    // Default to 10 searches per cycle, calculate interval
-    const defaultSearches = 10;
-    // interval = (searches * 60 * 24) / apiLimit
-    let optimalInterval = Math.round((defaultSearches * 60 * 24) / apiLimit);
-    // Clamp between 5 and 360 minutes
-    optimalInterval = Math.max(5, Math.min(360, optimalInterval));
-    
-    // Use saved values if they exist, otherwise use optimal
+    // Use saved values if they exist, otherwise use calculated defaults
     const searchesPerCycle = existingConfig?.search?.searches_per_cycle || defaultSearches;
-    const cycleInterval = existingConfig?.search?.cycle_interval_minutes || optimalInterval;
+    const cycleInterval = existingConfig?.search?.cycle_interval_minutes || defaultInterval;
     
-    // Calculate actual daily calls with current settings
-    const dailyCalls = Math.round((searchesPerCycle * 60 / cycleInterval) * 24);
-    const callsPerHour = Math.round(searchesPerCycle * 60 / cycleInterval);
-    const pctOfLimit = Math.round(dailyCalls / apiLimit * 100);
+    // Calculate how fast current settings burn the budget
+    const callsPerHour = searchesPerCycle * (60 / cycleInterval);
+    const dailyCalls = Math.round(callsPerHour * 24);
+    const hoursToExhaust = Math.round(apiLimit / callsPerHour);
     
-    // Calculate calls per hour for optimal
-    const optimalCallsPerHour = Math.round(defaultSearches * 60 / optimalInterval);
+    // Aggressive presets - same total calls, burned faster
+    // Aggressive 1: 2x speed (12 hours) - double searches, same interval
+    const agg1Searches = defaultSearches * 2;
+    const agg1Interval = defaultInterval;
+    const agg1Hours = 12;
     
-    // Calculate aggressive settings
-    const aggSearches = 25;
-    const aggInterval = 15;
-    const aggCallsPerHour = aggSearches * 60 / aggInterval; // 100 calls/hour
-    const aggDailyCalls = Math.round(aggCallsPerHour * 24);
-    const aggBurnHours = Math.round(apiLimit / aggCallsPerHour);
+    // Aggressive 2: 4x speed (6 hours) - 4x searches, same interval
+    const agg2Searches = defaultSearches * 4;
+    const agg2Interval = defaultInterval;
+    const agg2Hours = 6;
+    
+    // Aggressive 3: 8x speed (3 hours) - 4x searches, half interval
+    const agg3Searches = defaultSearches * 4;
+    const agg3Interval = 30;
+    const agg3Hours = 3;
     
     return `
     <div class="step active">
         <h2>⚙️ Search Pacing</h2>
-        <p class="desc">Control how TFM spreads your ${apiLimit.toLocaleString()} daily API calls.</p>
+        <p class="desc">Control how TFM uses your ${apiLimit.toLocaleString()} daily API calls.</p>
         
         <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--success-bg); border-color: var(--success);">
-            <strong>📊 Recommended for your ${apiLimit.toLocaleString()} API limit:</strong> ${defaultSearches} searches every ${optimalInterval} minutes = ~${optimalCallsPerHour} calls/hour. Your budget lasts all day with continuous searching.
+            <strong>📊 Default for ${apiLimit.toLocaleString()} API limit:</strong> ${defaultSearches} searches every ${defaultInterval} minutes spreads your budget evenly over 24 hours.
         </div>
         
         <div class="row">
             <div class="field">
                 <label>Searches Per Cycle</label>
-                <input type="number" id="set-per-cycle" value="${searchesPerCycle}" min="1" max="50">
+                <input type="number" id="set-per-cycle" value="${searchesPerCycle}" min="1" max="5000">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
                     Items searched each cycle
                 </div>
@@ -1099,20 +1098,28 @@ function stepSettings() {
         </div>
         
         <div id="pacing-calc" style="background: var(--bg3); border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 12px;">
-            <strong>📈 With these settings:</strong> <span id="calc-result">~${dailyCalls.toLocaleString()} API calls/day (${pctOfLimit}% of your limit)${pctOfLimit <= 100 ? ' — <span style="color: var(--success);">✓ Within limit</span>' : ' — <span style="color: var(--warn);">Budget exhausted in ~' + Math.round(apiLimit / (searchesPerCycle * 60 / cycleInterval)) + 'h</span>'}</span>
+            <strong>📈 With these settings:</strong> <span id="calc-result"></span>
         </div>
         
         <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 16px 0; font-size: 12px;">
-            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Want to search more aggressively?</div>
-            <p style="color: var(--text2); margin-bottom: 8px;">Burn through your daily budget faster. Useful for intensive searching during certain hours, then let TFM rest.</p>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
-                <div style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent;" onclick="applyPacing(${defaultSearches}, ${optimalInterval})">
+            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Pacing Presets</div>
+            <p style="color: var(--text2); margin-bottom: 10px;">Higher searches or shorter intervals = faster API usage. Choose how quickly to burn through your ${apiLimit.toLocaleString()} daily budget:</p>
+            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
                     <div style="font-weight: 500; margin-bottom: 4px;">🐢 Steady</div>
-                    <div style="color: var(--text3); font-size: 11px;">${defaultSearches} searches / ${optimalInterval} min<br>= ~${Math.round((defaultSearches * 60 / optimalInterval) * 24).toLocaleString()} calls/day<br>Runs continuously 24/7</div>
+                    <div style="color: var(--text3); font-size: 11px;">${defaultSearches} / ${defaultInterval} min<br>24 hours</div>
                 </div>
-                <div style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent;" onclick="applyPacing(${aggSearches}, ${aggInterval})">
-                    <div style="font-weight: 500; margin-bottom: 4px;">🐇 Aggressive</div>
-                    <div style="color: var(--text3); font-size: 11px;">${aggSearches} searches / ${aggInterval} min<br>= ~${aggDailyCalls.toLocaleString()} calls/day<br>Burns ${apiLimit.toLocaleString()} in ~${aggBurnHours} hours</div>
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${agg1Searches}, ${agg1Interval})">
+                    <div style="font-weight: 500; margin-bottom: 4px;">🐇 Fast</div>
+                    <div style="color: var(--text3); font-size: 11px;">${agg1Searches} / ${agg1Interval} min<br>${agg1Hours} hours</div>
+                </div>
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${agg2Searches}, ${agg2Interval})">
+                    <div style="font-weight: 500; margin-bottom: 4px;">🚀 Faster</div>
+                    <div style="color: var(--text3); font-size: 11px;">${agg2Searches} / ${agg2Interval} min<br>${agg2Hours} hours</div>
+                </div>
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${agg3Searches}, ${agg3Interval})">
+                    <div style="font-weight: 500; margin-bottom: 4px;">⚡ Blazing</div>
+                    <div style="color: var(--text3); font-size: 11px;">${agg3Searches} / ${agg3Interval} min<br>${agg3Hours} hours</div>
                 </div>
             </div>
         </div>
@@ -1167,31 +1174,36 @@ function applyPacing(searches, interval) {
 
 function updatePacingCalc() {
     const searches = parseInt(document.getElementById('set-per-cycle')?.value) || 10;
-    const interval = parseInt(document.getElementById('set-interval')?.value) || 30;
+    const interval = parseInt(document.getElementById('set-interval')?.value) || 60;
     const apiLimit = existingConfig?.search?.daily_api_limit || parseInt(document.getElementById('api-limit')?.value) || 500;
     
-    const dailyCalls = Math.round((searches * 60 / interval) * 24);
-    const pct = Math.round(dailyCalls / apiLimit * 100);
+    const callsPerHour = searches * (60 / interval);
+    const hoursToExhaust = apiLimit / callsPerHour;
     
     const el = document.getElementById('calc-result');
     if (el) {
-        let status = '';
-        if (pct <= 100) {
-            status = `<span style="color: var(--success);">✓ Within limit</span>`;
+        let message = '';
+        if (hoursToExhaust >= 24) {
+            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls over ~${Math.round(hoursToExhaust)} hours <span style="color: var(--success);">✓ Lasts all day</span>`;
+        } else if (hoursToExhaust >= 1) {
+            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls exhausted in ~${Math.round(hoursToExhaust)} hours <span style="color: var(--warn);">Then TFM rests</span>`;
         } else {
-            const burnHours = Math.round(apiLimit / (searches * 60 / interval));
-            status = `<span style="color: var(--warn);">Budget exhausted in ~${burnHours}h</span>`;
+            const minutes = Math.round(hoursToExhaust * 60);
+            message = `${searches.toLocaleString()} searches every ${interval} min = ${apiLimit.toLocaleString()} API calls exhausted in ~${minutes} minutes <span style="color: var(--warn);">Very aggressive!</span>`;
         }
-        el.innerHTML = `~${dailyCalls.toLocaleString()} API calls/day (${pct}% of limit) — ${status}`;
+        el.innerHTML = message;
     }
 }
 
-// Add event listeners for pacing inputs after render
+// Initialize calc on page load and when inputs change
 document.addEventListener('input', function(e) {
     if (e.target.id === 'set-per-cycle' || e.target.id === 'set-interval') {
         updatePacingCalc();
     }
 });
+
+// Also update on render
+setTimeout(updatePacingCalc, 100);
 
 function stepComplete() {
     const cfg = gatherConfig();
