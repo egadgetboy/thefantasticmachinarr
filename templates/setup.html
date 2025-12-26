@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.8c</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.8d</div>
 </div>
 <script>
 // Theme management
@@ -600,7 +600,7 @@ let counters = { sonarr:1, radarr:1, sabnzbd:1 };
 let baseUrl = '';
 let existingConfig = null;
 
-// Capture current form values into instances array before navigation
+// Capture current form values into memory before navigation
 function captureCurrentValues() {
     // Capture service instance values
     ['sonarr', 'radarr', 'sabnzbd'].forEach(svc => {
@@ -619,6 +619,89 @@ function captureCurrentValues() {
     const baseUrlEl = document.getElementById('base-url');
     if (baseUrlEl && baseUrlEl.value) {
         baseUrl = baseUrlEl.value.replace(/\/+$/, '');
+    }
+    
+    // Capture API limit and other welcome page values into existingConfig
+    if (!existingConfig) existingConfig = {};
+    
+    const apiLimitEl = document.getElementById('api-limit');
+    if (apiLimitEl) {
+        if (!existingConfig.search) existingConfig.search = {};
+        existingConfig.search.daily_api_limit = parseInt(apiLimitEl.value) || 500;
+    }
+    
+    // Capture tier settings
+    const tierHotMax = document.getElementById('tier-hot-max');
+    const tierHot = document.getElementById('tier-hot');
+    const tierWarmMin = document.getElementById('tier-warm-min');
+    const tierWarmMax = document.getElementById('tier-warm-max');
+    const tierWarm = document.getElementById('tier-warm');
+    const tierCoolMin = document.getElementById('tier-cool-min');
+    const tierCoolMax = document.getElementById('tier-cool-max');
+    const tierCool = document.getElementById('tier-cool');
+    const tierColdMin = document.getElementById('tier-cold-min');
+    const tierCold = document.getElementById('tier-cold');
+    
+    if (tierHotMax || tierWarmMin) {
+        if (!existingConfig.tiers) existingConfig.tiers = {};
+        if (tierHotMax) existingConfig.tiers.hot = { min_days: 0, max_days: parseInt(tierHotMax.value) || 90, interval_minutes: parseInt(tierHot?.value) || 60 };
+        if (tierWarmMin) existingConfig.tiers.warm = { min_days: parseInt(tierWarmMin.value) || 90, max_days: parseInt(tierWarmMax?.value) || 365, interval_minutes: parseInt(tierWarm?.value) || 360 };
+        if (tierCoolMin) existingConfig.tiers.cool = { min_days: parseInt(tierCoolMin.value) || 365, max_days: parseInt(tierCoolMax?.value) || 1095, interval_minutes: parseInt(tierCool?.value) || 1440 };
+        if (tierColdMin) existingConfig.tiers.cold = { min_days: parseInt(tierColdMin.value) || 1095, max_days: null, interval_minutes: parseInt(tierCold?.value) || 10080 };
+    }
+    
+    // Capture search pacing settings
+    const perCycleEl = document.getElementById('set-per-cycle');
+    const intervalEl = document.getElementById('set-interval');
+    if (perCycleEl || intervalEl) {
+        if (!existingConfig.search) existingConfig.search = {};
+        if (perCycleEl) existingConfig.search.searches_per_cycle = parseInt(perCycleEl.value) || 10;
+        if (intervalEl) existingConfig.search.cycle_interval_minutes = parseInt(intervalEl.value) || 30;
+    }
+    
+    // Capture quiet hours
+    const quietToggle = document.getElementById('quiet-toggle');
+    const quietStart = document.getElementById('quiet-start');
+    const quietEnd = document.getElementById('quiet-end');
+    if (quietToggle || quietStart) {
+        existingConfig.quiet_hours = {
+            enabled: quietToggle?.classList.contains('on') || false,
+            start_hour: parseInt(quietStart?.value) ?? 2,
+            end_hour: parseInt(quietEnd?.value) ?? 7
+        };
+    }
+    
+    // Capture auto-resolution settings
+    const arNoFiles = document.getElementById('ar-no_files_found');
+    if (arNoFiles) {
+        existingConfig.auto_resolution = {
+            enabled: true,
+            no_files_found: document.getElementById('ar-no_files_found')?.checked ?? true,
+            sample_only: document.getElementById('ar-sample_only')?.checked ?? true,
+            unknown_series: document.getElementById('ar-unknown_series')?.checked ?? true,
+            unexpected_episode: document.getElementById('ar-unexpected_episode')?.checked ?? true,
+            invalid_season_episode: document.getElementById('ar-invalid_season_episode')?.checked ?? true,
+            no_audio_tracks: document.getElementById('ar-no_audio_tracks')?.checked ?? true,
+            import_failed: document.getElementById('ar-import_failed')?.checked ?? true,
+            download_failed: document.getElementById('ar-download_failed')?.checked ?? true,
+            path_not_valid: document.getElementById('ar-path_not_valid')?.checked ?? false,
+            wait_minutes_before_action: parseInt(document.getElementById('ar-wait')?.value) || 30
+        };
+    }
+    
+    // Capture email settings
+    const emailHost = document.getElementById('email-host');
+    if (emailHost) {
+        existingConfig.email = {
+            enabled: !!emailHost.value,
+            smtp_host: emailHost.value || '',
+            smtp_port: parseInt(document.getElementById('email-port')?.value) || 587,
+            smtp_user: document.getElementById('email-user')?.value || '',
+            smtp_password: document.getElementById('email-pass')?.value || '',
+            smtp_tls: true,
+            from_address: document.getElementById('email-from')?.value || '',
+            to_address: document.getElementById('email-to')?.value || ''
+        };
     }
 }
 
