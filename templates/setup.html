@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9n</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9o</div>
 </div>
 <script>
 // Theme management
@@ -847,13 +847,7 @@ function renderContent() {
     else if (step === 2) c.innerHTML = stepService('radarr', '🎬', 'Movies');
     else if (step === 3) c.innerHTML = stepService('sabnzbd', '📥', 'Downloads');
     else if (step === 4) c.innerHTML = stepAutoRes();
-    else if (step === 5) {
-        c.innerHTML = stepSettings();
-        // Auto-apply calculated defaults (like clicking Steady button)
-        const apiLimit = existingConfig?.search?.daily_api_limit || 500;
-        const defaultSearches = Math.round(apiLimit / 24);
-        applyPacing(defaultSearches, 60);
-    }
+    else if (step === 5) c.innerHTML = stepSettings();
     else if (step === 6) c.innerHTML = stepComplete();
     
     document.getElementById('backBtn').disabled = step === 0;
@@ -1090,36 +1084,15 @@ function stepSettings() {
         <h2>⚙️ Search Pacing</h2>
         <p class="desc">Control how TFM uses your ${apiLimit.toLocaleString()} daily API calls.</p>
         
-        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--success-bg); border-color: var(--success);">
-            <strong>📊 Default for ${apiLimit.toLocaleString()} API limit:</strong> ${defaultSearches} searches every ${defaultInterval} minutes spreads your budget evenly over 24 hours.
+        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--warn-bg); border-color: var(--warn);">
+            <strong>👇 Choose a pacing preset below</strong> to set how quickly TFM burns through your daily API budget.
         </div>
         
-        <div class="row">
-            <div class="field">
-                <label>Searches Per Cycle</label>
-                <input type="number" id="set-per-cycle" value="${searchesPerCycle}" min="1" max="5000" autocomplete="off">
-                <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
-                    Items searched each cycle
-                </div>
-            </div>
-            <div class="field">
-                <label>Cycle Interval (minutes)</label>
-                <input type="number" id="set-interval" value="${cycleInterval}" min="5" max="360" autocomplete="off">
-                <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
-                    Time between cycles
-                </div>
-            </div>
-        </div>
-        
-        <div id="pacing-calc" style="background: var(--bg3); border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 12px;">
-            <strong>📈 With these settings:</strong> <span id="calc-result"></span>
-        </div>
-        
-        <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 16px 0; font-size: 12px;">
+        <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 0 0 16px; font-size: 12px;">
             <div style="font-weight: 600; margin-bottom: 8px;">⚡ Pacing Presets</div>
             <p style="color: var(--text2); margin-bottom: 10px;">Higher searches or shorter intervals = faster API usage. Choose how quickly to burn through your ${apiLimit.toLocaleString()} daily budget:</p>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
-                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid var(--success); text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
                     <div style="font-weight: 500; margin-bottom: 4px;">🐢 Steady</div>
                     <div style="color: var(--text3); font-size: 11px;">${defaultSearches} / ${defaultInterval} min<br>24 hours</div>
                 </div>
@@ -1136,6 +1109,27 @@ function stepSettings() {
                     <div style="color: var(--text3); font-size: 11px;">${agg3Searches} / ${agg3Interval} min<br>${agg3Hours} hours</div>
                 </div>
             </div>
+        </div>
+        
+        <div class="row">
+            <div class="field">
+                <label>Searches Per Cycle</label>
+                <input type="number" id="set-per-cycle" placeholder="Select a preset" min="1" max="5000" autocomplete="off">
+                <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
+                    Items searched each cycle
+                </div>
+            </div>
+            <div class="field">
+                <label>Cycle Interval (minutes)</label>
+                <input type="number" id="set-interval" placeholder="Select a preset" min="5" max="360" autocomplete="off">
+                <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
+                    Time between cycles
+                </div>
+            </div>
+        </div>
+        
+        <div id="pacing-calc" style="background: var(--bg3); border-radius: 8px; padding: 10px 14px; margin: 12px 0; font-size: 12px;">
+            <strong>📈 With these settings:</strong> <span id="calc-result">Select a preset above</span>
         </div>
         
         <h3 style="margin: 20px 0 8px;">😴 Quiet Hours (Optional)</h3>
@@ -1413,6 +1407,16 @@ async function autoSave() {
 }
 
 async function next() {
+    // Validate step 5 - require preset selection
+    if (step === 5) {
+        const perCycle = document.getElementById('set-per-cycle')?.value;
+        const interval = document.getElementById('set-interval')?.value;
+        if (!perCycle || !interval) {
+            alert('Please select a pacing preset before continuing.');
+            return;
+        }
+    }
+    
     // Capture current values before doing anything
     captureCurrentValues();
     
