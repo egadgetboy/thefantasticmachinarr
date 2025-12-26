@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.8a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.8b</div>
 </div>
 <script>
 // Theme management
@@ -1104,7 +1104,15 @@ function toggleSvc(svc, id, el) {
 
 function addSvc(svc) {
     counters[svc]++;
-    const defaultUrl = getDefaultUrl(svc);
+    let defaultUrl = getDefaultUrl(svc);
+    
+    // For SABnzbd, increment port for additional instances
+    if (svc === 'sabnzbd' && baseUrl && counters[svc] > 1) {
+        const basePort = 8080;
+        const newPort = basePort + (counters[svc] - 1);
+        defaultUrl = `${baseUrl}:${newPort}`;
+    }
+    
     instances[svc].push({id: counters[svc], on: true, url: defaultUrl});
     renderContent();
 }
