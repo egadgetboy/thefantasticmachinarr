@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9l</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9m</div>
 </div>
 <script>
 // Theme management
@@ -1221,8 +1221,15 @@ document.addEventListener('input', function(e) {
     }
 });
 
-// Also update on render
-setTimeout(updatePacingCalc, 100);
+// Apply calculated defaults after render (like clicking Steady button)
+setTimeout(function() {
+    const apiLimit = existingConfig?.search?.daily_api_limit || 500;
+    const defaultSearches = Math.round(apiLimit / 24);
+    const defaultInterval = 60;
+    if (document.getElementById('set-per-cycle')) {
+        applyPacing(defaultSearches, defaultInterval);
+    }
+}, 100);
 
 function stepComplete() {
     const cfg = gatherConfig();
