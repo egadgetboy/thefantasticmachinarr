@@ -52,6 +52,9 @@ class SmartSearcher:
         
         # Track series that have been searched (for deduplication)
         self.searched_series: Dict[str, datetime] = {}  # key: "instance:seriesId"
+        
+        # Track items flagged for manual intervention (exhausted search attempts)
+        self.intervention_items: Dict[str, Dict] = {}  # key: "search_exhausted:source:id"
     
     def _reset_daily_counters(self):
         """Reset counters at midnight."""
@@ -87,30 +90,68 @@ class SmartSearcher:
         if total_to_search <= 0:
             return []
         
-        # Get tier cooldown intervals from config
-        tier_cooldowns = {
-            Tier.HOT: self.config.tiers.hot.interval_minutes or 60,
-            Tier.WARM: self.config.tiers.warm.interval_minutes or 360,
-            Tier.COOL: self.config.tiers.cool.interval_minutes or 1440,
-            Tier.COLD: self.config.tiers.cold.interval_minutes or 10080,
+        # Base tier cooldowns (in minutes)
+        base_cooldowns = {
+            Tier.HOT: self.config.tiers.hot.interval_minutes or 60,      # 1 hour
+            Tier.WARM: self.config.tiers.warm.interval_minutes or 360,   # 6 hours
+            Tier.COOL: self.config.tiers.cool.interval_minutes or 10080, # 7 days (changed from 24hr)
+            Tier.COLD: self.config.tiers.cold.interval_minutes or 10080, # 7 days base
         }
         
-        # Filter out items still in cooldown
+        # Escalation thresholds - after this many attempts, escalate
+        escalation_thresholds = {
+            Tier.HOT: 24,   # After 24 attempts (24 hours of hourly tries) → notify
+            Tier.WARM: 8,   # After 8 attempts (48 hours of 6-hourly tries) → notify
+            Tier.COOL: 5,   # After 5 attempts (5 weeks) → escalate to monthly
+            Tier.COLD: 4,   # After 4 attempts (4 weeks) → escalate to monthly
+        }
+        
+        # Filter out items still in cooldown, track items needing intervention
         now = datetime.utcnow()
         eligible_items = []
         skipped_cooldown = 0
+        needs_intervention = []
         
         for item in all_items:
             if item.last_searched:
-                cooldown_minutes = tier_cooldowns[item.tier]
+                search_count = item.search_count or 0
+                tier = item.tier
+                
+                # Check if item needs intervention (Hot/Warm exhausted attempts)
+                if tier == Tier.HOT and search_count >= escalation_thresholds[Tier.HOT]:
+                    needs_intervention.append(item)
+                    skipped_cooldown += 1
+                    continue
+                elif tier == Tier.WARM and search_count >= escalation_thresholds[Tier.WARM]:
+                    needs_intervention.append(item)
+                    skipped_cooldown += 1
+                    continue
+                
+                # Calculate cooldown based on tier and attempt count
+                if tier == Tier.COOL and search_count >= escalation_thresholds[Tier.COOL]:
+                    # Cool items after 5 attempts: monthly cooldown
+                    cooldown_minutes = 43200  # 30 days
+                elif tier == Tier.COLD and search_count >= escalation_thresholds[Tier.COLD]:
+                    # Cold items after 4 attempts: monthly cooldown
+                    cooldown_minutes = 43200  # 30 days
+                else:
+                    cooldown_minutes = base_cooldowns[tier]
+                
                 time_since_search = (now - item.last_searched).total_seconds() / 60
                 if time_since_search < cooldown_minutes:
                     skipped_cooldown += 1
                     continue
+                    
             eligible_items.append(item)
         
         if skipped_cooldown > 0:
             self.log.debug(f"Skipped {skipped_cooldown} items still in cooldown")
+        
+        # Flag items needing intervention
+        if needs_intervention:
+            self.log.warning(f"{len(needs_intervention)} items need manual intervention after repeated search failures")
+            for item in needs_intervention:
+                self._flag_for_intervention(item)
         
         # Group by tier
         by_tier = {tier: [] for tier in Tier}
@@ -152,6 +193,49 @@ class SmartSearcher:
             selected.extend(tier_items[:count_needed])
         
         return selected[:total_to_search]
+    
+    def _flag_for_intervention(self, item: TieredItem):
+        """Flag an item for manual intervention after repeated failures."""
+        tier_name = item.tier.value
+        attempts = item.search_count or 0
+        
+        # Create intervention record
+        intervention_key = f"search_exhausted:{item.source}:{item.id}"
+        if intervention_key not in self.intervention_items:
+            self.intervention_items[intervention_key] = {
+                'item': item,
+                'reason': f"Searched {attempts} times over {self._get_search_duration(item)} without finding",
+                'flagged_at': datetime.utcnow(),
+                'notified': False,
+            }
+            self.log.warning(f"Flagged for intervention: {item.title} ({tier_name} tier, {attempts} attempts)")
+    
+    def _get_search_duration(self, item: TieredItem) -> str:
+        """Get human-readable duration of search attempts."""
+        if item.tier == Tier.HOT:
+            return "24 hours"
+        elif item.tier == Tier.WARM:
+            return "2 days"
+        elif item.tier == Tier.COOL:
+            return "5 weeks"
+        else:
+            return "4 weeks"
+    
+    def get_intervention_items(self) -> List[Dict]:
+        """Get items flagged for manual intervention."""
+        return [
+            {
+                'id': v['item'].id,
+                'title': v['item'].title,
+                'source': v['item'].source,
+                'instance_name': v['item'].instance_name,
+                'tier': v['item'].tier.value,
+                'search_count': v['item'].search_count,
+                'reason': v['reason'],
+                'flagged_at': v['flagged_at'].isoformat(),
+            }
+            for v in self.intervention_items.values()
+        ]
     
     def _prioritize_series(self, items: List[TieredItem]) -> List[TieredItem]:
         """Prioritize whole series searches over individual episodes."""
