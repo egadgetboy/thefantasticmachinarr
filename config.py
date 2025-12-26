@@ -24,12 +24,20 @@ class ServiceInstance:
 
 
 @dataclass
+class TierSettings:
+    """Settings for a single tier."""
+    min_days: int = 0
+    max_days: Optional[int] = None
+    interval_minutes: int = 60
+
+
+@dataclass
 class TierConfig:
-    """Tier threshold configuration (in days)."""
-    hot_days: int = 7
-    warm_days: int = 30
-    cool_days: int = 90
-    cold_days: int = 180
+    """Tier threshold configuration."""
+    hot: TierSettings = field(default_factory=lambda: TierSettings(min_days=0, max_days=90, interval_minutes=60))
+    warm: TierSettings = field(default_factory=lambda: TierSettings(min_days=90, max_days=365, interval_minutes=360))
+    cool: TierSettings = field(default_factory=lambda: TierSettings(min_days=365, max_days=1095, interval_minutes=1440))
+    cold: TierSettings = field(default_factory=lambda: TierSettings(min_days=1095, max_days=None, interval_minutes=10080))
 
 
 @dataclass
@@ -86,6 +94,14 @@ class EmailConfig:
 
 
 @dataclass
+class QuietHoursConfig:
+    """Quiet hours configuration - pause searching during specific hours."""
+    enabled: bool = False
+    start_hour: int = 2  # 2 AM
+    end_hour: int = 7    # 7 AM
+
+
+@dataclass
 class StorageConfig:
     """Storage monitoring configuration."""
     enabled: bool = True
@@ -111,6 +127,7 @@ class Config:
         self.auto_resolution = AutoResolutionConfig()
         self.search = SearchConfig()
         self.email = EmailConfig()
+        self.quiet_hours = QuietHoursConfig()
         self.storage = StorageConfig()
         
         # App settings
@@ -150,13 +167,21 @@ class Config:
         
         # Feature configs
         if 'tiers' in data:
-            self.tiers = TierConfig(**data['tiers'])
+            tiers_data = data['tiers']
+            self.tiers = TierConfig(
+                hot=TierSettings(**tiers_data.get('hot', {})) if isinstance(tiers_data.get('hot'), dict) else TierSettings(),
+                warm=TierSettings(**tiers_data.get('warm', {})) if isinstance(tiers_data.get('warm'), dict) else TierSettings(),
+                cool=TierSettings(**tiers_data.get('cool', {})) if isinstance(tiers_data.get('cool'), dict) else TierSettings(),
+                cold=TierSettings(**tiers_data.get('cold', {})) if isinstance(tiers_data.get('cold'), dict) else TierSettings(),
+            )
         if 'auto_resolution' in data:
             self.auto_resolution = AutoResolutionConfig(**data['auto_resolution'])
         if 'search' in data:
             self.search = SearchConfig(**data['search'])
         if 'email' in data:
             self.email = EmailConfig(**data['email'])
+        if 'quiet_hours' in data:
+            self.quiet_hours = QuietHoursConfig(**data['quiet_hours'])
         if 'storage' in data:
             # Handle paths_to_monitor separately since it's a list
             storage_data = data['storage'].copy()
@@ -215,6 +240,7 @@ class Config:
                 'auto_resolution': asdict(self.auto_resolution),
                 'search': asdict(self.search),
                 'email': asdict(self.email),
+                'quiet_hours': asdict(self.quiet_hours),
                 'storage': asdict(self.storage),
                 'app_name': self.app_name,
                 'setup_complete': self.setup_complete,
@@ -247,32 +273,16 @@ class Config:
         return [s for s in self.sabnzbd_instances if s.is_valid()]
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert configuration to dictionary (safe for API)."""
+        """Convert configuration to dictionary (for API/wizard)."""
         return {
-            'sonarr_instances': [
-                {'name': s.name, 'url': s.url, 'enabled': s.enabled}
-                for s in self.sonarr_instances
-            ],
-            'radarr_instances': [
-                {'name': r.name, 'url': r.url, 'enabled': r.enabled}
-                for r in self.radarr_instances
-            ],
-            'sabnzbd_instances': [
-                {'name': s.name, 'url': s.url, 'enabled': s.enabled}
-                for s in self.sabnzbd_instances
-            ],
+            'sonarr_instances': [asdict(s) for s in self.sonarr_instances],
+            'radarr_instances': [asdict(r) for r in self.radarr_instances],
+            'sabnzbd_instances': [asdict(s) for s in self.sabnzbd_instances],
             'tiers': asdict(self.tiers),
             'auto_resolution': asdict(self.auto_resolution),
             'search': asdict(self.search),
-            'email': {
-                'enabled': self.email.enabled,
-                'smtp_host': self.email.smtp_host,
-                'smtp_port': self.email.smtp_port,
-                'from_address': self.email.from_address,
-                'to_address': self.email.to_address,
-                'batch_finds': self.email.batch_finds,
-                'batch_interval_minutes': self.email.batch_interval_minutes,
-            },
+            'email': asdict(self.email),
+            'quiet_hours': asdict(self.quiet_hours),
             'storage': asdict(self.storage),
             'setup_complete': self.setup_complete,
             'debug_mode': self.debug_mode,
