@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9h</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9i</div>
 </div>
 <script>
 // Theme management
@@ -627,7 +627,16 @@ function captureCurrentValues() {
     const apiLimitEl = document.getElementById('api-limit');
     if (apiLimitEl) {
         if (!existingConfig.search) existingConfig.search = {};
-        existingConfig.search.daily_api_limit = parseInt(apiLimitEl.value) || 500;
+        const newApiLimit = parseInt(apiLimitEl.value) || 500;
+        const oldApiLimit = existingConfig.search.daily_api_limit;
+        
+        // If API limit changed, clear the search settings so they get recalculated
+        if (oldApiLimit && newApiLimit !== oldApiLimit) {
+            delete existingConfig.search.searches_per_cycle;
+            delete existingConfig.search.cycle_interval_minutes;
+        }
+        
+        existingConfig.search.daily_api_limit = newApiLimit;
     }
     
     // Capture tier settings
