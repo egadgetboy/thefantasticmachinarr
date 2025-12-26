@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9e</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9f</div>
 </div>
 <script>
 // Theme management
@@ -1046,9 +1046,14 @@ function stepSettings() {
     const defaultInterval = 60;
     const defaultSearches = Math.round(apiLimit / 24);
     
-    // Use saved values if they exist, otherwise use calculated defaults
-    const searchesPerCycle = existingConfig?.search?.searches_per_cycle || defaultSearches;
-    const cycleInterval = existingConfig?.search?.cycle_interval_minutes || defaultInterval;
+    // Use saved values ONLY if they differ from old hardcoded defaults (10/30 or 10/60)
+    // This ensures users get recalculated values based on their API limit
+    const savedSearches = existingConfig?.search?.searches_per_cycle;
+    const savedInterval = existingConfig?.search?.cycle_interval_minutes;
+    const isOldDefault = (savedSearches === 10 && (savedInterval === 30 || savedInterval === 60));
+    
+    const searchesPerCycle = (savedSearches && !isOldDefault) ? savedSearches : defaultSearches;
+    const cycleInterval = (savedInterval && !isOldDefault) ? savedInterval : defaultInterval;
     
     // Calculate how fast current settings burn the budget
     const callsPerHour = searchesPerCycle * (60 / cycleInterval);
