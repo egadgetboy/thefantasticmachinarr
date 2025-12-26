@@ -686,25 +686,25 @@
     </div>
     
     <main>
-        <!-- Activity Row - Recent Searches and Recent Finds side by side -->
-        <div class="panel-row">
-            <div class="panel half">
-                <div class="panel-head">
-                    <span class="panel-title">🔍 Recent Searches</span>
-                    <button class="btn btn-sm btn-sec" onclick="runSearch()">Run Now</button>
-                </div>
-                <div class="panel-body flush" id="search-list" style="max-height:280px">
-                    <div class="empty"><div class="empty-icon">🔎</div><p>No searches yet</p></div>
-                </div>
+        <!-- Recent Searches - Full Width -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🔍 Recent Searches</span>
+                <button class="btn btn-sm btn-sec" onclick="runSearch()">Run Now</button>
             </div>
-            <div class="panel half">
-                <div class="panel-head">
-                    <span class="panel-title">🎉 Recent Finds</span>
-                    <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
-                </div>
-                <div class="panel-body flush" id="finds-list" style="max-height:280px">
-                    <div class="empty"><div class="empty-icon">🎯</div><p>No finds yet</p></div>
-                </div>
+            <div class="panel-body flush" id="search-list" style="max-height:200px">
+                <div class="empty"><div class="empty-icon">🔎</div><p>No searches yet</p></div>
+            </div>
+        </div>
+        
+        <!-- Recent Finds - Full Width -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">🎉 Recent Finds</span>
+                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush" id="finds-list" style="max-height:200px">
+                <div class="empty"><div class="empty-icon">🎯</div><p>No finds yet</p></div>
             </div>
         </div>
         
@@ -712,6 +712,7 @@
         <div class="panel">
             <div class="panel-head">
                 <span class="panel-title">Missing Content by Tier</span>
+                <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
             </div>
             <div class="panel-body">
                 <div class="tiers">
@@ -720,6 +721,7 @@
                     <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
                     <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
                 </div>
+                <div id="tier-info" style="font-size: 11px; color: var(--text3); margin-top: 12px; text-align: center;"></div>
             </div>
         </div>
         
@@ -1028,7 +1030,12 @@
             if (scheduler && scheduler.tasks) {
                 const searchTask = scheduler.tasks.find(t => t.name === 'search_cycle');
                 if (searchTask && searchTask.next_run) {
-                    const nextRun = new Date(searchTask.next_run);
+                    // next_run is in UTC - append Z if not present
+                    let nextRunStr = searchTask.next_run;
+                    if (!nextRunStr.endsWith('Z') && !nextRunStr.includes('+')) {
+                        nextRunStr += 'Z';
+                    }
+                    const nextRun = new Date(nextRunStr);
                     const now = new Date();
                     const minsUntil = Math.max(0, Math.round((nextRun - now) / 60000));
                     
@@ -1101,106 +1108,68 @@
             const el = document.getElementById('storage-list');
             
             if (!data.paths?.length) {
-                el.innerHTML = '<div class="empty"><div class="empty-icon">💾</div><p>No storage info</p></div>';
+                el.innerHTML = '<div class="empty"><div class="empty-icon">💾</div><p>No storage info available</p></div>';
                 return;
             }
             
-            // Deduplicate and aggregate by unique mount point (looking for common parent paths)
-            const aggregated = {};
+            // Group by unique free space value (same filesystem)
+            const uniqueFS = {};
             data.paths.forEach(p => {
-                // Extract the main mount point (e.g., /mnt/hddpool/mediashare)
-                const parts = p.path.split('/');
-                let mountPoint = parts.slice(0, 4).join('/'); // e.g., /mnt/hddpool/mediashare
-                
-                // Categorize by media type
-                const pathLower = p.path.toLowerCase();
-                let category = 'Other';
-                if (pathLower.includes('/tv') || pathLower.includes('/series') || pathLower.includes('sonarr')) {
-                    category = 'TV Shows';
-                } else if (pathLower.includes('/movie') || pathLower.includes('radarr')) {
-                    category = 'Movies';
-                }
-                
-                // Group by mount point (they likely have the same free space)
-                if (!aggregated[mountPoint]) {
-                    aggregated[mountPoint] = {
-                        path: mountPoint,
+                const key = p.free_gb;
+                if (!uniqueFS[key]) {
+                    uniqueFS[key] = {
                         free_gb: p.free_gb,
-                        categories: new Set()
+                        paths: [],
+                        tvPaths: 0,
+                        moviePaths: 0
                     };
                 }
-                aggregated[mountPoint].categories.add(category);
+                uniqueFS[key].paths.push(p.path);
+                
+                const pathLower = p.path.toLowerCase();
+                if (pathLower.includes('/tv') || pathLower.includes('/series')) {
+                    uniqueFS[key].tvPaths++;
+                } else if (pathLower.includes('/movie')) {
+                    uniqueFS[key].moviePaths++;
+                }
             });
             
-            // Convert to array and build HTML
-            const mounts = Object.values(aggregated);
+            const filesystems = Object.values(uniqueFS);
             
-            if (mounts.length === 0) {
-                el.innerHTML = '<div class="empty"><div class="empty-icon">💾</div><p>No storage info</p></div>';
-                return;
-            }
-            
-            // If all paths have the same free space (same mount), just show one summary
-            const allSameFreeSpace = mounts.every(m => m.free_gb === mounts[0].free_gb);
-            
-            if (allSameFreeSpace && mounts.length > 0) {
-                const total = mounts[0];
-                const allCategories = new Set();
-                mounts.forEach(m => m.categories.forEach(c => allCategories.add(c)));
-                const categoriesStr = [...allCategories].filter(c => c !== 'Other').join(' & ') || 'Media';
+            // Display each unique filesystem
+            el.innerHTML = filesystems.map(fs => {
+                const freeGB = fs.free_gb;
+                const freeTB = (freeGB / 1000).toFixed(1);
+                const displayFree = freeGB >= 1000 ? `${freeTB} TB` : `${freeGB} GB`;
                 
-                // Estimate total space (free + used, rough guess based on typical usage)
-                const freeGb = total.free_gb;
-                const usedPct = freeGb > 10000 ? 50 : freeGb > 5000 ? 60 : freeGb > 1000 ? 70 : 80;
-                const estimatedTotal = Math.round(freeGb / (1 - usedPct/100));
-                const usedGb = estimatedTotal - freeGb;
+                // Determine what type of media
+                let mediaType = '';
+                if (fs.tvPaths > 0 && fs.moviePaths > 0) {
+                    mediaType = '📺 TV & 🎬 Movies';
+                } else if (fs.tvPaths > 0) {
+                    mediaType = '📺 TV Shows';
+                } else if (fs.moviePaths > 0) {
+                    mediaType = '🎬 Movies';
+                } else {
+                    mediaType = '💾 Media';
+                }
                 
-                const barClass = freeGb < 100 ? 'critical' : freeGb < 500 ? 'warn' : 'ok';
+                // Status indicator
+                const status = freeGB < 100 ? '🔴' : freeGB < 500 ? '🟡' : '🟢';
                 
-                el.innerHTML = `
-                    <div class="storage-summary">
-                        <div class="storage-item" style="flex: 1;">
-                            <div class="storage-item-header">
-                                <span class="storage-item-label">📺🎬 ${categoriesStr}</span>
-                                <span class="storage-item-value">${formatSize(freeGb)} free</span>
-                            </div>
-                            <div class="storage-bar">
-                                <div class="storage-bar-fill ${barClass}" style="width:${usedPct}%"></div>
-                            </div>
-                            <div class="storage-details">
-                                <span>${total.path}</span>
-                                <span>${freeGb > 1000 ? (freeGb/1000).toFixed(1) + ' TB' : freeGb + ' GB'} available</span>
-                            </div>
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border);">
+                        <div>
+                            <div style="font-weight: 500;">${status} ${mediaType}</div>
+                            <div style="font-size: 11px; color: var(--text3); margin-top: 2px;">${fs.paths.length} folder(s)</div>
                         </div>
-                    </div>`;
-            } else {
-                // Multiple distinct storage locations
-                el.innerHTML = `<div class="storage-summary">${mounts.map(m => {
-                    const categoriesStr = [...m.categories].filter(c => c !== 'Other').join(' & ') || 'Media';
-                    const freeGb = m.free_gb;
-                    const usedPct = freeGb > 10000 ? 50 : freeGb > 5000 ? 60 : freeGb > 1000 ? 70 : 80;
-                    const barClass = freeGb < 100 ? 'critical' : freeGb < 500 ? 'warn' : 'ok';
-                    
-                    return `
-                        <div class="storage-item">
-                            <div class="storage-item-header">
-                                <span class="storage-item-label">${categoriesStr}</span>
-                                <span class="storage-item-value">${formatSize(freeGb)} free</span>
-                            </div>
-                            <div class="storage-bar">
-                                <div class="storage-bar-fill ${barClass}" style="width:${usedPct}%"></div>
-                            </div>
-                            <div class="storage-details">
-                                <span>${m.path}</span>
-                            </div>
-                        </div>`;
-                }).join('')}</div>`;
-            }
-        }
-        
-        function formatSize(gb) {
-            if (gb >= 1000) return (gb / 1000).toFixed(1) + ' TB';
-            return gb.toFixed(0) + ' GB';
+                        <div style="text-align: right;">
+                            <div style="font-size: 18px; font-weight: 600;">${displayFree}</div>
+                            <div style="font-size: 11px; color: var(--text3);">available</div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
         }
         
         async function loadFinds() {
@@ -1481,6 +1450,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.11</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.12</div>
 </body>
 </html>
