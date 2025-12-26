@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.6b</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.6c</div>
 </div>
 <script>
 // Theme management
@@ -807,13 +807,11 @@ function stepAutoRes() {
 function stepSettings() {
     return `
     <div class="step active">
-        <h2>⚙️ Additional Settings</h2>
-        <p class="desc">Fine-tune how TFM searches and when you get notified.</p>
+        <h2>⚙️ Search Pacing</h2>
+        <p class="desc">Control how TFM spreads your API calls throughout the day.</p>
         
-        <h3 style="margin: 0 0 8px;">🔍 Search Behavior</h3>
-        
-        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px;">
-            <strong>How searching works:</strong> TFM runs in "cycles." Each cycle, it picks items from your missing content and searches your indexers for them. These settings control the pace.
+        <div class="info" style="margin: 0 0 16px; padding: 12px; font-size: 12px; background: var(--success-bg); border-color: var(--success);">
+            <strong>📊 Default behavior:</strong> TFM automatically spreads your Daily API Limit evenly over 24 hours. With the defaults below and a 500 API limit, TFM uses ~20 calls/hour — your budget lasts all day and searches run continuously.
         </div>
         
         <div class="row">
@@ -821,28 +819,35 @@ function stepSettings() {
                 <label>Searches Per Cycle</label>
                 <input type="number" id="set-per-cycle" value="10" min="1" max="50">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
-                    How many items TFM searches each cycle.<br>
-                    <strong>Lower (5-10):</strong> Gentler on indexers, slower progress<br>
-                    <strong>Higher (20-50):</strong> Faster progress, uses more API calls
+                    Items searched each cycle. Default: 10
                 </div>
             </div>
             <div class="field">
                 <label>Cycle Interval (minutes)</label>
-                <input type="number" id="set-interval" value="60" min="15" max="360">
+                <input type="number" id="set-interval" value="30" min="5" max="360">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
-                    Time between search cycles.<br>
-                    <strong>Shorter (15-30):</strong> More frequent searches<br>
-                    <strong>Longer (60-120):</strong> More spread out, fewer API calls
+                    Time between cycles. Default: 30 min
                 </div>
             </div>
         </div>
         
-        <div class="info" style="margin: 0 0 20px; padding: 10px; font-size: 11px; background: var(--success-bg); border-color: var(--success);">
-            <strong>💡 Example:</strong> 10 searches every 60 min = ~240 API calls/day. 20 searches every 30 min = ~960 API calls/day. Stay within your Daily API Limit!
+        <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 16px 0; font-size: 12px;">
+            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Want to search more aggressively?</div>
+            <p style="color: var(--text2); margin-bottom: 8px;">You can burn through your daily API budget faster. Useful if you want intensive searching during certain hours, then let TFM rest.</p>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 10px;">
+                <div style="background: var(--bg); padding: 10px; border-radius: 8px;">
+                    <div style="font-weight: 500; margin-bottom: 4px;">🐢 Steady (default)</div>
+                    <div style="color: var(--text3); font-size: 11px;">10 searches / 30 min<br>= ~480 calls/day<br>Runs continuously 24/7</div>
+                </div>
+                <div style="background: var(--bg); padding: 10px; border-radius: 8px;">
+                    <div style="font-weight: 500; margin-bottom: 4px;">🐇 Aggressive</div>
+                    <div style="color: var(--text3); font-size: 11px;">25 searches / 15 min<br>= ~2400 calls/day<br>Burns budget in ~5 hours</div>
+                </div>
+            </div>
         </div>
         
-        <h3 style="margin: 0 0 8px;">📧 Email Notifications (Optional)</h3>
-        <p class="desc" style="margin-bottom: 12px;">Get notified when TFM finds content, encounters issues, or needs your attention. Leave blank to skip.</p>
+        <h3 style="margin: 20px 0 8px;">📧 Email Notifications (Optional)</h3>
+        <p class="desc" style="margin-bottom: 12px;">Get notified when TFM finds content or needs attention. Leave blank to skip.</p>
         <div class="row">
             <div class="field"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
             <div class="field"><label>SMTP Port</label><input type="number" id="email-port" value="587"></div>
@@ -973,7 +978,7 @@ function gatherConfig() {
         enabled: true,
         daily_api_limit: parseInt(document.getElementById('api-limit')?.value) || 500,
         searches_per_cycle: parseInt(document.getElementById('set-per-cycle')?.value) || 10,
-        cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 60,
+        cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 30,
     };
     
     // Email
