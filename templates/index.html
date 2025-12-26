@@ -708,20 +708,30 @@
             </div>
         </div>
         
-        <!-- Tier Summary -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">Missing Content by Tier</span>
-                <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
-            </div>
-            <div class="panel-body">
-                <div class="tiers">
-                    <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div></div>
-                    <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div></div>
-                    <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
-                    <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
+        <!-- Missing Content by Tier + Storage side by side -->
+        <div class="panel-row">
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">Missing Content by Tier</span>
+                    <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
                 </div>
-                <div id="tier-info" style="font-size: 11px; color: var(--text3); margin-top: 12px; text-align: center;"></div>
+                <div class="panel-body">
+                    <div class="tiers">
+                        <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-count" id="tier-hot">-</div><div class="tier-name">Hot</div></div>
+                        <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-count" id="tier-warm">-</div><div class="tier-name">Warm</div></div>
+                        <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-count" id="tier-cool">-</div><div class="tier-name">Cool</div></div>
+                        <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-count" id="tier-cold">-</div><div class="tier-name">Cold</div></div>
+                    </div>
+                    <div id="tier-info" style="font-size: 11px; color: var(--text3); margin-top: 12px; text-align: center;"></div>
+                </div>
+            </div>
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">💾 Storage</span>
+                </div>
+                <div class="panel-body" id="storage-list">
+                    <div class="spinner"></div>
+                </div>
             </div>
         </div>
         
@@ -732,7 +742,7 @@
                     <span class="panel-title">⚠️ Queue Issues</span>
                     <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
                 </div>
-                <div class="panel-body flush" id="stuck-list" style="max-height:250px">
+                <div class="panel-body flush" id="stuck-list" style="max-height:350px">
                     <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
                 </div>
             </div>
@@ -741,19 +751,9 @@
                     <span class="panel-title">🖐️ Manual Intervention</span>
                     <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
                 </div>
-                <div class="panel-body flush" id="intervention-list" style="max-height:250px">
+                <div class="panel-body flush" id="intervention-list" style="max-height:350px">
                     <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
                 </div>
-            </div>
-        </div>
-        
-        <!-- Storage Summary -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">💾 Storage</span>
-            </div>
-            <div class="panel-body" id="storage-list">
-                <div class="spinner"></div>
             </div>
         </div>
         
@@ -1450,6 +1450,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.14a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.14b</div>
 </body>
 </html>
