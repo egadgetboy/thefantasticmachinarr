@@ -36,6 +36,39 @@ class SearchResult:
 class SmartSearcher:
     """Intelligent tier-based searcher with rate limiting."""
     
+    # Pacing presets based on daily API limit
+    # Format: (cooldown_minutes, max_attempts) for each tier
+    PACING_CONFIGS = {
+        # Steady (≤500): Patient, thorough
+        'steady': {
+            Tier.HOT:  {'cooldown': 60, 'max_attempts': 24, 'escalate_to': 'manual'},      # 1hr × 24 = 24hr → Manual
+            Tier.WARM: {'cooldown': 360, 'max_attempts': 8, 'escalate_to': 'manual'},      # 6hr × 8 = 48hr → Manual
+            Tier.COOL: {'cooldown': 1440, 'max_attempts': 5, 'escalate_to': 10080},        # 24hr × 5 = 5d → 7d cooldown
+            Tier.COLD: {'cooldown': 10080, 'max_attempts': 4, 'escalate_to': 43200},       # 7d × 4 = 28d → 30d cooldown
+        },
+        # Fast (≤2000): Balanced
+        'fast': {
+            Tier.HOT:  {'cooldown': 30, 'max_attempts': 16, 'escalate_to': 'manual'},      # 30min × 16 = 8hr → Manual
+            Tier.WARM: {'cooldown': 180, 'max_attempts': 8, 'escalate_to': 'manual'},      # 3hr × 8 = 24hr → Manual
+            Tier.COOL: {'cooldown': 720, 'max_attempts': 5, 'escalate_to': 4320},          # 12hr × 5 = 2.5d → 3d cooldown
+            Tier.COLD: {'cooldown': 4320, 'max_attempts': 4, 'escalate_to': 20160},        # 3d × 4 = 12d → 14d cooldown
+        },
+        # Faster (≤5000): Aggressive
+        'faster': {
+            Tier.HOT:  {'cooldown': 15, 'max_attempts': 16, 'escalate_to': 'manual'},      # 15min × 16 = 4hr → Manual
+            Tier.WARM: {'cooldown': 60, 'max_attempts': 8, 'escalate_to': 'manual'},       # 1hr × 8 = 8hr → Manual
+            Tier.COOL: {'cooldown': 360, 'max_attempts': 4, 'escalate_to': 2880},          # 6hr × 4 = 24hr → 2d cooldown
+            Tier.COLD: {'cooldown': 1440, 'max_attempts': 4, 'escalate_to': 10080},        # 1d × 4 = 4d → 7d cooldown
+        },
+        # Blazing (>5000): Maximum speed
+        'blazing': {
+            Tier.HOT:  {'cooldown': 10, 'max_attempts': 12, 'escalate_to': 'manual'},      # 10min × 12 = 2hr → Manual
+            Tier.WARM: {'cooldown': 30, 'max_attempts': 8, 'escalate_to': 'manual'},       # 30min × 8 = 4hr → Manual
+            Tier.COOL: {'cooldown': 180, 'max_attempts': 4, 'escalate_to': 1440},          # 3hr × 4 = 12hr → 1d cooldown
+            Tier.COLD: {'cooldown': 720, 'max_attempts': 4, 'escalate_to': 4320},          # 12hr × 4 = 2d → 3d cooldown
+        },
+    }
+    
     def __init__(self, config, tier_manager: TierManager, logger):
         self.config = config
         self.tier_manager = tier_manager
@@ -55,6 +88,23 @@ class SmartSearcher:
         
         # Track items flagged for manual intervention (exhausted search attempts)
         self.intervention_items: Dict[str, Dict] = {}  # key: "search_exhausted:source:id"
+    
+    def _get_pacing_preset(self) -> str:
+        """Determine pacing preset based on daily API limit."""
+        limit = self.config.search.daily_api_limit
+        if limit <= 500:
+            return 'steady'
+        elif limit <= 2000:
+            return 'fast'
+        elif limit <= 5000:
+            return 'faster'
+        else:
+            return 'blazing'
+    
+    def _get_tier_config(self, tier: Tier) -> Dict:
+        """Get cooldown config for a tier based on current pacing preset."""
+        preset = self._get_pacing_preset()
+        return self.PACING_CONFIGS[preset][tier]
     
     def _reset_daily_counters(self):
         """Reset counters at midnight."""
@@ -76,7 +126,7 @@ class SmartSearcher:
         return True, "OK"
     
     def _select_items_for_search(self, all_items: List[TieredItem]) -> List[TieredItem]:
-        """Select items for this search cycle based on tier distribution and cooldowns."""
+        """Select items for this search cycle based on tier distribution and pacing-aware cooldowns."""
         if not all_items:
             return []
         
@@ -90,21 +140,8 @@ class SmartSearcher:
         if total_to_search <= 0:
             return []
         
-        # Base tier cooldowns (in minutes)
-        base_cooldowns = {
-            Tier.HOT: self.config.tiers.hot.interval_minutes or 60,      # 1 hour
-            Tier.WARM: self.config.tiers.warm.interval_minutes or 360,   # 6 hours
-            Tier.COOL: self.config.tiers.cool.interval_minutes or 10080, # 7 days (changed from 24hr)
-            Tier.COLD: self.config.tiers.cold.interval_minutes or 10080, # 7 days base
-        }
-        
-        # Escalation thresholds - after this many attempts, escalate
-        escalation_thresholds = {
-            Tier.HOT: 24,   # After 24 attempts (24 hours of hourly tries) → notify
-            Tier.WARM: 8,   # After 8 attempts (48 hours of 6-hourly tries) → notify
-            Tier.COOL: 5,   # After 5 attempts (5 weeks) → escalate to monthly
-            Tier.COLD: 4,   # After 4 attempts (4 weeks) → escalate to monthly
-        }
+        preset = self._get_pacing_preset()
+        self.log.debug(f"Using pacing preset: {preset} (API limit: {self.config.search.daily_api_limit})")
         
         # Filter out items still in cooldown, track items needing intervention
         now = datetime.utcnow()
@@ -116,26 +153,24 @@ class SmartSearcher:
             if item.last_searched:
                 search_count = item.search_count or 0
                 tier = item.tier
+                tier_config = self._get_tier_config(tier)
                 
-                # Check if item needs intervention (Hot/Warm exhausted attempts)
-                if tier == Tier.HOT and search_count >= escalation_thresholds[Tier.HOT]:
-                    needs_intervention.append(item)
-                    skipped_cooldown += 1
-                    continue
-                elif tier == Tier.WARM and search_count >= escalation_thresholds[Tier.WARM]:
-                    needs_intervention.append(item)
-                    skipped_cooldown += 1
-                    continue
+                max_attempts = tier_config['max_attempts']
+                escalate_to = tier_config['escalate_to']
+                base_cooldown = tier_config['cooldown']
                 
-                # Calculate cooldown based on tier and attempt count
-                if tier == Tier.COOL and search_count >= escalation_thresholds[Tier.COOL]:
-                    # Cool items after 5 attempts: monthly cooldown
-                    cooldown_minutes = 43200  # 30 days
-                elif tier == Tier.COLD and search_count >= escalation_thresholds[Tier.COLD]:
-                    # Cold items after 4 attempts: monthly cooldown
-                    cooldown_minutes = 43200  # 30 days
+                # Check if item has exceeded max attempts
+                if search_count >= max_attempts:
+                    if escalate_to == 'manual':
+                        # Hot/Warm: escalate to manual intervention
+                        needs_intervention.append(item)
+                        skipped_cooldown += 1
+                        continue
+                    else:
+                        # Cool/Cold: switch to longer cooldown
+                        cooldown_minutes = escalate_to
                 else:
-                    cooldown_minutes = base_cooldowns[tier]
+                    cooldown_minutes = base_cooldown
                 
                 time_since_search = (now - item.last_searched).total_seconds() / 60
                 if time_since_search < cooldown_minutes:
@@ -198,28 +233,39 @@ class SmartSearcher:
         """Flag an item for manual intervention after repeated failures."""
         tier_name = item.tier.value
         attempts = item.search_count or 0
+        preset = self._get_pacing_preset()
+        tier_config = self._get_tier_config(item.tier)
         
         # Create intervention record
         intervention_key = f"search_exhausted:{item.source}:{item.id}"
         if intervention_key not in self.intervention_items:
+            duration = self._get_search_duration(item)
             self.intervention_items[intervention_key] = {
                 'item': item,
-                'reason': f"Searched {attempts} times over {self._get_search_duration(item)} without finding",
+                'reason': f"Searched {attempts} times over {duration} without finding ({preset} pacing)",
                 'flagged_at': datetime.utcnow(),
                 'notified': False,
+                'preset': preset,
+                'tier_config': tier_config,
             }
-            self.log.warning(f"Flagged for intervention: {item.title} ({tier_name} tier, {attempts} attempts)")
+            self.log.warning(f"Flagged for intervention: {item.title} ({tier_name} tier, {attempts} attempts, {preset} pacing)")
     
     def _get_search_duration(self, item: TieredItem) -> str:
-        """Get human-readable duration of search attempts."""
-        if item.tier == Tier.HOT:
-            return "24 hours"
-        elif item.tier == Tier.WARM:
-            return "2 days"
-        elif item.tier == Tier.COOL:
-            return "5 weeks"
+        """Get human-readable duration of search attempts based on pacing preset."""
+        tier_config = self._get_tier_config(item.tier)
+        cooldown = tier_config['cooldown']
+        max_attempts = tier_config['max_attempts']
+        
+        total_minutes = cooldown * max_attempts
+        
+        if total_minutes < 60:
+            return f"{total_minutes} minutes"
+        elif total_minutes < 1440:
+            hours = total_minutes // 60
+            return f"{hours} hour{'s' if hours > 1 else ''}"
         else:
-            return "4 weeks"
+            days = total_minutes // 1440
+            return f"{days} day{'s' if days > 1 else ''}"
     
     def get_intervention_items(self) -> List[Dict]:
         """Get items flagged for manual intervention."""
@@ -230,12 +276,39 @@ class SmartSearcher:
                 'source': v['item'].source,
                 'instance_name': v['item'].instance_name,
                 'tier': v['item'].tier.value,
+                'tier_emoji': v['item'].tier.emoji,
                 'search_count': v['item'].search_count,
                 'reason': v['reason'],
                 'flagged_at': v['flagged_at'].isoformat(),
+                'preset': v.get('preset', 'unknown'),
             }
             for v in self.intervention_items.values()
         ]
+    
+    def dismiss_intervention(self, source: str, item_id: int) -> bool:
+        """Dismiss an intervention item."""
+        key = f"search_exhausted:{source}:{item_id}"
+        if key in self.intervention_items:
+            del self.intervention_items[key]
+            self.log.info(f"Dismissed intervention for {source}:{item_id}")
+            return True
+        return False
+    
+    def reset_search_count(self, source: str, item_id: int) -> bool:
+        """Reset search count for an item to try again."""
+        key = f"{source}:{item_id}"
+        if key in self.tier_manager.search_history:
+            self.tier_manager.search_history[key].search_count = 0
+            self.tier_manager.search_history[key].last_searched = None
+            self.log.info(f"Reset search count for {source}:{item_id}")
+            
+            # Also remove from interventions if present
+            intervention_key = f"search_exhausted:{source}:{item_id}"
+            if intervention_key in self.intervention_items:
+                del self.intervention_items[intervention_key]
+            
+            return True
+        return False
     
     def _prioritize_series(self, items: List[TieredItem]) -> List[TieredItem]:
         """Prioritize whole series searches over individual episodes."""
