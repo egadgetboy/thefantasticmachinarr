@@ -298,11 +298,39 @@ class MachinarrCore:
     
     def get_interventions(self) -> Dict[str, Any]:
         """Get items needing manual intervention."""
-        interventions = self.queue_monitor.get_pending_interventions()
+        # Queue-based interventions
+        queue_interventions = self.queue_monitor.get_pending_interventions()
+        
+        # Search exhausted interventions (items tried too many times)
+        search_interventions = self.searcher.get_intervention_items()
+        
+        # Combine both types
+        all_items = [i.to_dict() for i in queue_interventions]
+        
+        # Add search interventions with consistent format
+        for si in search_interventions:
+            all_items.append({
+                'id': si['id'],
+                'title': si['title'],
+                'source': si['source'],
+                'instance_name': si['instance_name'],
+                'intervention_type': 'search_exhausted',
+                'reason': si['reason'],
+                'details': {
+                    'tier': si['tier'],
+                    'search_count': si['search_count'],
+                    'flagged_at': si['flagged_at'],
+                },
+                'available_actions': [
+                    {'action': 'dismiss', 'label': 'Dismiss'},
+                    {'action': 'reset_search', 'label': 'Reset & Try Again'},
+                ],
+                'created_at': si['flagged_at'],
+            })
         
         return {
-            'items': [i.to_dict() for i in interventions],
-            'count': len(interventions),
+            'items': all_items,
+            'count': len(all_items),
         }
     
     def trigger_search(self, data: Dict) -> Dict[str, Any]:
