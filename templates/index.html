@@ -490,6 +490,38 @@
         /* Full width panel */
         .full-width { grid-column: 1 / -1; }
         
+        /* Toggle switch */
+        .toggle {
+            width: 48px;
+            height: 26px;
+            background: var(--border);
+            border-radius: 13px;
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        .toggle.on {
+            background: var(--accent);
+        }
+        
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: #fff;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: 0.2s ease;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .toggle.on::after {
+            transform: translateX(22px);
+        }
+        
         /* Version footer */
         .version-footer {
             text-align: center;
@@ -722,6 +754,31 @@
                         <option value="20160">2 weeks</option>
                         <option value="43200">Monthly</option>
                     </select>
+                </div>
+            </div>
+            
+            <h4 style="margin: 24px 0 12px; font-size: 14px;">😴 Quiet Hours</h4>
+            <div style="background: var(--bg3); padding: 14px; border-radius: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                    <div>
+                        <div style="font-weight: 500;">Pause searching during certain hours</div>
+                        <div class="hint" style="margin-top: 4px;">TFM will stop searching between these hours (server time)</div>
+                    </div>
+                    <div class="toggle" id="settings-quiet-toggle" onclick="this.classList.toggle('on')" style="width: 48px; height: 26px; background: var(--border); border-radius: 13px; position: relative; cursor: pointer;"></div>
+                </div>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+                    <div>
+                        <label style="font-size: 12px; display: block; margin-bottom: 4px;">Start</label>
+                        <select id="settings-quiet-start" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                            <option value="0">00:00</option><option value="1">01:00</option><option value="2" selected>02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7">07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label style="font-size: 12px; display: block; margin-bottom: 4px;">End</label>
+                        <select id="settings-quiet-end" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                            <option value="0">00:00</option><option value="1">01:00</option><option value="2">02:00</option><option value="3">03:00</option><option value="4">04:00</option><option value="5">05:00</option><option value="6">06:00</option><option value="7" selected>07:00</option><option value="8">08:00</option><option value="9">09:00</option><option value="10">10:00</option><option value="11">11:00</option><option value="12">12:00</option><option value="13">13:00</option><option value="14">14:00</option><option value="15">15:00</option><option value="16">16:00</option><option value="17">17:00</option><option value="18">18:00</option><option value="19">19:00</option><option value="20">20:00</option><option value="21">21:00</option><option value="22">22:00</option><option value="23">23:00</option>
+                        </select>
+                    </div>
                 </div>
             </div>
             
@@ -1003,7 +1060,7 @@
             if (data.search) {
                 document.getElementById('settings-api-limit').value = data.search.daily_api_limit || 500;
                 document.getElementById('settings-per-cycle').value = data.search.searches_per_cycle || 10;
-                document.getElementById('settings-interval').value = data.search.cycle_interval_minutes || 60;
+                document.getElementById('settings-interval').value = data.search.cycle_interval_minutes || 30;
             }
             if (data.tiers) {
                 // Hot
@@ -1021,6 +1078,17 @@
                 document.getElementById('settings-cold-min').value = data.tiers.cold?.min_days || 1095;
                 document.getElementById('settings-cold-interval').value = data.tiers.cold?.interval_minutes || 10080;
             }
+            // Quiet hours
+            if (data.quiet_hours) {
+                const toggle = document.getElementById('settings-quiet-toggle');
+                if (data.quiet_hours.enabled) {
+                    toggle.classList.add('on');
+                } else {
+                    toggle.classList.remove('on');
+                }
+                document.getElementById('settings-quiet-start').value = data.quiet_hours.start_hour ?? 2;
+                document.getElementById('settings-quiet-end').value = data.quiet_hours.end_hour ?? 7;
+            }
             updateThemeButtons();
             document.getElementById('settings-modal').classList.add('show');
         }
@@ -1034,7 +1102,7 @@
                 search: {
                     daily_api_limit: parseInt(document.getElementById('settings-api-limit').value) || 500,
                     searches_per_cycle: parseInt(document.getElementById('settings-per-cycle').value) || 10,
-                    cycle_interval_minutes: parseInt(document.getElementById('settings-interval').value) || 60
+                    cycle_interval_minutes: parseInt(document.getElementById('settings-interval').value) || 30
                 },
                 tiers: {
                     hot: {
@@ -1057,6 +1125,11 @@
                         max_days: null,
                         interval_minutes: parseInt(document.getElementById('settings-cold-interval').value) || 10080
                     }
+                },
+                quiet_hours: {
+                    enabled: document.getElementById('settings-quiet-toggle').classList.contains('on'),
+                    start_hour: parseInt(document.getElementById('settings-quiet-start').value) || 2,
+                    end_hour: parseInt(document.getElementById('settings-quiet-end').value) || 7
                 }
             };
             const result = await api('settings', 'POST', settings);
@@ -1090,6 +1163,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.6c</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.7</div>
 </body>
 </html>
