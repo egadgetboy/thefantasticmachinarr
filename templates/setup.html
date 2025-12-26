@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9a</div>
 </div>
 <script>
 // Theme management
@@ -1038,8 +1038,8 @@ function stepAutoRes() {
 }
 
 function stepSettings() {
-    // Get API limit from welcome page
-    const apiLimit = parseInt(document.getElementById('api-limit')?.value) || 500;
+    // Get API limit from existingConfig (since the Welcome page DOM doesn't exist here)
+    const apiLimit = existingConfig?.search?.daily_api_limit || parseInt(document.getElementById('api-limit')?.value) || 500;
     
     // Calculate optimal settings for 24-hour spread
     // Target: spread API calls evenly over 24 hours
@@ -1159,7 +1159,7 @@ function applyPacing(searches, interval) {
 function updatePacingCalc() {
     const searches = parseInt(document.getElementById('set-per-cycle')?.value) || 10;
     const interval = parseInt(document.getElementById('set-interval')?.value) || 30;
-    const apiLimit = parseInt(document.getElementById('api-limit')?.value) || 500;
+    const apiLimit = existingConfig?.search?.daily_api_limit || parseInt(document.getElementById('api-limit')?.value) || 500;
     
     const dailyCalls = Math.round((searches * 60 / interval) * 24);
     const pct = Math.round(dailyCalls / apiLimit * 100);
