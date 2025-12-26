@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.8d</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9</div>
 </div>
 <script>
 // Theme management
@@ -710,7 +710,8 @@ async function loadExistingConfig() {
     try {
         const r = await fetch('/api/config');
         const cfg = await r.json();
-        if (cfg && cfg.setup_complete) {
+        // Load config even if setup not complete (for partial saves during wizard)
+        if (cfg && Object.keys(cfg).length > 0) {
             existingConfig = cfg;
             
             // Restore instances from config
@@ -725,7 +726,7 @@ async function loadExistingConfig() {
             if (cfg.sabnzbd_instances?.length) {
                 instances.sabnzbd = cfg.sabnzbd_instances.map((inst, i) => ({id: i+1, on: inst.enabled !== false, ...inst}));
                 counters.sabnzbd = instances.sabnzbd.length;
-            } else {
+            } else if (!cfg.sabnzbd_instances) {
                 instances.sabnzbd = [{id:1, on:false}];
             }
             
@@ -1254,9 +1255,15 @@ function gatherConfig() {
     
     ['sonarr','radarr','sabnzbd'].forEach(svc => {
         instances[svc].forEach(inst => {
-            const url = document.getElementById(`${svc}-${inst.id}-url`)?.value || '';
-            const key = document.getElementById(`${svc}-${inst.id}-key`)?.value || '';
-            const name = document.getElementById(`${svc}-${inst.id}-name`)?.value || `${svc} ${inst.id}`;
+            // Try DOM first, fall back to stored instance values
+            const urlEl = document.getElementById(`${svc}-${inst.id}-url`);
+            const keyEl = document.getElementById(`${svc}-${inst.id}-key`);
+            const nameEl = document.getElementById(`${svc}-${inst.id}-name`);
+            
+            const url = urlEl ? urlEl.value : (inst.url || '');
+            const key = keyEl ? keyEl.value : (inst.api_key || '');
+            const name = nameEl ? nameEl.value : (inst.name || `${svc} ${inst.id}`);
+            
             if (inst.on && url && key) {
                 cfg[svc + '_instances'].push({ url, api_key: key, name, enabled: true });
             }
@@ -1266,68 +1273,77 @@ function gatherConfig() {
     // Tier intervals and age ranges (in days)
     cfg.tiers = {
         hot: {
-            min_days: parseInt(document.getElementById('tier-hot-min')?.value) || 0,
-            max_days: parseInt(document.getElementById('tier-hot-max')?.value) || 90,
-            interval_minutes: parseInt(document.getElementById('tier-hot')?.value) || 60
+            min_days: parseInt(document.getElementById('tier-hot-min')?.value) || existingConfig?.tiers?.hot?.min_days || 0,
+            max_days: parseInt(document.getElementById('tier-hot-max')?.value) || existingConfig?.tiers?.hot?.max_days || 90,
+            interval_minutes: parseInt(document.getElementById('tier-hot')?.value) || existingConfig?.tiers?.hot?.interval_minutes || 60
         },
         warm: {
-            min_days: parseInt(document.getElementById('tier-warm-min')?.value) || 90,
-            max_days: parseInt(document.getElementById('tier-warm-max')?.value) || 365,
-            interval_minutes: parseInt(document.getElementById('tier-warm')?.value) || 360
+            min_days: parseInt(document.getElementById('tier-warm-min')?.value) || existingConfig?.tiers?.warm?.min_days || 90,
+            max_days: parseInt(document.getElementById('tier-warm-max')?.value) || existingConfig?.tiers?.warm?.max_days || 365,
+            interval_minutes: parseInt(document.getElementById('tier-warm')?.value) || existingConfig?.tiers?.warm?.interval_minutes || 360
         },
         cool: {
-            min_days: parseInt(document.getElementById('tier-cool-min')?.value) || 365,
-            max_days: parseInt(document.getElementById('tier-cool-max')?.value) || 1095,
-            interval_minutes: parseInt(document.getElementById('tier-cool')?.value) || 1440
+            min_days: parseInt(document.getElementById('tier-cool-min')?.value) || existingConfig?.tiers?.cool?.min_days || 365,
+            max_days: parseInt(document.getElementById('tier-cool-max')?.value) || existingConfig?.tiers?.cool?.max_days || 1095,
+            interval_minutes: parseInt(document.getElementById('tier-cool')?.value) || existingConfig?.tiers?.cool?.interval_minutes || 1440
         },
         cold: {
-            min_days: parseInt(document.getElementById('tier-cold-min')?.value) || 1095,
+            min_days: parseInt(document.getElementById('tier-cold-min')?.value) || existingConfig?.tiers?.cold?.min_days || 1095,
             max_days: null, // No upper limit
-            interval_minutes: parseInt(document.getElementById('tier-cold')?.value) || 10080
+            interval_minutes: parseInt(document.getElementById('tier-cold')?.value) || existingConfig?.tiers?.cold?.interval_minutes || 10080
         }
     };
     
-    // Auto-resolution
+    // Auto-resolution - use existingConfig values if DOM doesn't exist
+    const arFromDom = document.getElementById('ar-no_files_found');
+    const arFromCfg = existingConfig?.auto_resolution;
     cfg.auto_resolution = {
         enabled: true,
-        no_files_found: document.getElementById('ar-no_files_found')?.checked ?? true,
-        sample_only: document.getElementById('ar-sample_only')?.checked ?? true,
-        unknown_series: document.getElementById('ar-unknown_series')?.checked ?? true,
-        unexpected_episode: document.getElementById('ar-unexpected_episode')?.checked ?? true,
-        invalid_season_episode: document.getElementById('ar-invalid_season_episode')?.checked ?? true,
-        no_audio_tracks: document.getElementById('ar-no_audio_tracks')?.checked ?? true,
-        import_failed: document.getElementById('ar-import_failed')?.checked ?? true,
-        download_failed: document.getElementById('ar-download_failed')?.checked ?? true,
-        path_not_valid: document.getElementById('ar-path_not_valid')?.checked ?? false,
-        wait_minutes_before_action: parseInt(document.getElementById('ar-wait')?.value) || 30,
+        no_files_found: arFromDom ? arFromDom.checked : (arFromCfg?.no_files_found ?? true),
+        sample_only: document.getElementById('ar-sample_only')?.checked ?? arFromCfg?.sample_only ?? true,
+        unknown_series: document.getElementById('ar-unknown_series')?.checked ?? arFromCfg?.unknown_series ?? true,
+        unexpected_episode: document.getElementById('ar-unexpected_episode')?.checked ?? arFromCfg?.unexpected_episode ?? true,
+        invalid_season_episode: document.getElementById('ar-invalid_season_episode')?.checked ?? arFromCfg?.invalid_season_episode ?? true,
+        no_audio_tracks: document.getElementById('ar-no_audio_tracks')?.checked ?? arFromCfg?.no_audio_tracks ?? true,
+        import_failed: document.getElementById('ar-import_failed')?.checked ?? arFromCfg?.import_failed ?? true,
+        download_failed: document.getElementById('ar-download_failed')?.checked ?? arFromCfg?.download_failed ?? true,
+        path_not_valid: document.getElementById('ar-path_not_valid')?.checked ?? arFromCfg?.path_not_valid ?? false,
+        wait_minutes_before_action: parseInt(document.getElementById('ar-wait')?.value) || arFromCfg?.wait_minutes_before_action || 30,
     };
     
-    // Search settings - API limit from welcome page
+    // Search settings - API limit from welcome page, fall back to existingConfig
+    const apiLimitEl = document.getElementById('api-limit');
+    const perCycleEl = document.getElementById('set-per-cycle');
+    const intervalEl = document.getElementById('set-interval');
     cfg.search = {
         enabled: true,
-        daily_api_limit: parseInt(document.getElementById('api-limit')?.value) || 500,
-        searches_per_cycle: parseInt(document.getElementById('set-per-cycle')?.value) || 10,
-        cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 30,
+        daily_api_limit: apiLimitEl ? parseInt(apiLimitEl.value) : (existingConfig?.search?.daily_api_limit || 500),
+        searches_per_cycle: perCycleEl ? parseInt(perCycleEl.value) : (existingConfig?.search?.searches_per_cycle || 10),
+        cycle_interval_minutes: intervalEl ? parseInt(intervalEl.value) : (existingConfig?.search?.cycle_interval_minutes || 30),
     };
     
-    // Quiet hours
+    // Quiet hours - fall back to existingConfig
+    const quietToggle = document.getElementById('quiet-toggle');
+    const quietStart = document.getElementById('quiet-start');
+    const quietEnd = document.getElementById('quiet-end');
     cfg.quiet_hours = {
-        enabled: document.getElementById('quiet-toggle')?.classList.contains('on') || false,
-        start_hour: parseInt(document.getElementById('quiet-start')?.value) || 2,
-        end_hour: parseInt(document.getElementById('quiet-end')?.value) || 7,
+        enabled: quietToggle ? quietToggle.classList.contains('on') : (existingConfig?.quiet_hours?.enabled || false),
+        start_hour: quietStart ? parseInt(quietStart.value) : (existingConfig?.quiet_hours?.start_hour ?? 2),
+        end_hour: quietEnd ? parseInt(quietEnd.value) : (existingConfig?.quiet_hours?.end_hour ?? 7),
     };
     
-    // Email
-    const emailHost = document.getElementById('email-host')?.value;
+    // Email - fall back to existingConfig
+    const emailHostEl = document.getElementById('email-host');
+    const emailHost = emailHostEl ? emailHostEl.value : existingConfig?.email?.smtp_host;
     cfg.email = {
         enabled: !!emailHost,
         smtp_host: emailHost || '',
-        smtp_port: parseInt(document.getElementById('email-port')?.value) || 587,
-        smtp_user: document.getElementById('email-user')?.value || '',
-        smtp_password: document.getElementById('email-pass')?.value || '',
+        smtp_port: parseInt(document.getElementById('email-port')?.value) || existingConfig?.email?.smtp_port || 587,
+        smtp_user: document.getElementById('email-user')?.value || existingConfig?.email?.smtp_user || '',
+        smtp_password: document.getElementById('email-pass')?.value || existingConfig?.email?.smtp_password || '',
         smtp_tls: true,
-        from_address: document.getElementById('email-from')?.value || '',
-        to_address: document.getElementById('email-to')?.value || '',
+        from_address: document.getElementById('email-from')?.value || existingConfig?.email?.from_address || '',
+        to_address: document.getElementById('email-to')?.value || existingConfig?.email?.to_address || '',
     };
     
     return cfg;
