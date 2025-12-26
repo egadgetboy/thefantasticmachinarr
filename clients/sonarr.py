@@ -64,6 +64,34 @@ class SonarrClient(BaseClient):
         
         return all_missing
     
+    def get_cutoff_unmet(self) -> List[Dict]:
+        """Get episodes that don't meet quality cutoff (upgrades wanted)."""
+        all_cutoff = []
+        page = 1
+        page_size = 100
+        
+        while True:
+            result = self.get('wanted/cutoff', params={
+                'page': page,
+                'pageSize': page_size,
+                'sortKey': 'airDateUtc',
+                'sortDirection': 'descending',
+                'monitored': True
+            })
+            
+            records = result.get('records', [])
+            all_cutoff.extend(records)
+            
+            if len(records) < page_size:
+                break
+            page += 1
+            
+            # Safety limit
+            if page > 50:
+                break
+        
+        return all_cutoff
+    
     # ==================== Queue ====================
     
     def get_queue(self, include_unknown: bool = True) -> List[Dict]:
