@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.6c</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.7</div>
 </div>
 <script>
 // Theme management
@@ -598,6 +598,125 @@ let step = 0;
 const instances = { sonarr: [{id:1,on:true}], radarr: [{id:1,on:true}], sabnzbd: [{id:1,on:false}] };
 let counters = { sonarr:1, radarr:1, sabnzbd:1 };
 let baseUrl = '';
+let existingConfig = null;
+
+// Load existing config if available
+async function loadExistingConfig() {
+    try {
+        const r = await fetch('/api/config');
+        const cfg = await r.json();
+        if (cfg && cfg.setup_complete) {
+            existingConfig = cfg;
+            
+            // Restore instances from config
+            if (cfg.sonarr_instances?.length) {
+                instances.sonarr = cfg.sonarr_instances.map((inst, i) => ({id: i+1, on: inst.enabled !== false, ...inst}));
+                counters.sonarr = instances.sonarr.length;
+            }
+            if (cfg.radarr_instances?.length) {
+                instances.radarr = cfg.radarr_instances.map((inst, i) => ({id: i+1, on: inst.enabled !== false, ...inst}));
+                counters.radarr = instances.radarr.length;
+            }
+            if (cfg.sabnzbd_instances?.length) {
+                instances.sabnzbd = cfg.sabnzbd_instances.map((inst, i) => ({id: i+1, on: inst.enabled !== false, ...inst}));
+                counters.sabnzbd = instances.sabnzbd.length;
+            } else {
+                instances.sabnzbd = [{id:1, on:false}];
+            }
+            
+            // Try to extract base URL from first sonarr instance
+            if (cfg.sonarr_instances?.[0]?.url) {
+                const url = cfg.sonarr_instances[0].url;
+                const match = url.match(/^(https?:\/\/[^:\/]+)/);
+                if (match) baseUrl = match[1];
+            }
+        }
+    } catch(e) {
+        console.log('No existing config found');
+    }
+}
+
+// Apply existing config values to form fields after render
+function applyExistingConfig() {
+    if (!existingConfig) return;
+    const cfg = existingConfig;
+    
+    // Welcome page
+    if (document.getElementById('base-url') && baseUrl) {
+        document.getElementById('base-url').value = baseUrl;
+    }
+    if (document.getElementById('api-limit') && cfg.search?.daily_api_limit) {
+        document.getElementById('api-limit').value = cfg.search.daily_api_limit;
+    }
+    
+    // Tier config
+    if (cfg.tiers) {
+        if (document.getElementById('tier-hot-max')) document.getElementById('tier-hot-max').value = cfg.tiers.hot?.max_days || 90;
+        if (document.getElementById('tier-hot')) document.getElementById('tier-hot').value = cfg.tiers.hot?.interval_minutes || 60;
+        if (document.getElementById('tier-warm-min')) document.getElementById('tier-warm-min').value = cfg.tiers.warm?.min_days || 90;
+        if (document.getElementById('tier-warm-max')) document.getElementById('tier-warm-max').value = cfg.tiers.warm?.max_days || 365;
+        if (document.getElementById('tier-warm')) document.getElementById('tier-warm').value = cfg.tiers.warm?.interval_minutes || 360;
+        if (document.getElementById('tier-cool-min')) document.getElementById('tier-cool-min').value = cfg.tiers.cool?.min_days || 365;
+        if (document.getElementById('tier-cool-max')) document.getElementById('tier-cool-max').value = cfg.tiers.cool?.max_days || 1095;
+        if (document.getElementById('tier-cool')) document.getElementById('tier-cool').value = cfg.tiers.cool?.interval_minutes || 1440;
+        if (document.getElementById('tier-cold-min')) document.getElementById('tier-cold-min').value = cfg.tiers.cold?.min_days || 1095;
+        if (document.getElementById('tier-cold')) document.getElementById('tier-cold').value = cfg.tiers.cold?.interval_minutes || 10080;
+    }
+    
+    // Service instances - populate URL/key fields
+    ['sonarr', 'radarr', 'sabnzbd'].forEach(svc => {
+        const cfgInstances = cfg[svc + '_instances'] || [];
+        cfgInstances.forEach((inst, i) => {
+            const id = i + 1;
+            const urlEl = document.getElementById(`${svc}-${id}-url`);
+            const keyEl = document.getElementById(`${svc}-${id}-key`);
+            const nameEl = document.getElementById(`${svc}-${id}-name`);
+            if (urlEl) urlEl.value = inst.url || '';
+            if (keyEl) keyEl.value = inst.api_key || '';
+            if (nameEl) nameEl.value = inst.name || '';
+        });
+    });
+    
+    // Auto-resolution
+    if (cfg.auto_resolution) {
+        const ar = cfg.auto_resolution;
+        if (document.getElementById('ar-no_files_found')) document.getElementById('ar-no_files_found').checked = ar.no_files_found !== false;
+        if (document.getElementById('ar-sample_only')) document.getElementById('ar-sample_only').checked = ar.sample_only !== false;
+        if (document.getElementById('ar-unknown_series')) document.getElementById('ar-unknown_series').checked = ar.unknown_series !== false;
+        if (document.getElementById('ar-unexpected_episode')) document.getElementById('ar-unexpected_episode').checked = ar.unexpected_episode !== false;
+        if (document.getElementById('ar-invalid_season_episode')) document.getElementById('ar-invalid_season_episode').checked = ar.invalid_season_episode !== false;
+        if (document.getElementById('ar-no_audio_tracks')) document.getElementById('ar-no_audio_tracks').checked = ar.no_audio_tracks !== false;
+        if (document.getElementById('ar-import_failed')) document.getElementById('ar-import_failed').checked = ar.import_failed !== false;
+        if (document.getElementById('ar-download_failed')) document.getElementById('ar-download_failed').checked = ar.download_failed !== false;
+        if (document.getElementById('ar-path_not_valid')) document.getElementById('ar-path_not_valid').checked = ar.path_not_valid === true;
+        if (document.getElementById('ar-wait')) document.getElementById('ar-wait').value = ar.wait_minutes_before_action || 30;
+    }
+    
+    // Search settings
+    if (cfg.search) {
+        if (document.getElementById('set-per-cycle')) document.getElementById('set-per-cycle').value = cfg.search.searches_per_cycle || 10;
+        if (document.getElementById('set-interval')) document.getElementById('set-interval').value = cfg.search.cycle_interval_minutes || 30;
+    }
+    
+    // Quiet hours
+    if (cfg.quiet_hours) {
+        if (document.getElementById('quiet-toggle') && cfg.quiet_hours.enabled) {
+            document.getElementById('quiet-toggle').classList.add('on');
+        }
+        if (document.getElementById('quiet-start')) document.getElementById('quiet-start').value = cfg.quiet_hours.start_hour ?? 2;
+        if (document.getElementById('quiet-end')) document.getElementById('quiet-end').value = cfg.quiet_hours.end_hour ?? 7;
+    }
+    
+    // Email
+    if (cfg.email) {
+        if (document.getElementById('email-host')) document.getElementById('email-host').value = cfg.email.smtp_host || '';
+        if (document.getElementById('email-port')) document.getElementById('email-port').value = cfg.email.smtp_port || 587;
+        if (document.getElementById('email-user')) document.getElementById('email-user').value = cfg.email.smtp_user || '';
+        if (document.getElementById('email-pass')) document.getElementById('email-pass').value = cfg.email.smtp_password || '';
+        if (document.getElementById('email-from')) document.getElementById('email-from').value = cfg.email.from_address || '';
+        if (document.getElementById('email-to')) document.getElementById('email-to').value = cfg.email.to_address || '';
+    }
+}
 
 function renderSteps() {
     document.getElementById('steps').innerHTML = STEPS.map((_, i) => 
@@ -617,6 +736,9 @@ function renderContent() {
     
     document.getElementById('backBtn').disabled = step === 0;
     document.getElementById('nextBtn').textContent = step === STEPS.length - 1 ? 'Finish' : 'Next';
+    
+    // Apply existing config values after rendering
+    applyExistingConfig();
 }
 
 function stepWelcome() {
@@ -846,6 +968,31 @@ function stepSettings() {
             </div>
         </div>
         
+        <h3 style="margin: 20px 0 8px;">😴 Quiet Hours (Optional)</h3>
+        <p class="desc" style="margin-bottom: 12px;">Pause searching during specific hours. Useful to reduce server load at night or focus API usage during peak hours.</p>
+        
+        <div class="svc" style="padding: 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <div style="font-weight: 500;">Enable Quiet Hours</div>
+                <div class="toggle" id="quiet-toggle" onclick="this.classList.toggle('on')"></div>
+            </div>
+            <div class="row" style="margin-bottom: 0;">
+                <div class="field" style="margin-bottom: 0;">
+                    <label>Start Time</label>
+                    <select id="quiet-start" style="width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        ${Array.from({length: 24}, (_, i) => `<option value="${i}" ${i === 2 ? 'selected' : ''}>${i.toString().padStart(2, '0')}:00</option>`).join('')}
+                    </select>
+                </div>
+                <div class="field" style="margin-bottom: 0;">
+                    <label>End Time</label>
+                    <select id="quiet-end" style="width: 100%; padding: 10px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                        ${Array.from({length: 24}, (_, i) => `<option value="${i}" ${i === 7 ? 'selected' : ''}>${i.toString().padStart(2, '0')}:00</option>`).join('')}
+                    </select>
+                </div>
+            </div>
+            <div style="font-size: 11px; color: var(--text3); margin-top: 8px;">TFM will pause all searching between these hours (server time).</div>
+        </div>
+        
         <h3 style="margin: 20px 0 8px;">📧 Email Notifications (Optional)</h3>
         <p class="desc" style="margin-bottom: 12px;">Get notified when TFM finds content or needs attention. Leave blank to skip.</p>
         <div class="row">
@@ -981,6 +1128,13 @@ function gatherConfig() {
         cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 30,
     };
     
+    // Quiet hours
+    cfg.quiet_hours = {
+        enabled: document.getElementById('quiet-toggle')?.classList.contains('on') || false,
+        start_hour: parseInt(document.getElementById('quiet-start')?.value) || 2,
+        end_hour: parseInt(document.getElementById('quiet-end')?.value) || 7,
+    };
+    
     // Email
     const emailHost = document.getElementById('email-host')?.value;
     cfg.email = {
@@ -1022,8 +1176,11 @@ function back() {
     if (step > 0) { step--; renderSteps(); renderContent(); }
 }
 
-renderSteps();
-renderContent();
+// Initialize - load existing config then render
+loadExistingConfig().then(() => {
+    renderSteps();
+    renderContent();
+});
 </script>
 </body>
 </html>
