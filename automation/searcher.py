@@ -170,13 +170,14 @@ class SmartSearcher:
             self.log.warning(f"Search cycle skipped: {reason}")
             return {'skipped': True, 'reason': reason}
         
-        # Gather all missing items
+        # Gather all missing items AND upgrades
         all_items = []
         
-        # Sonarr instances
+        # Sonarr instances - Missing
         for name, client in sonarr_clients.items():
             try:
                 missing = client.get_missing_episodes()
+                self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
                 series_cache = {}
                 
                 for ep in missing:
@@ -192,20 +193,61 @@ class SmartSearcher:
                         series_cache.get(series_id, {}),
                         name
                     )
+                    item.search_type = 'missing'
                     all_items.append(item)
                     
             except Exception as e:
-                self.log.error(f"Error getting missing from {name}: {e}")
+                self.log.error(f"Error getting missing from Sonarr ({name}): {e}")
         
-        # Radarr instances
+        # Sonarr instances - Upgrades (cutoff unmet)
+        for name, client in sonarr_clients.items():
+            try:
+                upgrades = client.get_cutoff_unmet()
+                self.log.info(f"Sonarr ({name}): Found {len(upgrades)} episodes needing upgrade")
+                series_cache = {}
+                
+                for ep in upgrades:
+                    series_id = ep.get('seriesId')
+                    if series_id and series_id not in series_cache:
+                        try:
+                            series_cache[series_id] = client.get_series_by_id(series_id)
+                        except:
+                            series_cache[series_id] = {}
+                    
+                    item = self.tier_manager.classify_episode(
+                        ep, 
+                        series_cache.get(series_id, {}),
+                        name
+                    )
+                    item.search_type = 'upgrade'
+                    all_items.append(item)
+                    
+            except Exception as e:
+                self.log.error(f"Error getting upgrades from Sonarr ({name}): {e}")
+        
+        # Radarr instances - Missing
         for name, client in radarr_clients.items():
             try:
                 missing = client.get_missing_movies()
+                self.log.info(f"Radarr ({name}): Found {len(missing)} missing movies")
                 for movie in missing:
                     item = self.tier_manager.classify_movie(movie, name)
+                    item.search_type = 'missing'
                     all_items.append(item)
             except Exception as e:
-                self.log.error(f"Error getting missing from {name}: {e}")
+                self.log.error(f"Error getting missing from Radarr ({name}): {e}")
+        
+        # Radarr instances - Upgrades (cutoff unmet)
+        for name, client in radarr_clients.items():
+            try:
+                upgrades = client.get_cutoff_unmet()
+                self.log.info(f"Radarr ({name}): Found {len(upgrades)} movies needing upgrade")
+                for movie in upgrades:
+                    item = self.tier_manager.classify_movie(movie, name)
+                    item.search_type = 'upgrade'
+                    all_items.append(item)
+            except Exception as e:
+                self.log.error(f"Error getting upgrades from Radarr ({name}): {e}")
         
         # Select items for this cycle
         selected = self._select_items_for_search(all_items)
