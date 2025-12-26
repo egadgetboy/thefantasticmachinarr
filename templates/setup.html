@@ -548,7 +548,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.5</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.6</div>
 </div>
 <script>
 // Theme management
@@ -604,67 +604,124 @@ function stepWelcome() {
         </div>
         
         <h3 style="margin-top: 24px; margin-bottom: 8px;">📊 Daily API Limit</h3>
-        <p class="desc">Most indexers limit how many API calls you can make per day. TFM spreads searches throughout the day to stay within your limits and avoid temporary bans.</p>
+        <p class="desc">Most indexers limit how many API calls you can make per day. TFM spreads searches throughout the day to stay within your limits.</p>
         
-        <div class="row" style="margin-top: 12px;">
-            <div class="field" style="margin-bottom: 0;">
-                <label>Daily API Call Budget</label>
-                <input type="number" id="api-limit" value="500" min="50" max="10000" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
-            </div>
+        <div class="field" style="margin-top: 12px; margin-bottom: 0;">
+            <label>Daily API Call Budget</label>
+            <input type="number" id="api-limit" value="500" min="50" max="50000">
         </div>
         
         <div class="info" style="margin-top: 12px;">
             <strong>💡 How to determine your limit:</strong><br><br>
-            <strong>Single indexer:</strong> Check your indexer's dashboard for "API calls" or "API limit" — common limits are 1000, 2000, or 5000/day.<br><br>
-            <strong>Multiple indexers:</strong> You can be more aggressive! Add up your limited indexers and estimate ~2000/day for each "unlimited" one. Example: if you have 5000 + 2000 + 1000 + 3 unlimited → try 8000-14000. If one indexer hits its limit, TFM continues with the others. Temp bans are brief (usually 1-24 hours) and not permanent.<br><br>
-            <strong>When in doubt:</strong> Start with 500-1000 and increase over time. You can adjust this later in Settings.
+            <strong>Single indexer:</strong> Check your indexer's dashboard for "API limit" — common limits are 1000, 2000, or 5000/day.<br><br>
+            <strong>Multiple indexers:</strong> Add up your limited indexers + ~2000 for each "unlimited" one. Example: 5000 + 2000 + 1000 + 3 unlimited → try 8000-14000. If one hits its limit, TFM continues with the others.<br><br>
+            <strong>When in doubt:</strong> Start with 500-1000. You can adjust this anytime in Settings.
         </div>
         
         <h3 style="margin-top: 24px; margin-bottom: 8px;">🎯 Search Tier Configuration</h3>
-        <p class="desc">TFM prioritizes the hottest new releases first, then works through older content over time. Newer content is searched more frequently because it's more likely to be available.</p>
+        <p class="desc">Define what "Hot", "Warm", "Cool", and "Cold" mean to you, and how often TFM should search each tier. Hot content is prioritized and searched most frequently.</p>
+        
+        <div class="info" style="margin-top: 0; margin-bottom: 16px; background: var(--success-bg); border-color: var(--success);">
+            <strong>💡 How tiers work:</strong> Content age is based on when it was added to your wanted list (for new shows/movies) or original release date (for older content). Hot = highest priority, Cold = lowest. TFM cycles through tiers, always giving Hot the most attention.
+        </div>
         
         <div class="tiers">
             <div class="tier">
                 <div class="tier-emoji">🔥</div>
                 <div class="tier-name">Hot</div>
-                <input type="text" id="tier-hot-range" value="0-3 months" style="margin-top: 6px; width: 100%; padding: 4px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); text-align: center; font-size: 11px;">
-                <select id="tier-hot" style="margin-top: 6px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                    <option value="30">Every 30 min</option>
-                    <option value="60" selected>Every hour</option>
-                    <option value="120">Every 2 hours</option>
-                    <option value="180">Every 3 hours</option>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Age range</div>
+                <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
+                    <select id="tier-hot-min" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="0" selected>0</option>
+                    </select>
+                    <span style="color: var(--text2);">to</span>
+                    <select id="tier-hot-max" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="3">3 days</option>
+                        <option value="7">1 week</option>
+                        <option value="14">2 weeks</option>
+                        <option value="30">1 month</option>
+                        <option value="90" selected>3 months</option>
+                        <option value="180">6 months</option>
+                    </select>
+                </div>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Search every</div>
+                <select id="tier-hot" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <option value="30">30 min</option>
+                    <option value="60" selected>1 hour</option>
+                    <option value="120">2 hours</option>
+                    <option value="180">3 hours</option>
+                    <option value="360">6 hours</option>
                 </select>
             </div>
             <div class="tier">
                 <div class="tier-emoji">☀️</div>
                 <div class="tier-name">Warm</div>
-                <input type="text" id="tier-warm-range" value="3-12 months" style="margin-top: 6px; width: 100%; padding: 4px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); text-align: center; font-size: 11px;">
-                <select id="tier-warm" style="margin-top: 6px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                    <option value="180">Every 3 hours</option>
-                    <option value="360" selected>Every 6 hours</option>
-                    <option value="720">Every 12 hours</option>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Age range</div>
+                <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
+                    <select id="tier-warm-min" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="90" selected>3 mo</option>
+                        <option value="180">6 mo</option>
+                    </select>
+                    <span style="color: var(--text2);">to</span>
+                    <select id="tier-warm-max" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="180">6 months</option>
+                        <option value="365" selected>1 year</option>
+                        <option value="548">18 months</option>
+                        <option value="730">2 years</option>
+                    </select>
+                </div>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Search every</div>
+                <select id="tier-warm" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <option value="180">3 hours</option>
+                    <option value="360" selected>6 hours</option>
+                    <option value="720">12 hours</option>
                     <option value="1440">Daily</option>
                 </select>
             </div>
             <div class="tier">
                 <div class="tier-emoji">❄️</div>
                 <div class="tier-name">Cool</div>
-                <input type="text" id="tier-cool-range" value="1-3 years" style="margin-top: 6px; width: 100%; padding: 4px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); text-align: center; font-size: 11px;">
-                <select id="tier-cool" style="margin-top: 6px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                    <option value="720">Every 12 hours</option>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Age range</div>
+                <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
+                    <select id="tier-cool-min" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="365" selected>1 yr</option>
+                        <option value="548">18 mo</option>
+                        <option value="730">2 yr</option>
+                    </select>
+                    <span style="color: var(--text2);">to</span>
+                    <select id="tier-cool-max" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="730">2 years</option>
+                        <option value="1095" selected>3 years</option>
+                        <option value="1825">5 years</option>
+                    </select>
+                </div>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Search every</div>
+                <select id="tier-cool" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <option value="720">12 hours</option>
                     <option value="1440" selected>Daily</option>
-                    <option value="2880">Every 2 days</option>
-                    <option value="4320">Every 3 days</option>
+                    <option value="2880">2 days</option>
+                    <option value="4320">3 days</option>
                 </select>
             </div>
             <div class="tier">
                 <div class="tier-emoji">🧊</div>
                 <div class="tier-name">Cold</div>
-                <input type="text" id="tier-cold-range" value="3+ years" style="margin-top: 6px; width: 100%; padding: 4px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text); text-align: center; font-size: 11px;">
-                <select id="tier-cold" style="margin-top: 6px; width: 100%; padding: 6px; background: var(--bg2); border: 1px solid var(--border); border-radius: 4px; color: var(--text);">
-                    <option value="4320">Every 3 days</option>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Age range</div>
+                <div style="display: flex; gap: 4px; align-items: center; margin-bottom: 6px;">
+                    <select id="tier-cold-min" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;">
+                        <option value="1095" selected>3 yr</option>
+                        <option value="1825">5 yr</option>
+                    </select>
+                    <span style="color: var(--text2);">to</span>
+                    <select id="tier-cold-max" style="flex:1; padding: 6px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 11px;" disabled>
+                        <option value="99999" selected>∞</option>
+                    </select>
+                </div>
+                <div style="font-size: 11px; color: var(--text2); margin: 4px 0;">Search every</div>
+                <select id="tier-cold" style="width: 100%; padding: 8px; background: var(--bg); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <option value="4320">3 days</option>
                     <option value="10080" selected>Weekly</option>
-                    <option value="20160">Every 2 weeks</option>
+                    <option value="20160">2 weeks</option>
                     <option value="43200">Monthly</option>
                 </select>
             </div>
@@ -850,22 +907,26 @@ function gatherConfig() {
         });
     });
     
-    // Tier intervals and age ranges
+    // Tier intervals and age ranges (in days)
     cfg.tiers = {
         hot: {
-            age_range: document.getElementById('tier-hot-range')?.value || '0-3 months',
+            min_days: parseInt(document.getElementById('tier-hot-min')?.value) || 0,
+            max_days: parseInt(document.getElementById('tier-hot-max')?.value) || 90,
             interval_minutes: parseInt(document.getElementById('tier-hot')?.value) || 60
         },
         warm: {
-            age_range: document.getElementById('tier-warm-range')?.value || '3-12 months',
+            min_days: parseInt(document.getElementById('tier-warm-min')?.value) || 90,
+            max_days: parseInt(document.getElementById('tier-warm-max')?.value) || 365,
             interval_minutes: parseInt(document.getElementById('tier-warm')?.value) || 360
         },
         cool: {
-            age_range: document.getElementById('tier-cool-range')?.value || '1-3 years',
+            min_days: parseInt(document.getElementById('tier-cool-min')?.value) || 365,
+            max_days: parseInt(document.getElementById('tier-cool-max')?.value) || 1095,
             interval_minutes: parseInt(document.getElementById('tier-cool')?.value) || 1440
         },
         cold: {
-            age_range: document.getElementById('tier-cold-range')?.value || '3+ years',
+            min_days: parseInt(document.getElementById('tier-cold-min')?.value) || 1095,
+            max_days: null, // No upper limit
             interval_minutes: parseInt(document.getElementById('tier-cold')?.value) || 10080
         }
     };
