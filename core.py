@@ -176,23 +176,38 @@ class MachinarrCore:
     
     def get_dashboard_data(self) -> Dict[str, Any]:
         """Get data for dashboard display."""
-        # Scoreboard
+        # Scoreboard with finds breakdown
+        finds_by_source = {'sonarr': 0, 'radarr': 0}
+        for find in self.recent_finds:
+            source = find.get('source', '').lower()
+            if source in finds_by_source:
+                finds_by_source[source] += 1
+        
         scoreboard = {
             'finds_today': self.searcher.finds_today,
             'finds_total': self.searcher.finds_total,
             'api_hits_today': self.searcher.api_hits_today,
             'api_limit': self.config.search.daily_api_limit,
+            'finds_by_source': finds_by_source,
         }
         
         # Get tier stats
         missing_items = self._get_all_missing()
         tier_stats = self.tier_manager.get_tier_stats(missing_items)
         
+        # Scheduler info
+        scheduler_info = None
+        if hasattr(self, 'scheduler') and self.scheduler:
+            scheduler_info = {
+                'tasks': [t.to_dict() for t in self.scheduler.tasks.values()]
+            }
+        
         return {
             'scoreboard': scoreboard,
             'tiers': tier_stats,
             'stuck_count': len(self.queue_monitor.get_stuck_items()),
             'intervention_count': len(self.queue_monitor.get_pending_interventions()),
+            'scheduler': scheduler_info,
         }
     
     def _get_all_missing(self) -> List:
