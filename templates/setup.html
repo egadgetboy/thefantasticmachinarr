@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9k</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9l</div>
 </div>
 <script>
 // Theme management
@@ -1091,14 +1091,14 @@ function stepSettings() {
         <div class="row">
             <div class="field">
                 <label>Searches Per Cycle</label>
-                <input type="number" id="set-per-cycle" value="${searchesPerCycle}" min="1" max="5000">
+                <input type="number" id="set-per-cycle" value="${searchesPerCycle}" min="1" max="5000" autocomplete="off">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
                     Items searched each cycle
                 </div>
             </div>
             <div class="field">
                 <label>Cycle Interval (minutes)</label>
-                <input type="number" id="set-interval" value="${cycleInterval}" min="5" max="360">
+                <input type="number" id="set-interval" value="${cycleInterval}" min="5" max="360" autocomplete="off">
                 <div style="font-size: 11px; color: var(--text3); margin-top: 4px;">
                     Time between cycles
                 </div>
