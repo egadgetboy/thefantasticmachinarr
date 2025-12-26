@@ -115,7 +115,7 @@
         <div class="logo"><span>🎬</span> The Fantastic Machinarr</div>
         <div style="display:flex;align-items:center;gap:16px">
             <div class="status-dots" id="status-dots"></div>
-            <a href="/setup" class="settings-link">⚙️</a>
+            <a href="#" class="settings-link" onclick="openSettingsModal(); return false;">⚙️</a>
         </div>
     </header>
     
@@ -233,6 +233,37 @@
             <p id="modal-desc"></p>
             <div id="modal-details"></div>
             <div class="modal-actions" id="modal-actions"></div>
+        </div>
+    </div>
+    
+    <!-- Settings Modal -->
+    <div class="modal" id="settings-modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <h3>⚙️ Settings</h3>
+            <div style="margin: 20px 0;">
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">📊 Daily API Limit</label>
+                    <input type="number" id="settings-api-limit" value="500" min="50" max="50000" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">TFM spreads searches throughout the day to stay within this limit.</div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">🔍 Searches Per Cycle</label>
+                    <input type="number" id="settings-per-cycle" value="10" min="1" max="50" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">How many items to search each cycle.</div>
+                </div>
+                <div style="margin-bottom: 16px;">
+                    <label style="display: block; margin-bottom: 6px; font-weight: 500;">⏱️ Cycle Interval (minutes)</label>
+                    <input type="number" id="settings-interval" value="60" min="15" max="360" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+                    <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Time between search cycles.</div>
+                </div>
+            </div>
+            <div style="display: flex; gap: 12px; justify-content: flex-end; padding-top: 16px; border-top: 1px solid var(--border);">
+                <button class="btn btn-sec" onclick="closeSettingsModal()">Cancel</button>
+                <button class="btn btn-pri" onclick="saveSettings()">Save Settings</button>
+            </div>
+            <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--border); text-align: center;">
+                <a href="/setup" style="color: var(--text2); font-size: 13px;">Run Setup Wizard Again →</a>
+            </div>
         </div>
     </div>
     
@@ -467,6 +498,43 @@
             document.getElementById('modal').classList.remove('show');
         }
         
+        async function openSettingsModal() {
+            // Load current settings
+            const data = await api('settings');
+            if (data.search) {
+                document.getElementById('settings-api-limit').value = data.search.daily_api_limit || 500;
+                document.getElementById('settings-per-cycle').value = data.search.searches_per_cycle || 10;
+                document.getElementById('settings-interval').value = data.search.cycle_interval_minutes || 60;
+            }
+            document.getElementById('settings-modal').classList.add('show');
+        }
+        
+        function closeSettingsModal() {
+            document.getElementById('settings-modal').classList.remove('show');
+        }
+        
+        async function saveSettings() {
+            const settings = {
+                search: {
+                    daily_api_limit: parseInt(document.getElementById('settings-api-limit').value) || 500,
+                    searches_per_cycle: parseInt(document.getElementById('settings-per-cycle').value) || 10,
+                    cycle_interval_minutes: parseInt(document.getElementById('settings-interval').value) || 60
+                }
+            };
+            const result = await api('settings', 'POST', settings);
+            if (result.success) {
+                closeSettingsModal();
+                loadDashboard(); // Refresh to show new limit
+            } else {
+                alert('Failed to save settings: ' + result.message);
+            }
+        }
+        
+        // Close modals when clicking outside
+        document.getElementById('settings-modal').addEventListener('click', function(e) {
+            if (e.target === this) closeSettingsModal();
+        });
+        
         // Initial load
         loadStatus();
         loadDashboard();
@@ -484,6 +552,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div style="text-align: center; padding: 12px; font-size: 11px; color: #64748b; border-top: 1px solid #334155; margin-top: 20px;">The Fantastic Machinarr v1.0.4</div>
+    <div style="text-align: center; padding: 12px; font-size: 11px; color: #64748b; border-top: 1px solid #334155; margin-top: 20px;">The Fantastic Machinarr v1.0.4a</div>
 </body>
 </html>
