@@ -69,10 +69,16 @@ class WebServer:
         def api_complete_setup():
             data = request.get_json() or {}
             try:
+                # Check if this is final save or auto-save
+                is_final = data.get('setup_complete', False)
+                
                 self.config.update(data)
-                self.config.setup_complete = True
+                
+                if is_final:
+                    self.config.setup_complete = True
+                    self.core.reinit_clients()
+                
                 self.config.save()
-                self.core.reinit_clients()
                 return jsonify({'success': True})
             except Exception as e:
                 return jsonify({'success': False, 'message': str(e)})
