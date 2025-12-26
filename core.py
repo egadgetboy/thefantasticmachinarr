@@ -301,7 +301,7 @@ class MachinarrCore:
         # Queue-based interventions
         queue_interventions = self.queue_monitor.get_pending_interventions()
         
-        # Search exhausted interventions (items tried too many times)
+        # Search interventions (exhausted attempts and long-missing)
         search_interventions = self.searcher.get_intervention_items()
         
         # Combine both types
@@ -309,28 +309,58 @@ class MachinarrCore:
         
         # Add search interventions with consistent format
         for si in search_interventions:
+            intervention_type = si.get('intervention_type', 'search_exhausted')
+            urgency = si.get('urgency', 'high')
+            
+            # Different actions based on type
+            if intervention_type == 'long_missing':
+                available_actions = [
+                    {'action': 'dismiss', 'label': 'Keep Waiting'},
+                    {'action': 'reset_search', 'label': 'Search Again Now'},
+                    {'action': 'open_in_arr', 'label': 'Open in Sonarr/Radarr'},
+                ]
+                details = {
+                    'tier': si['tier'],
+                    'tier_emoji': si.get('tier_emoji', ''),
+                    'search_count': si['search_count'],
+                    'months_missing': si.get('months_missing', 0),
+                    'milestone': si.get('milestone', 0),
+                    'flagged_at': si['flagged_at'],
+                }
+            else:  # search_exhausted
+                available_actions = [
+                    {'action': 'dismiss', 'label': 'Dismiss'},
+                    {'action': 'reset_search', 'label': 'Reset & Try Again'},
+                ]
+                details = {
+                    'tier': si['tier'],
+                    'tier_emoji': si.get('tier_emoji', ''),
+                    'search_count': si['search_count'],
+                    'preset': si.get('preset', 'unknown'),
+                    'flagged_at': si['flagged_at'],
+                }
+            
             all_items.append({
                 'id': si['id'],
                 'title': si['title'],
                 'source': si['source'],
                 'instance_name': si['instance_name'],
-                'intervention_type': 'search_exhausted',
+                'intervention_type': intervention_type,
+                'urgency': urgency,
                 'reason': si['reason'],
-                'details': {
-                    'tier': si['tier'],
-                    'search_count': si['search_count'],
-                    'flagged_at': si['flagged_at'],
-                },
-                'available_actions': [
-                    {'action': 'dismiss', 'label': 'Dismiss'},
-                    {'action': 'reset_search', 'label': 'Reset & Try Again'},
-                ],
+                'details': details,
+                'available_actions': available_actions,
                 'created_at': si['flagged_at'],
             })
+        
+        # Sort by urgency (high first)
+        all_items.sort(key=lambda x: (0 if x.get('urgency') == 'high' else 1, x.get('created_at', '')))
         
         return {
             'items': all_items,
             'count': len(all_items),
+            'urgent_count': sum(1 for i in all_items if i.get('urgency') == 'high'),
+            'long_missing_count': sum(1 for i in all_items if i.get('intervention_type') == 'long_missing'),
         }
     
     def trigger_search(self, data: Dict) -> Dict[str, Any]:
