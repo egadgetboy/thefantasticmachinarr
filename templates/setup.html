@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9p</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9q</div>
 </div>
 <script>
 // Theme management
@@ -1089,9 +1089,9 @@ function stepSettings() {
         </div>
         
         <div style="background: var(--bg3); border-radius: 10px; padding: 14px; margin: 0 0 16px; font-size: 12px;">
-            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Choose Your Pacing</div>
+            <div style="font-weight: 600; margin-bottom: 8px;">⚡ Click To Choose Your Pacing</div>
             <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 10px;">
-                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid var(--success); text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
+                <div class="preset-btn" style="background: var(--bg); padding: 10px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; text-align: center;" onclick="applyPacing(${defaultSearches}, ${defaultInterval})">
                     <div style="font-weight: 500; margin-bottom: 4px;">🐢 Steady</div>
                     <div style="color: var(--text3); font-size: 11px;">${defaultSearches} / ${defaultInterval} min<br>24 hours</div>
                     <div style="color: var(--success); font-size: 10px; margin-top: 4px;">✓ Recommended</div>
