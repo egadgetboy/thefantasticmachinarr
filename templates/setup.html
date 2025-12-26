@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Setup - The Fantastic Machinarr</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎬</text></svg>">
+    <style>
+        :root { --bg: #0f172a; --bg2: #1e293b; --bg3: #334155; --text: #f8fafc; --text2: #94a3b8; --accent: #8b5cf6; --accent2: #7c3aed; --success: #22c55e; --warn: #f59e0b; --error: #ef4444; --border: #475569; }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; display: flex; justify-content: center; align-items: center; padding: 20px; }
+        .wizard { background: var(--bg2); border-radius: 16px; width: 100%; max-width: 720px; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5); overflow: hidden; }
+        .header { background: linear-gradient(135deg, var(--accent), #ec4899); padding: 32px; text-align: center; }
+        .header h1 { font-size: 26px; margin-bottom: 8px; }
+        .header p { opacity: 0.9; }
+        .steps { display: flex; justify-content: center; padding: 16px; gap: 8px; background: var(--bg3); }
+        .step-dot { width: 12px; height: 12px; border-radius: 50%; background: var(--border); transition: all 0.3s; }
+        .step-dot.active { background: var(--accent); box-shadow: 0 0 12px var(--accent); }
+        .step-dot.done { background: var(--success); }
+        .content { padding: 28px; max-height: 55vh; overflow-y: auto; }
+        .step { display: none; animation: fadeIn 0.3s; }
+        .step.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+        h2 { font-size: 20px; margin-bottom: 6px; }
+        .desc { color: var(--text2); margin-bottom: 20px; }
+        .svc { background: var(--bg3); border-radius: 10px; padding: 18px; margin-bottom: 14px; border: 1px solid var(--border); }
+        .svc-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+        .svc-title { display: flex; align-items: center; gap: 10px; font-weight: 600; }
+        .svc-icon { width: 32px; height: 32px; border-radius: 6px; display: flex; align-items: center; justify-content: center; }
+        .svc-icon.sonarr { background: #35c5f4; }
+        .svc-icon.radarr { background: #ffc230; }
+        .svc-icon.sabnzbd { background: #f0a000; }
+        .badge { font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--bg2); color: var(--text2); }
+        .toggle { width: 44px; height: 24px; background: var(--border); border-radius: 12px; position: relative; cursor: pointer; }
+        .toggle.on { background: var(--accent); }
+        .toggle::after { content: ''; position: absolute; width: 20px; height: 20px; background: #fff; border-radius: 50%; top: 2px; left: 2px; transition: 0.2s; }
+        .toggle.on::after { transform: translateX(20px); }
+        .fields { display: none; }
+        .fields.show { display: block; }
+        .row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+        .field { margin-bottom: 14px; }
+        .field label { display: block; margin-bottom: 5px; font-size: 13px; font-weight: 500; }
+        .field input, .field select { width: 100%; padding: 10px 12px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text); font-size: 14px; }
+        .field input:focus { outline: none; border-color: var(--accent); }
+        .test-btn { width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); color: var(--text); border-radius: 6px; cursor: pointer; margin-top: 8px; }
+        .test-btn:hover { border-color: var(--accent); }
+        .test-btn.ok { background: var(--success); border-color: var(--success); }
+        .test-btn.fail { background: var(--error); border-color: var(--error); }
+        .add-btn { width: 100%; padding: 12px; background: transparent; border: 2px dashed var(--border); border-radius: 8px; color: var(--text2); cursor: pointer; }
+        .add-btn:hover { border-color: var(--accent); color: var(--accent); }
+        .remove { background: none; border: none; color: var(--error); cursor: pointer; font-size: 18px; padding: 4px 8px; }
+        .footer { display: flex; justify-content: space-between; padding: 18px 28px; border-top: 1px solid var(--border); }
+        .btn { padding: 12px 24px; border-radius: 8px; font-size: 14px; font-weight: 500; cursor: pointer; border: none; }
+        .btn-sec { background: var(--bg3); color: var(--text); }
+        .btn-pri { background: var(--accent); color: #fff; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .info { background: rgba(139,92,246,0.1); border: 1px solid rgba(139,92,246,0.3); border-radius: 8px; padding: 12px; font-size: 13px; color: var(--text2); margin-top: 16px; }
+        .tiers { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 16px 0; }
+        .tier { background: var(--bg3); padding: 14px 10px; border-radius: 8px; text-align: center; }
+        .tier-emoji { font-size: 28px; }
+        .tier-name { font-weight: 600; margin: 4px 0; }
+        .tier-desc { font-size: 11px; color: var(--text2); }
+        .summary { background: var(--bg3); border-radius: 8px; padding: 16px; }
+        .sum-item { margin-bottom: 10px; }
+        .sum-sub { margin-left: 24px; font-size: 13px; color: var(--text2); }
+        .check-row { display: flex; align-items: center; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border); }
+        .check-row:last-child { border: none; }
+        .check-row label { flex: 1; }
+        input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--accent); }
+    </style>
+</head>
+<body>
+<div class="wizard">
+    <div class="header">
+        <h1>🎬 The Fantastic Machinarr</h1>
+        <p>Intelligent media library automation</p>
+    </div>
+    <div class="steps" id="steps"></div>
+    <div class="content" id="content"></div>
+    <div class="footer">
+        <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
+        <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
+    </div>
+</div>
+<script>
+const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Settings', 'Complete'];
+let step = 0;
+const instances = { sonarr: [{id:1,on:true}], radarr: [{id:1,on:true}], sabnzbd: [{id:1,on:false}] };
+let counters = { sonarr:1, radarr:1, sabnzbd:1 };
+
+function renderSteps() {
+    document.getElementById('steps').innerHTML = STEPS.map((_, i) => 
+        `<div class="step-dot ${i < step ? 'done' : i === step ? 'active' : ''}" data-step="${i}"></div>`
+    ).join('');
+}
+
+function renderContent() {
+    const c = document.getElementById('content');
+    if (step === 0) c.innerHTML = stepWelcome();
+    else if (step === 1) c.innerHTML = stepService('sonarr', '📺', 'TV Shows');
+    else if (step === 2) c.innerHTML = stepService('radarr', '🎬', 'Movies');
+    else if (step === 3) c.innerHTML = stepService('sabnzbd', '📥', 'Downloads');
+    else if (step === 4) c.innerHTML = stepAutoRes();
+    else if (step === 5) c.innerHTML = stepSettings();
+    else if (step === 6) c.innerHTML = stepComplete();
+    
+    document.getElementById('backBtn').disabled = step === 0;
+    document.getElementById('nextBtn').textContent = step === STEPS.length - 1 ? 'Finish' : 'Next';
+}
+
+function stepWelcome() {
+    return `
+    <div class="step active">
+        <h2>👋 Welcome!</h2>
+        <p class="desc">The Fantastic Machinarr helps Sonarr and Radarr find content they can't find on their own.</p>
+        <div class="tiers">
+            <div class="tier"><div class="tier-emoji">🔥</div><div class="tier-name">Hot</div><div class="tier-desc">Hourly</div></div>
+            <div class="tier"><div class="tier-emoji">☀️</div><div class="tier-name">Warm</div><div class="tier-desc">Every 6hr</div></div>
+            <div class="tier"><div class="tier-emoji">❄️</div><div class="tier-name">Cool</div><div class="tier-desc">Daily</div></div>
+            <div class="tier"><div class="tier-emoji">🧊</div><div class="tier-name">Cold</div><div class="tier-desc">Weekly</div></div>
+        </div>
+        <div class="info"><strong>Features:</strong> Tier-based searching, stuck queue resolution, manual intervention options, API rate limiting, email notifications.</div>
+    </div>`;
+}
+
+function stepService(svc, icon, desc) {
+    const name = svc.charAt(0).toUpperCase() + svc.slice(1);
+    const ports = {sonarr:'8989', radarr:'7878', sabnzbd:'8080'};
+    let html = `<div class="step active"><h2>${icon} ${name}</h2><p class="desc">Configure your ${name} instance(s) for ${desc}.</p><div id="${svc}-list">`;
+    
+    instances[svc].forEach((inst, i) => {
+        const badge = i === 0 ? 'Primary' : `Instance ${inst.id}`;
+        html += `
+        <div class="svc" data-id="${svc}-${inst.id}">
+            <div class="svc-head">
+                <div class="svc-title"><div class="svc-icon ${svc}">${icon}</div><span>${name}</span><span class="badge">${badge}</span></div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <div class="toggle ${inst.on?'on':''}" onclick="toggleSvc('${svc}',${inst.id},this)"></div>
+                    ${i > 0 ? `<button class="remove" onclick="removeSvc('${svc}',${inst.id})">×</button>` : ''}
+                </div>
+            </div>
+            <div class="fields ${inst.on?'show':''}" id="fields-${svc}-${inst.id}">
+                <div class="row">
+                    <div class="field"><label>URL</label><input type="text" id="${svc}-${inst.id}-url" placeholder="http://192.168.1.100:${ports[svc]}"></div>
+                    <div class="field"><label>API Key</label><input type="password" id="${svc}-${inst.id}-key" placeholder="Your API key"></div>
+                </div>
+                <div class="field"><label>Name (optional)</label><input type="text" id="${svc}-${inst.id}-name" placeholder="e.g., ${name} 4K"></div>
+                <button class="test-btn" onclick="testSvc('${svc}',${inst.id},this)">Test Connection</button>
+            </div>
+        </div>`;
+    });
+    
+    html += `</div><button class="add-btn" onclick="addSvc('${svc}')">+ Add Another ${name}</button>`;
+    if (svc === 'sabnzbd') html += `<div class="info">💡 SABnzbd is optional. Skip if using a different download client.</div>`;
+    html += `</div>`;
+    return html;
+}
+
+function stepAutoRes() {
+    return `
+    <div class="step active">
+        <h2>🔧 Auto-Resolution Settings</h2>
+        <p class="desc">Choose which stuck queue issues to resolve automatically.</p>
+        <div class="svc">
+            <div class="check-row"><label>🗑️ No files found / eligible for import</label><input type="checkbox" id="ar-no_files_found" checked></div>
+            <div class="check-row"><label>📽️ File is a sample only</label><input type="checkbox" id="ar-sample_only" checked></div>
+            <div class="check-row"><label>❓ Unknown series/movie</label><input type="checkbox" id="ar-unknown_series" checked></div>
+            <div class="check-row"><label>⚠️ Unexpected episode</label><input type="checkbox" id="ar-unexpected_episode" checked></div>
+            <div class="check-row"><label>🔢 Invalid season/episode</label><input type="checkbox" id="ar-invalid_season_episode" checked></div>
+            <div class="check-row"><label>🔇 No audio tracks detected</label><input type="checkbox" id="ar-no_audio_tracks" checked></div>
+            <div class="check-row"><label>❌ Import failed</label><input type="checkbox" id="ar-import_failed" checked></div>
+            <div class="check-row"><label>📥 Download failed</label><input type="checkbox" id="ar-download_failed" checked></div>
+            <div class="check-row"><label>📁 Path not valid (needs manual fix)</label><input type="checkbox" id="ar-path_not_valid"></div>
+        </div>
+        <div class="field" style="margin-top:16px">
+            <label>Wait time before auto-resolving (minutes)</label>
+            <input type="number" id="ar-wait" value="30" min="5" max="120">
+        </div>
+    </div>`;
+}
+
+function stepSettings() {
+    return `
+    <div class="step active">
+        <h2>⚙️ Search Settings</h2>
+        <p class="desc">Configure API limits and search behavior.</p>
+        <div class="row">
+            <div class="field"><label>Daily API Limit</label><input type="number" id="set-api-limit" value="500" min="50" max="2000"></div>
+            <div class="field"><label>Searches Per Cycle</label><input type="number" id="set-per-cycle" value="10" min="1" max="50"></div>
+        </div>
+        <div class="row">
+            <div class="field"><label>Cycle Interval (minutes)</label><input type="number" id="set-interval" value="60" min="15" max="360"></div>
+            <div class="field">&nbsp;</div>
+        </div>
+        <h3 style="margin:20px 0 10px">📧 Email Notifications (Optional)</h3>
+        <div class="row">
+            <div class="field"><label>SMTP Host</label><input type="text" id="email-host" placeholder="smtp.gmail.com"></div>
+            <div class="field"><label>SMTP Port</label><input type="number" id="email-port" value="587"></div>
+        </div>
+        <div class="row">
+            <div class="field"><label>Username</label><input type="text" id="email-user" placeholder="your@email.com"></div>
+            <div class="field"><label>Password</label><input type="password" id="email-pass" placeholder="App password"></div>
+        </div>
+        <div class="row">
+            <div class="field"><label>From Address</label><input type="text" id="email-from" placeholder="machinarr@example.com"></div>
+            <div class="field"><label>To Address</label><input type="text" id="email-to" placeholder="you@example.com"></div>
+        </div>
+    </div>`;
+}
+
+function stepComplete() {
+    const cfg = gatherConfig();
+    let html = `<div class="step active" style="text-align:center"><div style="font-size:64px">🎉</div><h2>All Set!</h2><p class="desc">Your Fantastic Machinarr is ready.</p><div class="summary" style="text-align:left">`;
+    
+    ['sonarr','radarr','sabnzbd'].forEach(svc => {
+        const icon = {sonarr:'📺', radarr:'🎬', sabnzbd:'📥'}[svc];
+        const name = svc.charAt(0).toUpperCase() + svc.slice(1);
+        const insts = cfg[svc + '_instances'];
+        html += `<div class="sum-item">${icon} <strong>${name}:</strong> ${insts.length} instance(s)</div>`;
+        insts.forEach(i => { html += `<div class="sum-sub">• ${i.name || i.url}</div>`; });
+    });
+    
+    html += `</div></div>`;
+    return html;
+}
+
+function toggleSvc(svc, id, el) {
+    el.classList.toggle('on');
+    const on = el.classList.contains('on');
+    document.getElementById(`fields-${svc}-${id}`).classList.toggle('show', on);
+    const inst = instances[svc].find(i => i.id === id);
+    if (inst) inst.on = on;
+}
+
+function addSvc(svc) {
+    counters[svc]++;
+    instances[svc].push({id: counters[svc], on: true});
+    renderContent();
+}
+
+function removeSvc(svc, id) {
+    instances[svc] = instances[svc].filter(i => i.id !== id);
+    renderContent();
+}
+
+async function testSvc(svc, id, btn) {
+    const url = document.getElementById(`${svc}-${id}-url`).value;
+    const key = document.getElementById(`${svc}-${id}-key`).value;
+    if (!url || !key) { alert('Enter URL and API key'); return; }
+    
+    btn.textContent = 'Testing...';
+    try {
+        const r = await fetch(`/api/test/${svc}`, {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({url, api_key: key})
+        });
+        const data = await r.json();
+        btn.textContent = data.success ? '✓ Connected' : '✗ Failed';
+        btn.className = 'test-btn ' + (data.success ? 'ok' : 'fail');
+    } catch(e) {
+        btn.textContent = '✗ Error';
+        btn.className = 'test-btn fail';
+    }
+    setTimeout(() => { btn.textContent = 'Test Connection'; btn.className = 'test-btn'; }, 3000);
+}
+
+function gatherConfig() {
+    const cfg = { sonarr_instances: [], radarr_instances: [], sabnzbd_instances: [] };
+    
+    ['sonarr','radarr','sabnzbd'].forEach(svc => {
+        instances[svc].forEach(inst => {
+            const url = document.getElementById(`${svc}-${inst.id}-url`)?.value || '';
+            const key = document.getElementById(`${svc}-${inst.id}-key`)?.value || '';
+            const name = document.getElementById(`${svc}-${inst.id}-name`)?.value || `${svc} ${inst.id}`;
+            if (inst.on && url && key) {
+                cfg[svc + '_instances'].push({ url, api_key: key, name, enabled: true });
+            }
+        });
+    });
+    
+    // Auto-resolution
+    cfg.auto_resolution = {
+        enabled: true,
+        no_files_found: document.getElementById('ar-no_files_found')?.checked ?? true,
+        sample_only: document.getElementById('ar-sample_only')?.checked ?? true,
+        unknown_series: document.getElementById('ar-unknown_series')?.checked ?? true,
+        unexpected_episode: document.getElementById('ar-unexpected_episode')?.checked ?? true,
+        invalid_season_episode: document.getElementById('ar-invalid_season_episode')?.checked ?? true,
+        no_audio_tracks: document.getElementById('ar-no_audio_tracks')?.checked ?? true,
+        import_failed: document.getElementById('ar-import_failed')?.checked ?? true,
+        download_failed: document.getElementById('ar-download_failed')?.checked ?? true,
+        path_not_valid: document.getElementById('ar-path_not_valid')?.checked ?? false,
+        wait_minutes_before_action: parseInt(document.getElementById('ar-wait')?.value) || 30,
+    };
+    
+    // Search
+    cfg.search = {
+        enabled: true,
+        daily_api_limit: parseInt(document.getElementById('set-api-limit')?.value) || 500,
+        searches_per_cycle: parseInt(document.getElementById('set-per-cycle')?.value) || 10,
+        cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 60,
+    };
+    
+    // Email
+    const emailHost = document.getElementById('email-host')?.value;
+    cfg.email = {
+        enabled: !!emailHost,
+        smtp_host: emailHost || '',
+        smtp_port: parseInt(document.getElementById('email-port')?.value) || 587,
+        smtp_user: document.getElementById('email-user')?.value || '',
+        smtp_password: document.getElementById('email-pass')?.value || '',
+        smtp_tls: true,
+        from_address: document.getElementById('email-from')?.value || '',
+        to_address: document.getElementById('email-to')?.value || '',
+    };
+    
+    return cfg;
+}
+
+async function next() {
+    if (step === STEPS.length - 1) {
+        const cfg = gatherConfig();
+        cfg.setup_complete = true;
+        try {
+            const r = await fetch('/api/setup/complete', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(cfg)
+            });
+            const data = await r.json();
+            if (data.success) window.location.href = '/';
+            else alert('Setup failed: ' + data.message);
+        } catch(e) { alert('Error: ' + e.message); }
+        return;
+    }
+    step++;
+    renderSteps();
+    renderContent();
+}
+
+function back() {
+    if (step > 0) { step--; renderSteps(); renderContent(); }
+}
+
+renderSteps();
+renderContent();
+</script>
+</body>
+</html>
