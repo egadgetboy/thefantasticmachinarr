@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.7</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.7a</div>
 </div>
 <script>
 // Theme management
@@ -876,7 +876,10 @@ function stepService(svc, icon, desc) {
     
     instances[svc].forEach((inst, i) => {
         const badge = i === 0 ? 'Primary' : `Instance ${inst.id}`;
-        const urlValue = i === 0 && defaultUrl ? defaultUrl : '';
+        // Use existing URL from config, or default URL if available, or empty
+        const urlValue = inst.url || defaultUrl || '';
+        const keyValue = inst.api_key || '';
+        const nameValue = inst.name || '';
         html += `
         <div class="svc" data-id="${svc}-${inst.id}">
             <div class="svc-head">
@@ -889,9 +892,9 @@ function stepService(svc, icon, desc) {
             <div class="fields ${inst.on?'show':''}" id="fields-${svc}-${inst.id}">
                 <div class="row">
                     <div class="field"><label>URL</label><input type="text" id="${svc}-${inst.id}-url" placeholder="http://192.168.1.100:${ports[svc]}" value="${urlValue}"></div>
-                    <div class="field"><label>API Key</label><input type="password" id="${svc}-${inst.id}-key" placeholder="Your API key"></div>
+                    <div class="field"><label>API Key</label><input type="password" id="${svc}-${inst.id}-key" placeholder="Your API key" value="${keyValue}"></div>
                 </div>
-                <div class="field"><label>Name (optional)</label><input type="text" id="${svc}-${inst.id}-name" placeholder="e.g., ${name} 4K"></div>
+                <div class="field"><label>Name (optional)</label><input type="text" id="${svc}-${inst.id}-name" placeholder="e.g., ${name} 4K" value="${nameValue}"></div>
                 <button class="test-btn" onclick="testSvc('${svc}',${inst.id},this)">Test Connection</button>
             </div>
         </div>`;
@@ -1036,7 +1039,8 @@ function toggleSvc(svc, id, el) {
 
 function addSvc(svc) {
     counters[svc]++;
-    instances[svc].push({id: counters[svc], on: true});
+    const defaultUrl = getDefaultUrl(svc);
+    instances[svc].push({id: counters[svc], on: true, url: defaultUrl});
     renderContent();
 }
 
