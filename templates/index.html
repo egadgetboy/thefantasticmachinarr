@@ -253,6 +253,127 @@
             border-radius: 3px;
         }
         
+        /* Panel Row - side by side panels */
+        .panel-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+        
+        .panel.half {
+            margin-bottom: 0;
+        }
+        
+        @media (max-width: 900px) {
+            .panel-row {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        /* Compact Scoreboard */
+        .scoreboard.compact {
+            padding: 12px 20px;
+            gap: 16px;
+        }
+        
+        .scoreboard.compact .score-card {
+            padding: 12px 16px;
+            min-width: 100px;
+        }
+        
+        .scoreboard.compact .score-val {
+            font-size: 28px;
+        }
+        
+        .scoreboard.compact .score-label {
+            font-size: 10px;
+        }
+        
+        .score-breakdown {
+            font-size: 10px;
+            color: var(--text3);
+            margin-top: 2px;
+        }
+        
+        .score-card.status {
+            background: var(--bg3);
+        }
+        
+        .score-card.status .score-val {
+            font-size: 24px;
+        }
+        
+        .score-card.status.active {
+            background: var(--success-bg);
+            border-color: var(--success);
+        }
+        
+        .score-card.status.paused {
+            background: var(--warn-bg);
+            border-color: var(--warn);
+        }
+        
+        .score-card.status.exhausted {
+            background: var(--error-bg);
+            border-color: var(--error);
+        }
+        
+        /* Storage Summary */
+        .storage-summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+        }
+        
+        .storage-item {
+            background: var(--bg3);
+            padding: 16px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+        }
+        
+        .storage-item-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        
+        .storage-item-label {
+            font-weight: 600;
+            font-size: 13px;
+        }
+        
+        .storage-item-value {
+            font-size: 12px;
+            color: var(--text2);
+        }
+        
+        .storage-bar {
+            height: 8px;
+            background: var(--bg);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .storage-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        .storage-bar-fill.ok { background: var(--success); }
+        .storage-bar-fill.warn { background: var(--warn); }
+        .storage-bar-fill.critical { background: var(--error); }
+        
+        .storage-details {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 11px;
+            color: var(--text3);
+        }
+        
         /* Tiers */
         .tiers {
             display: flex;
@@ -543,7 +664,8 @@
         </div>
     </header>
     
-    <div class="scoreboard">
+    <!-- Compact Scoreboard -->
+    <div class="scoreboard compact">
         <div class="score-card hot">
             <div class="score-val" id="finds-today">0</div>
             <div class="score-label">Finds Today</div>
@@ -551,23 +673,45 @@
         <div class="score-card">
             <div class="score-val" id="finds-total">0</div>
             <div class="score-label">Total Finds</div>
+            <div class="score-breakdown" id="finds-breakdown"></div>
         </div>
         <div class="score-card api">
-            <div class="score-val" id="api-used">0</div>
-            <div class="score-label">API Hits Today</div>
+            <div class="score-val"><span id="api-used">0</span><span style="color:var(--text3);font-size:16px"> / <span id="api-limit">500</span></span></div>
+            <div class="score-label">API Calls</div>
         </div>
-        <div class="score-card">
-            <div class="score-val" id="api-limit">500</div>
-            <div class="score-label">Daily Limit</div>
+        <div class="score-card status" id="status-card">
+            <div class="score-val" id="status-indicator">⏳</div>
+            <div class="score-label" id="status-text">Initializing...</div>
         </div>
     </div>
     
     <main>
+        <!-- Activity Row - Recent Searches and Recent Finds side by side -->
+        <div class="panel-row">
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">🔍 Recent Searches</span>
+                    <button class="btn btn-sm btn-sec" onclick="runSearch()">Run Now</button>
+                </div>
+                <div class="panel-body flush" id="search-list" style="max-height:280px">
+                    <div class="empty"><div class="empty-icon">🔎</div><p>No searches yet</p></div>
+                </div>
+            </div>
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">🎉 Recent Finds</span>
+                    <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
+                </div>
+                <div class="panel-body flush" id="finds-list" style="max-height:280px">
+                    <div class="empty"><div class="empty-icon">🎯</div><p>No finds yet</p></div>
+                </div>
+            </div>
+        </div>
+        
         <!-- Tier Summary -->
         <div class="panel">
             <div class="panel-head">
                 <span class="panel-title">Missing Content by Tier</span>
-                <button class="btn btn-sm btn-sec" onclick="runSearch()">🔍 Run Search</button>
             </div>
             <div class="panel-body">
                 <div class="tiers">
@@ -579,56 +723,35 @@
             </div>
         </div>
         
-        <!-- Stuck Queue Items -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">⚠️ Queue Issues</span>
-                <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
+        <!-- Queue Issues and Manual Intervention side by side -->
+        <div class="panel-row">
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">⚠️ Queue Issues</span>
+                    <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
+                </div>
+                <div class="panel-body flush" id="stuck-list" style="max-height:250px">
+                    <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
+                </div>
             </div>
-            <div class="panel-body flush" id="stuck-list">
-                <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
+            <div class="panel half">
+                <div class="panel-head">
+                    <span class="panel-title">🖐️ Manual Intervention</span>
+                    <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
+                </div>
+                <div class="panel-body flush" id="intervention-list" style="max-height:250px">
+                    <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
+                </div>
             </div>
         </div>
         
-        <!-- Manual Interventions -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🖐️ Manual Intervention</span>
-                <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
-            </div>
-            <div class="panel-body flush" id="intervention-list">
-                <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
-            </div>
-        </div>
-        
-        <!-- Storage -->
+        <!-- Storage Summary -->
         <div class="panel">
             <div class="panel-head">
                 <span class="panel-title">💾 Storage</span>
             </div>
             <div class="panel-body" id="storage-list">
                 <div class="spinner"></div>
-            </div>
-        </div>
-        
-        <!-- Recent Finds - Separate Prominent Pane -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🎉 Recent Finds</span>
-                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
-            </div>
-            <div class="panel-body flush" id="finds-list" style="max-height:350px">
-                <div class="empty"><div class="empty-icon">🔍</div><p>No finds yet - TFM is working on it!</p></div>
-            </div>
-        </div>
-        
-        <!-- Recent Searches -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🔎 Recent Searches</span>
-            </div>
-            <div class="panel-body flush" id="search-list" style="max-height:350px">
-                <div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>
             </div>
         </div>
         
@@ -851,6 +974,18 @@
                 document.getElementById('finds-total').textContent = data.scoreboard.finds_total;
                 document.getElementById('api-used').textContent = data.scoreboard.api_hits_today;
                 document.getElementById('api-limit').textContent = data.scoreboard.api_limit;
+                
+                // Finds breakdown
+                const breakdown = document.getElementById('finds-breakdown');
+                if (breakdown && data.scoreboard.finds_by_source) {
+                    const parts = [];
+                    if (data.scoreboard.finds_by_source.sonarr) parts.push(`📺 ${data.scoreboard.finds_by_source.sonarr}`);
+                    if (data.scoreboard.finds_by_source.radarr) parts.push(`🎬 ${data.scoreboard.finds_by_source.radarr}`);
+                    breakdown.textContent = parts.join(' • ') || '';
+                }
+                
+                // Update status indicator
+                updateStatusIndicator(data.scoreboard, data.scheduler);
             }
             if (data.tiers) {
                 document.getElementById('tier-hot').textContent = data.tiers.hot?.count ?? 0;
@@ -858,6 +993,55 @@
                 document.getElementById('tier-cool').textContent = data.tiers.cool?.count ?? 0;
                 document.getElementById('tier-cold').textContent = data.tiers.cold?.count ?? 0;
             }
+        }
+        
+        function updateStatusIndicator(scoreboard, scheduler) {
+            const card = document.getElementById('status-card');
+            const indicator = document.getElementById('status-indicator');
+            const text = document.getElementById('status-text');
+            
+            const apiUsed = scoreboard.api_hits_today || 0;
+            const apiLimit = scoreboard.api_limit || 500;
+            const apiRemaining = apiLimit - apiUsed;
+            
+            // Check if API exhausted
+            if (apiRemaining <= 0) {
+                card.className = 'score-card status exhausted';
+                indicator.textContent = '💤';
+                // Calculate time until midnight reset
+                const now = new Date();
+                const midnight = new Date(now);
+                midnight.setHours(24, 0, 0, 0);
+                const hoursUntilReset = Math.ceil((midnight - now) / (1000 * 60 * 60));
+                text.textContent = `Resets in ${hoursUntilReset}h`;
+                return;
+            }
+            
+            // Check scheduler for next run
+            if (scheduler && scheduler.tasks) {
+                const searchTask = scheduler.tasks.find(t => t.name === 'search_cycle');
+                if (searchTask && searchTask.next_run) {
+                    const nextRun = new Date(searchTask.next_run);
+                    const now = new Date();
+                    const minsUntil = Math.max(0, Math.round((nextRun - now) / 60000));
+                    
+                    if (minsUntil <= 1) {
+                        card.className = 'score-card status active';
+                        indicator.textContent = '🔍';
+                        text.textContent = 'Searching...';
+                    } else {
+                        card.className = 'score-card status';
+                        indicator.textContent = '⏱️';
+                        text.textContent = `Next: ${minsUntil}m`;
+                    }
+                    return;
+                }
+            }
+            
+            // Default - active
+            card.className = 'score-card status active';
+            indicator.textContent = '✅';
+            text.textContent = 'Active';
         }
         
         async function loadQueue() {
@@ -914,18 +1098,102 @@
                 return;
             }
             
-            el.innerHTML = data.paths.map(p => {
-                const pct = 100 - (p.free_gb / (p.free_gb + 100)) * 100; // Rough estimate
-                const cls = pct > 90 ? 'crit' : pct > 75 ? 'warn' : '';
-                return `
-                <div class="storage-bar">
-                    <div class="storage-head">
-                        <span class="storage-path">${esc(p.path)}</span>
-                        <span>${p.free_gb} GB free</span>
-                    </div>
-                    <div class="bar"><div class="bar-fill ${cls}" style="width:${100-pct}%"></div></div>
-                </div>`;
-            }).join('');
+            // Deduplicate and aggregate by unique mount point (looking for common parent paths)
+            const aggregated = {};
+            data.paths.forEach(p => {
+                // Extract the main mount point (e.g., /mnt/hddpool/mediashare)
+                const parts = p.path.split('/');
+                let mountPoint = parts.slice(0, 4).join('/'); // e.g., /mnt/hddpool/mediashare
+                
+                // Categorize by media type
+                const pathLower = p.path.toLowerCase();
+                let category = 'Other';
+                if (pathLower.includes('/tv') || pathLower.includes('/series') || pathLower.includes('sonarr')) {
+                    category = 'TV Shows';
+                } else if (pathLower.includes('/movie') || pathLower.includes('radarr')) {
+                    category = 'Movies';
+                }
+                
+                // Group by mount point (they likely have the same free space)
+                if (!aggregated[mountPoint]) {
+                    aggregated[mountPoint] = {
+                        path: mountPoint,
+                        free_gb: p.free_gb,
+                        categories: new Set()
+                    };
+                }
+                aggregated[mountPoint].categories.add(category);
+            });
+            
+            // Convert to array and build HTML
+            const mounts = Object.values(aggregated);
+            
+            if (mounts.length === 0) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">💾</div><p>No storage info</p></div>';
+                return;
+            }
+            
+            // If all paths have the same free space (same mount), just show one summary
+            const allSameFreeSpace = mounts.every(m => m.free_gb === mounts[0].free_gb);
+            
+            if (allSameFreeSpace && mounts.length > 0) {
+                const total = mounts[0];
+                const allCategories = new Set();
+                mounts.forEach(m => m.categories.forEach(c => allCategories.add(c)));
+                const categoriesStr = [...allCategories].filter(c => c !== 'Other').join(' & ') || 'Media';
+                
+                // Estimate total space (free + used, rough guess based on typical usage)
+                const freeGb = total.free_gb;
+                const usedPct = freeGb > 10000 ? 50 : freeGb > 5000 ? 60 : freeGb > 1000 ? 70 : 80;
+                const estimatedTotal = Math.round(freeGb / (1 - usedPct/100));
+                const usedGb = estimatedTotal - freeGb;
+                
+                const barClass = freeGb < 100 ? 'critical' : freeGb < 500 ? 'warn' : 'ok';
+                
+                el.innerHTML = `
+                    <div class="storage-summary">
+                        <div class="storage-item" style="flex: 1;">
+                            <div class="storage-item-header">
+                                <span class="storage-item-label">📺🎬 ${categoriesStr}</span>
+                                <span class="storage-item-value">${formatSize(freeGb)} free</span>
+                            </div>
+                            <div class="storage-bar">
+                                <div class="storage-bar-fill ${barClass}" style="width:${usedPct}%"></div>
+                            </div>
+                            <div class="storage-details">
+                                <span>${total.path}</span>
+                                <span>${freeGb > 1000 ? (freeGb/1000).toFixed(1) + ' TB' : freeGb + ' GB'} available</span>
+                            </div>
+                        </div>
+                    </div>`;
+            } else {
+                // Multiple distinct storage locations
+                el.innerHTML = `<div class="storage-summary">${mounts.map(m => {
+                    const categoriesStr = [...m.categories].filter(c => c !== 'Other').join(' & ') || 'Media';
+                    const freeGb = m.free_gb;
+                    const usedPct = freeGb > 10000 ? 50 : freeGb > 5000 ? 60 : freeGb > 1000 ? 70 : 80;
+                    const barClass = freeGb < 100 ? 'critical' : freeGb < 500 ? 'warn' : 'ok';
+                    
+                    return `
+                        <div class="storage-item">
+                            <div class="storage-item-header">
+                                <span class="storage-item-label">${categoriesStr}</span>
+                                <span class="storage-item-value">${formatSize(freeGb)} free</span>
+                            </div>
+                            <div class="storage-bar">
+                                <div class="storage-bar-fill ${barClass}" style="width:${usedPct}%"></div>
+                            </div>
+                            <div class="storage-details">
+                                <span>${m.path}</span>
+                            </div>
+                        </div>`;
+                }).join('')}</div>`;
+            }
+        }
+        
+        function formatSize(gb) {
+            if (gb >= 1000) return (gb / 1000).toFixed(1) + ' TB';
+            return gb.toFixed(0) + ' GB';
         }
         
         async function loadFinds() {
@@ -1163,6 +1431,6 @@
         setInterval(loadFinds, 60000);
         setInterval(loadLogs, 30000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9r</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.10</div>
 </body>
 </html>
