@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.9m</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.9n</div>
 </div>
 <script>
 // Theme management
@@ -847,7 +847,13 @@ function renderContent() {
     else if (step === 2) c.innerHTML = stepService('radarr', '🎬', 'Movies');
     else if (step === 3) c.innerHTML = stepService('sabnzbd', '📥', 'Downloads');
     else if (step === 4) c.innerHTML = stepAutoRes();
-    else if (step === 5) c.innerHTML = stepSettings();
+    else if (step === 5) {
+        c.innerHTML = stepSettings();
+        // Auto-apply calculated defaults (like clicking Steady button)
+        const apiLimit = existingConfig?.search?.daily_api_limit || 500;
+        const defaultSearches = Math.round(apiLimit / 24);
+        applyPacing(defaultSearches, 60);
+    }
     else if (step === 6) c.innerHTML = stepComplete();
     
     document.getElementById('backBtn').disabled = step === 0;
@@ -1214,22 +1220,12 @@ function updatePacingCalc() {
     }
 }
 
-// Initialize calc on page load and when inputs change
+// Update calc when inputs change
 document.addEventListener('input', function(e) {
     if (e.target.id === 'set-per-cycle' || e.target.id === 'set-interval') {
         updatePacingCalc();
     }
 });
-
-// Apply calculated defaults after render (like clicking Steady button)
-setTimeout(function() {
-    const apiLimit = existingConfig?.search?.daily_api_limit || 500;
-    const defaultSearches = Math.round(apiLimit / 24);
-    const defaultInterval = 60;
-    if (document.getElementById('set-per-cycle')) {
-        applyPacing(defaultSearches, defaultInterval);
-    }
-}, 100);
 
 function stepComplete() {
     const cfg = gatherConfig();
