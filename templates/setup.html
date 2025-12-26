@@ -81,7 +81,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.3a</div>
+    <div style="text-align: center; padding: 10px; font-size: 11px; color: var(--text2); border-top: 1px solid var(--border);">The Fantastic Machinarr v1.0.4</div>
 </div>
 <script>
 const STEPS = ['Welcome', 'Sonarr', 'Radarr', 'SABnzbd', 'Auto-Resolution', 'Settings', 'Complete'];
@@ -114,16 +114,33 @@ function stepWelcome() {
     return `
     <div class="step active">
         <h2>👋 Welcome!</h2>
-        <p class="desc">The Fantastic Machinarr helps Sonarr and Radarr find content they can't find on their own.</p>
+        <p class="desc">The Fantastic Machinarr (TFM) is a companion tool for Sonarr and Radarr that continuously searches for missing content using a smart tier-based system. It prioritizes new releases while gradually filling out your entire library in the background.</p>
         
         <div class="field" style="margin-top: 20px;">
             <label>🌐 Server Base URL</label>
             <input type="text" id="base-url" placeholder="http://192.168.1.100" value="${baseUrl}" onchange="updateBaseUrl(this.value)">
-            <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Enter your server IP/hostname. This will prefill Sonarr, Radarr, and SABnzbd URLs.</div>
+            <div style="font-size: 12px; color: var(--text2); margin-top: 6px;">Your server IP/hostname — used to prefill Sonarr, Radarr, and SABnzbd URLs.</div>
+        </div>
+        
+        <h3 style="margin-top: 24px; margin-bottom: 8px;">📊 Daily API Limit</h3>
+        <p class="desc">Most indexers limit how many API calls you can make per day. TFM spreads searches throughout the day to stay within your limits and avoid temporary bans.</p>
+        
+        <div class="row" style="margin-top: 12px;">
+            <div class="field" style="margin-bottom: 0;">
+                <label>Daily API Call Budget</label>
+                <input type="number" id="api-limit" value="500" min="50" max="10000" style="width: 100%; padding: 10px; background: var(--bg2); border: 1px solid var(--border); border-radius: 6px; color: var(--text);">
+            </div>
+        </div>
+        
+        <div class="info" style="margin-top: 12px;">
+            <strong>💡 How to determine your limit:</strong><br><br>
+            <strong>Single indexer:</strong> Check your indexer's dashboard or account page for "API calls" or "API limit" — common limits are 1000, 2000, or 5000/day.<br><br>
+            <strong>Multiple indexers:</strong> Use your <em>lowest limited</em> indexer as a guide. For example, if you have indexers with limits of 5000, 2000, unlimited, unlimited, unlimited, and 1000 — use 1000 or slightly below to be safe. "Unlimited" indexers still appreciate conservative usage.<br><br>
+            <strong>When in doubt:</strong> Start with 500. You can increase later if your indexers allow more.
         </div>
         
         <h3 style="margin-top: 24px; margin-bottom: 8px;">🎯 Search Tier Configuration</h3>
-        <p class="desc">TFM focuses on finding the <strong>hottest new releases first</strong>, while still working through older content to build a complete library. Newer content is searched more frequently because it's more likely to be available on indexers.</p>
+        <p class="desc">TFM prioritizes the hottest new releases first, then works through older content over time. Newer content is searched more frequently because it's more likely to be available.</p>
         
         <div class="tiers">
             <div class="tier">
@@ -171,8 +188,6 @@ function stepWelcome() {
                 </select>
             </div>
         </div>
-        
-        <div class="info"><strong>💡 How it works:</strong> TFM prioritizes Hot content (most likely to be found) while still searching Warm, Cool, and Cold tiers in the background. Over time, this fills out your entire library without hammering your indexers. Adjust age ranges and intervals based on your preferences and API limits.</div>
     </div>`;
 }
 
@@ -381,10 +396,10 @@ function gatherConfig() {
         wait_minutes_before_action: parseInt(document.getElementById('ar-wait')?.value) || 30,
     };
     
-    // Search
+    // Search settings - API limit from welcome page
     cfg.search = {
         enabled: true,
-        daily_api_limit: parseInt(document.getElementById('set-api-limit')?.value) || 500,
+        daily_api_limit: parseInt(document.getElementById('api-limit')?.value) || 500,
         searches_per_cycle: parseInt(document.getElementById('set-per-cycle')?.value) || 10,
         cycle_interval_minutes: parseInt(document.getElementById('set-interval')?.value) || 60,
     };
