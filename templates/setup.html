@@ -576,7 +576,7 @@
         <button class="btn btn-sec" id="backBtn" onclick="back()" disabled>Back</button>
         <button class="btn btn-pri" id="nextBtn" onclick="next()">Next</button>
     </div>
-    <div class="version-footer">The Fantastic Machinarr v1.0.8</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.8a</div>
 </div>
 <script>
 // Theme management
@@ -1220,7 +1220,26 @@ function gatherConfig() {
     return cfg;
 }
 
+// Auto-save current progress (without marking setup_complete)
+async function autoSave() {
+    try {
+        const cfg = gatherConfig();
+        cfg.setup_complete = false; // Don't mark complete until Finish
+        await fetch('/api/setup/complete', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify(cfg)
+        });
+        console.log('Progress auto-saved');
+    } catch(e) {
+        console.log('Auto-save failed:', e);
+    }
+}
+
 async function next() {
+    // Auto-save progress before moving to next step
+    await autoSave();
+    
     if (step === STEPS.length - 1) {
         const cfg = gatherConfig();
         cfg.setup_complete = true;
@@ -1241,7 +1260,10 @@ async function next() {
     renderContent();
 }
 
-function back() {
+async function back() {
+    // Auto-save progress before going back
+    await autoSave();
+    
     if (step > 0) { step--; renderSteps(); renderContent(); }
 }
 
