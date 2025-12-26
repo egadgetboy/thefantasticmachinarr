@@ -151,13 +151,18 @@ class WebServer:
                 'search': cfg.get('search', {
                     'daily_api_limit': 500,
                     'searches_per_cycle': 10,
-                    'cycle_interval_minutes': 60,
+                    'cycle_interval_minutes': 30,
                 }),
                 'tiers': cfg.get('tiers', {
                     'hot': {'min_days': 0, 'max_days': 90, 'interval_minutes': 60},
                     'warm': {'min_days': 90, 'max_days': 365, 'interval_minutes': 360},
                     'cool': {'min_days': 365, 'max_days': 1095, 'interval_minutes': 1440},
                     'cold': {'min_days': 1095, 'max_days': None, 'interval_minutes': 10080},
+                }),
+                'quiet_hours': cfg.get('quiet_hours', {
+                    'enabled': False,
+                    'start_hour': 2,
+                    'end_hour': 7,
                 })
             })
         
@@ -173,6 +178,10 @@ class WebServer:
                     if not hasattr(self.config, 'tiers') or not self.config.tiers:
                         self.config.tiers = {}
                     self.config.tiers.update(data['tiers'])
+                if 'quiet_hours' in data:
+                    if not hasattr(self.config, 'quiet_hours') or not self.config.quiet_hours:
+                        self.config.quiet_hours = {}
+                    self.config.quiet_hours.update(data['quiet_hours'])
                 self.config.save()
                 return jsonify({'success': True})
             except Exception as e:
