@@ -498,53 +498,105 @@
                 font-size: 9px;
             }
             .scoreboard {
+                display: grid;
                 grid-template-columns: 1fr 1fr;
-                gap: 10px;
-                padding: 12px;
+                gap: 8px;
+                padding: 10px;
+            }
+            .scoreboard.compact {
+                padding: 10px;
+                gap: 8px;
             }
             .score-card {
-                padding: 12px;
+                padding: 10px;
+                min-width: 0;
             }
-            .score-num {
-                font-size: 28px;
+            .score-val {
+                font-size: 24px;
             }
             .score-label {
+                font-size: 8px;
+            }
+            .score-breakdown {
                 font-size: 9px;
             }
             header {
-                padding: 12px 16px;
-                flex-wrap: wrap;
-                gap: 8px;
+                padding: 10px 12px;
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 10px;
+            }
+            .header-right {
+                width: 100%;
+                justify-content: space-between;
             }
             .logo {
                 font-size: 16px;
-            }
-            .status-dots {
-                gap: 6px;
-                flex-wrap: wrap;
-            }
-            .dot {
-                font-size: 11px;
-                padding: 4px 8px;
-            }
-            main {
-                padding: 12px;
-                gap: 12px;
-            }
-            .panel-head {
-                padding: 10px 12px;
-                flex-wrap: wrap;
                 gap: 8px;
             }
+            .logo span {
+                font-size: 20px;
+            }
+            .status-dots {
+                display: flex;
+                flex-wrap: wrap;
+                gap: 4px;
+                flex: 1;
+            }
+            .dot {
+                font-size: 10px;
+                padding: 3px 8px;
+            }
+            .theme-btn, .settings-btn {
+                padding: 6px 10px;
+                font-size: 14px;
+            }
+            main {
+                padding: 10px;
+                gap: 10px;
+            }
+            .panel-head {
+                padding: 8px 12px;
+                flex-wrap: wrap;
+                gap: 6px;
+            }
             .panel-title {
-                font-size: 13px;
+                font-size: 12px;
             }
             .panel-body {
-                padding: 12px;
+                padding: 10px;
             }
             .activity-bar {
                 padding: 8px 12px;
-                font-size: 12px;
+                font-size: 11px;
+                flex-wrap: wrap;
+                gap: 4px;
+            }
+            .activity-detail {
+                width: 100%;
+                margin-left: 0;
+            }
+        }
+        
+        /* Extra small mobile */
+        @media (max-width: 400px) {
+            .scoreboard {
+                grid-template-columns: 1fr 1fr;
+                gap: 6px;
+                padding: 8px;
+            }
+            .score-card {
+                padding: 8px;
+            }
+            .score-val {
+                font-size: 20px;
+            }
+            .score-label {
+                font-size: 7px;
+            }
+            .dot {
+                font-size: 9px;
+                padding: 2px 6px;
             }
         }
         
@@ -2557,6 +2609,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.42</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.43</div>
 </body>
 </html>
