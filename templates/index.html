@@ -1441,10 +1441,10 @@
     </div>
     
     <main>
-        <!-- Row 1: Missing Content by Tier -->
+        <!-- Row 1: Content Needing Action by Tier -->
         <div class="panel">
             <div class="panel-head" style="padding: 10px 16px;">
-                <span class="panel-title">🎯 Missing Content by Tier</span>
+                <span class="panel-title">🎯 Content Needing Action</span>
                 <span id="tier-total-label" style="color:var(--text2);font-size:12px">Loading...</span>
             </div>
             <div class="panel-body" style="padding: 12px 16px;">
@@ -1456,7 +1456,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Hot</div>
                                 <div class="tier-desc">0-90 days</div>
-                                <div class="tier-breakdown"><span>📺</span><span id="tier-hot-sonarr">-</span> <span>🎬</span><span id="tier-hot-radarr">-</span></div>
+                                <div class="tier-breakdown"><span>🔍</span><span id="tier-hot-missing">-</span> <span>⬆️</span><span id="tier-hot-upgrade">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1467,7 +1467,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Warm</div>
                                 <div class="tier-desc">90-365 days</div>
-                                <div class="tier-breakdown"><span>📺</span><span id="tier-warm-sonarr">-</span> <span>🎬</span><span id="tier-warm-radarr">-</span></div>
+                                <div class="tier-breakdown"><span>🔍</span><span id="tier-warm-missing">-</span> <span>⬆️</span><span id="tier-warm-upgrade">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1478,7 +1478,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Cool</div>
                                 <div class="tier-desc">1-3 years</div>
-                                <div class="tier-breakdown"><span>📺</span><span id="tier-cool-sonarr">-</span> <span>🎬</span><span id="tier-cool-radarr">-</span></div>
+                                <div class="tier-breakdown"><span>🔍</span><span id="tier-cool-missing">-</span> <span>⬆️</span><span id="tier-cool-upgrade">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1489,7 +1489,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Cold</div>
                                 <div class="tier-desc">3+ years</div>
-                                <div class="tier-breakdown"><span>📺</span><span id="tier-cold-sonarr">-</span> <span>🎬</span><span id="tier-cold-radarr">-</span></div>
+                                <div class="tier-breakdown"><span>🔍</span><span id="tier-cold-missing">-</span> <span>⬆️</span><span id="tier-cold-upgrade">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1966,30 +1966,29 @@
             }
             
             if (data.tiers) {
-                // Update tier totals
+                // Update tier totals (missing + upgrades combined)
                 const tiers = data.tiers;
                 document.getElementById('tier-hot').textContent = (tiers.hot?.total ?? 0).toLocaleString();
                 document.getElementById('tier-warm').textContent = (tiers.warm?.total ?? 0).toLocaleString();
                 document.getElementById('tier-cool').textContent = (tiers.cool?.total ?? 0).toLocaleString();
                 document.getElementById('tier-cold').textContent = (tiers.cold?.total ?? 0).toLocaleString();
                 
-                // Update per-tier Sonarr/Radarr breakdowns
-                document.getElementById('tier-hot-sonarr').textContent = (tiers.hot?.sonarr ?? 0).toLocaleString();
-                document.getElementById('tier-hot-radarr').textContent = (tiers.hot?.radarr ?? 0).toLocaleString();
-                document.getElementById('tier-warm-sonarr').textContent = (tiers.warm?.sonarr ?? 0).toLocaleString();
-                document.getElementById('tier-warm-radarr').textContent = (tiers.warm?.radarr ?? 0).toLocaleString();
-                document.getElementById('tier-cool-sonarr').textContent = (tiers.cool?.sonarr ?? 0).toLocaleString();
-                document.getElementById('tier-cool-radarr').textContent = (tiers.cool?.radarr ?? 0).toLocaleString();
-                document.getElementById('tier-cold-sonarr').textContent = (tiers.cold?.sonarr ?? 0).toLocaleString();
-                document.getElementById('tier-cold-radarr').textContent = (tiers.cold?.radarr ?? 0).toLocaleString();
+                // Update per-tier Missing/Upgrade breakdowns
+                document.getElementById('tier-hot-missing').textContent = (tiers.hot?.total_missing ?? 0).toLocaleString();
+                document.getElementById('tier-hot-upgrade').textContent = (tiers.hot?.total_upgrade ?? 0).toLocaleString();
+                document.getElementById('tier-warm-missing').textContent = (tiers.warm?.total_missing ?? 0).toLocaleString();
+                document.getElementById('tier-warm-upgrade').textContent = (tiers.warm?.total_upgrade ?? 0).toLocaleString();
+                document.getElementById('tier-cool-missing').textContent = (tiers.cool?.total_missing ?? 0).toLocaleString();
+                document.getElementById('tier-cool-upgrade').textContent = (tiers.cool?.total_upgrade ?? 0).toLocaleString();
+                document.getElementById('tier-cold-missing').textContent = (tiers.cold?.total_missing ?? 0).toLocaleString();
+                document.getElementById('tier-cold-upgrade').textContent = (tiers.cold?.total_upgrade ?? 0).toLocaleString();
                 
-                // Calculate total for header label
-                const total = (tiers.hot?.total ?? 0) + (tiers.warm?.total ?? 0) + 
-                             (tiers.cool?.total ?? 0) + (tiers.cold?.total ?? 0);
-                const totalSonarr = (tiers.hot?.sonarr ?? 0) + (tiers.warm?.sonarr ?? 0) + 
-                                   (tiers.cool?.sonarr ?? 0) + (tiers.cold?.sonarr ?? 0);
-                const totalRadarr = (tiers.hot?.radarr ?? 0) + (tiers.warm?.radarr ?? 0) + 
-                                   (tiers.cool?.radarr ?? 0) + (tiers.cold?.radarr ?? 0);
+                // Calculate totals for header label
+                const totalMissing = (tiers.hot?.total_missing ?? 0) + (tiers.warm?.total_missing ?? 0) + 
+                                    (tiers.cool?.total_missing ?? 0) + (tiers.cold?.total_missing ?? 0);
+                const totalUpgrade = (tiers.hot?.total_upgrade ?? 0) + (tiers.warm?.total_upgrade ?? 0) + 
+                                    (tiers.cool?.total_upgrade ?? 0) + (tiers.cold?.total_upgrade ?? 0);
+                const grandTotal = totalMissing + totalUpgrade;
                 
                 const tierLabel = document.getElementById('tier-total-label');
                 if (tierLabel) {
@@ -1997,7 +1996,7 @@
                     if (data.loading) {
                         tierLabel.innerHTML = `<span style="color:var(--accent)">📊 ${data.loading_stage || 'Loading...'}</span>`;
                     } else {
-                        tierLabel.textContent = `${total.toLocaleString()} total (📺 ${totalSonarr.toLocaleString()} • 🎬 ${totalRadarr.toLocaleString()})`;
+                        tierLabel.textContent = `${grandTotal.toLocaleString()} total (🔍 ${totalMissing.toLocaleString()} missing • ⬆️ ${totalUpgrade.toLocaleString()} upgrades)`;
                     }
                 }
             }
@@ -3603,7 +3602,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.85';
+        const CURRENT_VERSION = '1.0.86';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3697,6 +3696,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.85</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.86</div>
 </body>
 </html>

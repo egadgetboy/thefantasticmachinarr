@@ -347,12 +347,17 @@ class MachinarrCore:
             missing_data = self._tier_cache
             self.log.debug("Using cached tier data")
         else:
-            # Start progressive loading in background if not already running
-            if not self._progressive_loading:
-                self._start_progressive_load()
-            
-            # Return current progressive state (partial data)
-            missing_data = self._get_progressive_state()
+            # Try to load from disk cache first (for restart recovery)
+            if self._tier_cache is None and self._load_catalog_cache():
+                missing_data = self._tier_cache
+                self.log.info("Restored tier data from disk cache")
+            else:
+                # Start progressive loading in background if not already running
+                if not self._progressive_loading:
+                    self._start_progressive_load()
+                
+                # Return current progressive state (partial data)
+                missing_data = self._get_progressive_state()
         
         scoreboard = {
             'finds_today': self.searcher.finds_today,
@@ -369,6 +374,7 @@ class MachinarrCore:
         # Tier stats now come from the comprehensive count
         tier_stats = missing_data['tier_counts']
         tier_stats['total'] = missing_data['total_missing']
+        tier_stats['total_upgrades'] = missing_data['total_upgrades']
         
         # Scheduler info
         scheduler_info = None
@@ -397,21 +403,85 @@ class MachinarrCore:
             'radarr_missing': 0,
             'radarr_upgrade': 0,
         }
+        # Track BOTH missing and upgrades by tier
         self._progressive_tiers = {
-            'hot': {'sonarr': 0, 'radarr': 0, 'total': 0},
-            'warm': {'sonarr': 0, 'radarr': 0, 'total': 0},
-            'cool': {'sonarr': 0, 'radarr': 0, 'total': 0},
-            'cold': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'hot': {'sonarr_missing': 0, 'sonarr_upgrade': 0, 'radarr_missing': 0, 'radarr_upgrade': 0, 'total_missing': 0, 'total_upgrade': 0},
+            'warm': {'sonarr_missing': 0, 'sonarr_upgrade': 0, 'radarr_missing': 0, 'radarr_upgrade': 0, 'total_missing': 0, 'total_upgrade': 0},
+            'cool': {'sonarr_missing': 0, 'sonarr_upgrade': 0, 'radarr_missing': 0, 'radarr_upgrade': 0, 'total_missing': 0, 'total_upgrade': 0},
+            'cold': {'sonarr_missing': 0, 'sonarr_upgrade': 0, 'radarr_missing': 0, 'radarr_upgrade': 0, 'total_missing': 0, 'total_upgrade': 0},
         }
     
     def _get_progressive_state(self) -> Dict[str, Any]:
         """Get current progressive loading state."""
+        # Build tier counts with both missing and upgrade totals
+        tier_counts = {}
+        for tier, data in self._progressive_tiers.items():
+            tier_counts[tier] = {
+                'sonarr': data['sonarr_missing'] + data['sonarr_upgrade'],
+                'radarr': data['radarr_missing'] + data['radarr_upgrade'],
+                'total': data['total_missing'] + data['total_upgrade'],
+                # Detailed breakdown
+                'sonarr_missing': data['sonarr_missing'],
+                'sonarr_upgrade': data['sonarr_upgrade'],
+                'radarr_missing': data['radarr_missing'],
+                'radarr_upgrade': data['radarr_upgrade'],
+                'total_missing': data['total_missing'],
+                'total_upgrade': data['total_upgrade'],
+            }
+        
         return {
             'counts': self._progressive_counts.copy(),
-            'tier_counts': {k: v.copy() for k, v in self._progressive_tiers.items()},
+            'tier_counts': tier_counts,
             'total_missing': self._progressive_counts['sonarr_missing'] + self._progressive_counts['radarr_missing'],
             'total_upgrades': self._progressive_counts['sonarr_upgrade'] + self._progressive_counts['radarr_upgrade'],
         }
+    
+    def _save_catalog_cache(self):
+        """Save catalog data to disk for persistence across restarts."""
+        try:
+            import json
+            cache_path = self.config.data_dir / 'catalog_cache.json'
+            cache_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {
+                'counts': self._progressive_counts,
+                'tiers': self._progressive_tiers,
+                'timestamp': datetime.now().isoformat(),
+            }
+            
+            with open(cache_path, 'w') as f:
+                json.dump(data, f)
+            self.log.debug("Catalog cache saved")
+        except Exception as e:
+            self.log.warning(f"Could not save catalog cache: {e}")
+    
+    def _load_catalog_cache(self) -> bool:
+        """Load catalog data from disk. Returns True if valid cache found."""
+        try:
+            import json
+            cache_path = self.config.data_dir / 'catalog_cache.json'
+            
+            if not cache_path.exists():
+                return False
+            
+            with open(cache_path, 'r') as f:
+                data = json.load(f)
+            
+            # Check if cache is fresh (less than 5 minutes old)
+            cache_time = datetime.fromisoformat(data['timestamp'])
+            if (datetime.now() - cache_time).total_seconds() > 300:
+                self.log.info("Catalog cache expired, will refresh")
+                return False
+            
+            self._progressive_counts = data['counts']
+            self._progressive_tiers = data['tiers']
+            self._tier_cache = self._get_progressive_state()
+            self._tier_cache_time = cache_time
+            self.log.info("Loaded catalog cache from disk")
+            return True
+        except Exception as e:
+            self.log.warning(f"Could not load catalog cache: {e}")
+            return False
     
     def _start_progressive_load(self):
         """Start progressive loading in background thread."""
@@ -444,8 +514,8 @@ class MachinarrCore:
                             tier = self.tier_manager.classify_from_date_str(
                                 ep.get('airDateUtc') or ep.get('airDate')
                             )
-                            self._progressive_tiers[tier]['sonarr'] += 1
-                            self._progressive_tiers[tier]['total'] += 1
+                            self._progressive_tiers[tier]['sonarr_missing'] += 1
+                            self._progressive_tiers[tier]['total_missing'] += 1
                     
                     if len(episodes) < page_size:
                         break
@@ -465,6 +535,12 @@ class MachinarrCore:
                     
                     with self._progress_lock:
                         self._progressive_counts['sonarr_upgrade'] += len(episodes)
+                        for ep in episodes:
+                            tier = self.tier_manager.classify_from_date_str(
+                                ep.get('airDateUtc') or ep.get('airDate')
+                            )
+                            self._progressive_tiers[tier]['sonarr_upgrade'] += 1
+                            self._progressive_tiers[tier]['total_upgrade'] += 1
                     
                     if len(episodes) < page_size:
                         break
@@ -486,8 +562,8 @@ class MachinarrCore:
                         self._progressive_counts['radarr_missing'] += len(movies)
                         for movie in movies:
                             tier = self.tier_manager.classify_movie_date(movie)
-                            self._progressive_tiers[tier]['radarr'] += 1
-                            self._progressive_tiers[tier]['total'] += 1
+                            self._progressive_tiers[tier]['radarr_missing'] += 1
+                            self._progressive_tiers[tier]['total_missing'] += 1
                     
                     if len(movies) < page_size:
                         break
@@ -507,6 +583,10 @@ class MachinarrCore:
                     
                     with self._progress_lock:
                         self._progressive_counts['radarr_upgrade'] += len(movies)
+                        for movie in movies:
+                            tier = self.tier_manager.classify_movie_date(movie)
+                            self._progressive_tiers[tier]['radarr_upgrade'] += 1
+                            self._progressive_tiers[tier]['total_upgrade'] += 1
                     
                     if len(movies) < page_size:
                         break
@@ -551,9 +631,10 @@ class MachinarrCore:
                     self._progressive_stage = update_stage()
                     self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
                 
-                # Cache the final result
+                # Cache the final result and save to disk
                 self._tier_cache = self._get_progressive_state()
                 self._tier_cache_time = datetime.now()
+                self._save_catalog_cache()  # Persist for restart recovery
                 self.log.info("Tier data cached (progressive load complete)")
                 self.set_activity('idle', 'Ready', 'Library catalog updated')
                 
