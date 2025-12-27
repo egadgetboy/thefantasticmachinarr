@@ -1468,7 +1468,14 @@
         }
         
         function pageNav(containerId, direction) {
-            const stateKey = containerId.replace('-list', '').replace('stuck', 'queue').replace('intervention', 'interventions');
+            // Map container IDs to state keys
+            const keyMap = {
+                'search-list': 'searches',
+                'finds-list': 'finds',
+                'stuck-list': 'queue',
+                'intervention-list': 'interventions'
+            };
+            const stateKey = keyMap[containerId];
             const state = paginationState[stateKey];
             if (!state) return;
             
@@ -2515,6 +2522,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.35</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.36</div>
 </body>
 </html>
