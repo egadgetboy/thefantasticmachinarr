@@ -1049,12 +1049,16 @@
             width: 90%;
             border: 1px solid var(--border);
             box-shadow: var(--card-shadow);
+            overflow: hidden;
         }
         
         .modal h3 {
             margin-bottom: 16px;
             font-size: 18px;
             font-weight: 600;
+            word-break: break-word;
+            overflow-wrap: break-word;
+            line-height: 1.4;
         }
         
         .modal-actions {
@@ -3463,7 +3467,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.74';
+        const CURRENT_VERSION = '1.0.75';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3557,6 +3561,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.74</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.75</div>
 </body>
 </html>
