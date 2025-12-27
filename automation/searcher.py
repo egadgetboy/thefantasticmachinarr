@@ -978,17 +978,16 @@ class SmartSearcher:
                     series_key = f"{item.instance_name}:{item.series_id}"
                     
                     if series_key not in self.searched_series:
-                        # TAG BEFORE SEARCH for find attribution
+                        # TRACK SEARCH for find attribution (using episode ID)
                         if self.find_tracker:
-                            self.find_tracker.tag_for_search(
-                                client=client,
+                            self.find_tracker.track_search(
                                 source='sonarr',
                                 instance_name=item.instance_name,
-                                series_id=item.series_id,
-                                movie_id=None,
+                                item_id=item.id,  # episode_id
                                 title=item.title,
                                 tier=item.tier.value,
-                                search_type=item.search_type
+                                search_type=item.search_type,
+                                series_id=item.series_id
                             )
                         
                         self.log.info(f"Searching series: {item.title.split(' - ')[0]}")
@@ -1005,17 +1004,16 @@ class SmartSearcher:
                                           next_search_at=next_search,
                                           lifecycle_state=lifecycle)
                 
-                # Episode search - still tag the series for attribution
-                if self.find_tracker and item.series_id:
-                    self.find_tracker.tag_for_search(
-                        client=client,
+                # Episode search - track the episode ID
+                if self.find_tracker:
+                    self.find_tracker.track_search(
                         source='sonarr',
                         instance_name=item.instance_name,
-                        series_id=item.series_id,
-                        movie_id=None,
+                        item_id=item.id,  # episode_id
                         title=item.title,
                         tier=item.tier.value,
-                        search_type=item.search_type
+                        search_type=item.search_type,
+                        series_id=item.series_id
                     )
                 
                 self.log.info(f"Searching episode: {item.title}")
@@ -1031,14 +1029,12 @@ class SmartSearcher:
                                       max_attempts=max_attempts,
                                       lifecycle_state='error')
                 
-                # TAG BEFORE SEARCH for find attribution
+                # TRACK SEARCH for find attribution
                 if self.find_tracker:
-                    self.find_tracker.tag_for_search(
-                        client=client,
+                    self.find_tracker.track_search(
                         source='radarr',
                         instance_name=item.instance_name,
-                        series_id=None,
-                        movie_id=item.id,
+                        item_id=item.id,  # movie_id
                         title=item.title,
                         tier=item.tier.value,
                         search_type=item.search_type
