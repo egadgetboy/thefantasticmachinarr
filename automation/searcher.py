@@ -223,6 +223,40 @@ class SmartSearcher:
                 self.log.info(f"Loaded {len(self.search_results)} search results, {self.finds_total} total finds, {series_count} cached series")
         except Exception as e:
             self.log.warning(f"Could not load search results: {e}")
+        
+        # If no results loaded, try to populate from tier_manager's search_history
+        # This handles migration from older versions that only used search_history.json
+        if not self.search_results and hasattr(self.tier_manager, 'search_history'):
+            migrated = 0
+            for key, item in self.tier_manager.search_history.items():
+                if item.last_searched:
+                    try:
+                        result = SearchResult(
+                            item=item,
+                            success=True,
+                            message="Migrated from search history",
+                            timestamp=item.last_searched,
+                            search_type=item.search_type or 'missing',
+                            attempt_number=item.search_count or 1,
+                            max_attempts=12,
+                            cooldown_minutes=self._get_tier_cooldown(item.tier),
+                            lifecycle_state='cooldown' if item.last_searched else 'searched',
+                        )
+                        self.search_results.append(result)
+                        migrated += 1
+                    except Exception as e:
+                        self.log.debug(f"Could not migrate {key}: {e}")
+            
+            if migrated > 0:
+                # Sort by timestamp
+                self.search_results.sort(key=lambda r: r.timestamp)
+                self.log.info(f"Migrated {migrated} items from search_history.json")
+                self._save_results(force=True)  # Persist the migration
+    
+    def _get_tier_cooldown(self, tier: Tier) -> int:
+        """Get cooldown minutes for a tier based on current pacing preset."""
+        preset = self._get_pacing_preset()
+        return self.PACING_CONFIGS.get(preset, {}).get(tier, {}).get('cooldown', 60)
     
     def _save_results(self, force: bool = False):
         """Save search results to disk.
