@@ -24,10 +24,10 @@ Content is automatically classified by age into four tiers:
 
 | Tier | Age | Priority | Philosophy |
 |------|-----|----------|------------|
-| 🔥 **Hot** | 0-7 days | Highest | New releases - search aggressively |
-| ☀️ **Warm** | 7-30 days | High | Recent content - search regularly |
-| ❄️ **Cool** | 30-180 days | Medium | Older content - search weekly |
-| 🧊 **Cold** | 180+ days | Low | Rare content - search monthly, never give up |
+| 🔥 **Hot** | 0-90 days | Highest | New releases - search aggressively |
+| ☀️ **Warm** | 90-365 days | High | Recent content - search regularly |
+| ❄️ **Cool** | 1-3 years | Medium | Older content - search weekly |
+| 🧊 **Cold** | 3+ years | Low | Rare content - search monthly, never give up |
 
 ### ⚡ Pacing Presets
 Choose how aggressive TFM should be based on your indexer limits:
@@ -39,190 +39,259 @@ Choose how aggressive TFM should be based on your indexer limits:
 | 🚀 **Faster** | ~5,000 | Premium indexers |
 | ⚡ **Blazing** | 10,000+ | Unlimited indexers |
 
-Each preset automatically adjusts:
-- Search cooldowns per tier
-- Maximum attempts before escalation
-- When to notify you vs. keep trying
-
 ### 🔄 Smart Cooldowns
-TFM remembers what it's searched and doesn't waste API calls:
-
-- **Hot items**: Retry quickly (every 10-60 min based on pacing)
-- **Cold items**: Retry slowly (weekly/monthly)
-- **Already searched**: Skip until cooldown expires
-- **Never gives up**: Cool/Cold items keep trying forever, just less often
+TFM remembers what it's searched and doesn't waste API calls on recently searched items.
 
 ### 🚨 Intelligent Escalation
-When searching isn't working, TFM knows when to ask for help:
-
-**Urgent Interventions** (Hot/Warm items):
-- "Searched 24 times over 24 hours without finding"
-- Suggests: Dismiss or Reset & Try Again
-
-**Long-Missing Notifications** (Cool/Cold items):
-- Milestone alerts at 1, 3, 6, 12, 18, 24 months
-- Suggests: Keep Waiting, Search Again, or check elsewhere (YouTube, etc.)
+When searching isn't working, TFM knows when to ask for help with manual interventions.
 
 ### 📊 Upgrade Searching
-TFM doesn't just find missing content—it also searches for **quality upgrades** (cutoff unmet) to improve your existing library.
+TFM also searches for **quality upgrades** (cutoff unmet) to improve your existing library.
 
 ### ⏰ Quiet Hours
-Pause searching during specific hours (e.g., 2 AM - 6 AM) to reduce load during maintenance windows or peak usage times.
+Pause searching during specific hours to reduce load during maintenance windows.
 
 ### 🔧 Queue Management
-Automatically detects and handles stuck downloads:
-- Identifies common issues (no files found, sample only, not an upgrade)
-- Auto-resolves when possible (blocklist and retry)
-- Escalates to manual intervention when needed
-- Shows countdown timer until auto-resolution
+Automatically detects and handles stuck downloads with auto-resolution capabilities.
 
 ---
 
-## 📱 Dashboard
-
-The web dashboard gives you complete visibility:
-
-### Scoreboard
-- **Finds Today / Total**: Track your success
-- **API Calls**: Monitor usage vs. daily limit
-- **Status**: Current state (searching, sleeping, idle)
-
-### Activity Bar
-Real-time status showing what TFM is doing right now.
-
-### Data Tables with Pagination
-All activity panels support:
-- 10 items per page
-- Up to 500 items in history
-- Prev/Next navigation
-
-| Panel | Shows |
-|-------|-------|
-| **Recent Searches** | Time, Type (missing/upgrade), Source, Title, Tier, Status |
-| **Recent Finds** | Time, How Found, Source, Title, Details |
-| **Queue Issues** | Stuck duration, Issue type, Auto-resolve countdown |
-| **Manual Intervention** | Urgent vs. long-missing, Tier, Search count, Actions |
-
----
-
-## 🚀 Getting Started
+## 🚀 Installation
 
 ### Prerequisites
-- Sonarr v3+ and/or Radarr v3+
-- Docker (recommended) or Python 3.9+
+- Docker installed on your system
+- Sonarr v3+ and/or Radarr v3+ running and accessible
 - API keys for your Sonarr/Radarr instances
 
-### Docker Installation
+---
+
+### 🐧 Linux (Ubuntu/Debian/etc.)
 
 ```bash
 # Clone the repository
 git clone https://github.com/egadgetboy/thefantasticmachinarr.git
 cd thefantasticmachinarr
 
-# Build the image
+# Build the Docker image
 docker build -t fantastic-machinarr:latest .
+
+# Create config directory
+mkdir -p /opt/tfm/config
 
 # Run the container
 docker run -d \
   --name fantastic-machinarr \
+  --restart unless-stopped \
   -p 8080:8080 \
-  -v /path/to/config:/config \
+  -v /opt/tfm/config:/config \
   fantastic-machinarr:latest
 ```
 
-### TrueNAS SCALE
-1. Build the image using the command above
-2. Create a new container in the TrueNAS UI
-3. Map port 8080 and the config volume
-4. Start the container
+Access the web UI at `http://your-server-ip:8080`
 
-### First Run
-1. Open `http://your-server:8080` in your browser
+---
+
+### 🪟 Windows (Docker Desktop)
+
+1. Install [Docker Desktop for Windows](https://www.docker.com/products/docker-desktop/)
+2. Open PowerShell or Command Prompt:
+
+```powershell
+# Clone the repository
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git
+cd thefantasticmachinarr
+
+# Build the Docker image
+docker build -t fantastic-machinarr:latest .
+
+# Run the container
+docker run -d --name fantastic-machinarr --restart unless-stopped -p 8080:8080 -v tfm-config:/config fantastic-machinarr:latest
+```
+
+Access the web UI at `http://localhost:8080`
+
+---
+
+### 🍎 macOS (Docker Desktop)
+
+1. Install [Docker Desktop for Mac](https://www.docker.com/products/docker-desktop/)
+2. Open Terminal:
+
+```bash
+# Clone the repository
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git
+cd thefantasticmachinarr
+
+# Build the Docker image
+docker build -t fantastic-machinarr:latest .
+
+# Create config directory
+mkdir -p ~/tfm/config
+
+# Run the container
+docker run -d \
+  --name fantastic-machinarr \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v ~/tfm/config:/config \
+  fantastic-machinarr:latest
+```
+
+Access the web UI at `http://localhost:8080`
+
+---
+
+### 📦 Unraid
+
+1. Open Unraid terminal (or SSH)
+2. Build the image:
+
+```bash
+cd /mnt/user/appdata
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git
+cd thefantasticmachinarr
+docker build -t fantastic-machinarr:latest .
+```
+
+3. In Unraid web UI, go to **Docker** → **Add Container**
+4. Configure:
+   - **Name:** fantastic-machinarr
+   - **Repository:** fantastic-machinarr:latest
+   - **Network Type:** Bridge
+   - **Port:** 8080 → 8080
+   - **Path:** /mnt/user/appdata/tfm/config → /config
+5. Click **Apply**
+
+Access the web UI at `http://your-unraid-ip:8080`
+
+---
+
+### 🗄️ OpenMediaVault (OMV)
+
+1. Install Docker via OMV-Extras if not already installed
+2. SSH into your OMV server:
+
+```bash
+# Clone the repository
+cd /srv/dev-disk-by-label-*/appdata  # adjust path to your data drive
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git
+cd thefantasticmachinarr
+
+# Build the Docker image
+docker build -t fantastic-machinarr:latest .
+
+# Create config directory
+mkdir -p /srv/dev-disk-by-label-*/appdata/tfm/config
+
+# Run the container
+docker run -d \
+  --name fantastic-machinarr \
+  --restart unless-stopped \
+  -p 8080:8080 \
+  -v /srv/dev-disk-by-label-*/appdata/tfm/config:/config \
+  fantastic-machinarr:latest
+```
+
+Or use Portainer (if installed via OMV-Extras) to manage the container.
+
+Access the web UI at `http://your-omv-ip:8080`
+
+---
+
+### 🐠 TrueNAS SCALE
+
+1. SSH into TrueNAS or use Shell from web UI
+2. Clone and build:
+
+```bash
+cd /mnt/pool/scripts  # adjust to your pool name
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git tfm
+cd tfm
+docker build -t fantastic-machinarr:latest .
+```
+
+3. In TrueNAS web UI, go to **Apps** → **Discover Apps** → **Custom App**
+4. Configure:
+   - **Application Name:** fantastic-machinarr
+   - **Image Repository:** fantastic-machinarr
+   - **Image Tag:** latest
+   - **Port:** 8080 (container) → 8787 (node port, or your choice)
+   - **Storage:** Add host path mount
+     - Host Path: `/mnt/pool/scripts/tfm/config`
+     - Mount Path: `/config`
+5. Save and deploy
+
+Access the web UI at `http://your-truenas-ip:8787`
+
+**Updating on TrueNAS:**
+```bash
+cd /mnt/pool/scripts/tfm && git pull origin main && docker build --no-cache -t fantastic-machinarr:latest .
+```
+Then restart the app from TrueNAS UI.
+
+---
+
+### 🐳 Docker Compose
+
+Create a `docker-compose.yml` file:
+
+```yaml
+version: '3.8'
+services:
+  fantastic-machinarr:
+    build: .
+    container_name: fantastic-machinarr
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./config:/config
+```
+
+Then run:
+```bash
+git clone https://github.com/egadgetboy/thefantasticmachinarr.git
+cd thefantasticmachinarr
+docker-compose up -d
+```
+
+---
+
+## 🔧 First Run Setup
+
+1. Open the web UI at `http://your-server:8080`
 2. The Setup Wizard will guide you through:
-   - Adding Sonarr/Radarr instances
+   - Adding Sonarr/Radarr instances (URL + API key)
    - Choosing a pacing preset
-   - Configuring tier thresholds
+   - Configuring tier thresholds (optional)
    - Setting up quiet hours (optional)
    - Configuring email notifications (optional)
 
 ---
 
-## ⚙️ Configuration
+## 📱 Dashboard
 
-### Pacing Presets Explained
+The web dashboard provides:
 
-**🐢 Steady (≤500 API/day)**
-- Hot: 1hr cooldown, 24 attempts → 24hr to intervention
-- Warm: 6hr cooldown, 8 attempts → 48hr to intervention
-- Cool: Weekly, then monthly
-- Cold: Monthly, then quarterly
-
-**🐇 Fast (≤2,000 API/day)**
-- Hot: 30min cooldown, 16 attempts → 8hr to intervention
-- Warm: 3hr cooldown, 8 attempts → 24hr to intervention
-- Cool: Every 3 days, then bi-weekly
-- Cold: Bi-weekly, then monthly
-
-**🚀 Faster (≤5,000 API/day)**
-- Hot: 15min cooldown, 16 attempts → 4hr to intervention
-- Warm: 1hr cooldown, 8 attempts → 8hr to intervention
-- Cool: Daily, then weekly
-- Cold: Weekly, then bi-weekly
-
-**⚡ Blazing (>5,000 API/day)**
-- Hot: 10min cooldown, 12 attempts → 2hr to intervention
-- Warm: 30min cooldown, 8 attempts → 4hr to intervention
-- Cool: Every 6 hours, then every 3 days
-- Cold: Every 3 days, then weekly
-
-### Tier Configuration
-Customize age thresholds in the wizard or settings:
-- Hot: 0-7 days (default)
-- Warm: 7-30 days (default)
-- Cool: 30-180 days (default)
-- Cold: 180+ days (default)
-
-### Search Distribution
-Control what percentage of each search cycle goes to each tier:
-- Hot: 40% (default)
-- Warm: 30% (default)
-- Cool: 20% (default)
-- Cold: 10% (default)
+- **Scoreboard**: Finds today/total, API calls, next search countdown
+- **Missing Content by Tier**: Visual breakdown of your library gaps
+- **Search Activity**: Recent searches with status
+- **Recent Finds**: Successfully grabbed content
+- **Queue Issues**: Stuck downloads with auto-resolve
+- **Manual Interventions**: Items needing your attention
 
 ---
 
-## 🔍 How It Works
+## 🔄 Updating
 
-### Search Cycle
-1. **Gather**: Fetch all missing episodes/movies and cutoff unmet (upgrades)
-2. **Classify**: Assign each item to a tier based on age
-3. **Filter**: Remove items still in cooldown
-4. **Select**: Pick items based on tier distribution percentages
-5. **Randomize**: Shuffle within each tier (if enabled)
-6. **Search**: Trigger searches via Sonarr/Radarr API
-7. **Record**: Track what was searched and when
-
-### Queue Monitoring
-1. **Scan**: Check download queues every few minutes
-2. **Detect**: Identify stuck items (warnings, errors, stalled)
-3. **Track**: Record when items first got stuck
-4. **Wait**: Allow configured time for auto-resolution
-5. **Resolve**: Auto-fix if possible, or escalate to manual intervention
-
-### Find Detection
-1. **Monitor**: Watch for items transitioning from "missing" to "downloaded"
-2. **Record**: Log the find with timestamp and resolution type
-3. **Count**: Update daily and total find counters
-
----
-
-## 📧 Notifications (Coming Soon)
-
-Email notifications for:
-- Urgent interventions (Hot/Warm search failures)
-- Long-missing milestones (1, 3, 6, 12+ months)
-- Daily/weekly digest of finds
-- Queue issues requiring attention
+```bash
+cd /path/to/thefantasticmachinarr
+git pull origin main
+docker build --no-cache -t fantastic-machinarr:latest .
+docker stop fantastic-machinarr
+docker rm fantastic-machinarr
+# Then recreate the container using your platform's method above
+```
 
 ---
 
@@ -233,13 +302,14 @@ TFM provides a REST API for integration:
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/status` | GET | Current status and statistics |
+| `/api/dashboard` | GET | Dashboard data with tier counts |
+| `/api/scoreboard` | GET | Quick scoreboard data |
 | `/api/missing` | GET | Missing items by tier |
 | `/api/searches` | GET | Recent search history |
 | `/api/finds` | GET | Recent finds |
 | `/api/queue` | GET | Queue status and stuck items |
 | `/api/interventions` | GET | Items needing attention |
 | `/api/search` | POST | Trigger manual search |
-| `/api/storage` | GET | Storage space info |
 | `/api/config` | GET/POST | Configuration management |
 
 ---
