@@ -154,6 +154,11 @@ class WebServer:
             version = data.get('version', '')
             return jsonify(self.core.check_version_upgrade(version))
         
+        # ============ Activity Refresh ============
+        @self.app.route('/api/activity/refresh', methods=['POST'])
+        def api_refresh_activity():
+            return jsonify(self.core.refresh_activity())
+        
         # ============ Logs ============
         @self.app.route('/api/logs')
         def api_logs():

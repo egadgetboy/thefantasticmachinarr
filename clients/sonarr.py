@@ -225,6 +225,15 @@ class SonarrClient(BaseClient):
         """Trigger RSS sync."""
         return self.post('command', data={'name': 'RssSync'})
     
+    def get_commands(self) -> List[Dict]:
+        """Get all commands (running and completed)."""
+        return self.get('command')
+    
+    def get_active_commands(self) -> List[Dict]:
+        """Get only running/queued commands."""
+        commands = self.get_commands()
+        return [c for c in commands if c.get('status') in ('queued', 'started')]
+    
     # ==================== Statistics ====================
     
     def get_stats(self) -> Dict:

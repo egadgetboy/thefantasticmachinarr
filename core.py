@@ -1008,3 +1008,88 @@ class MachinarrCore:
             'last_version': last_version,
             'current_version': current_version
         }
+    
+    def refresh_activity(self) -> Dict[str, Any]:
+        """Refresh all activity state from Sonarr/Radarr.
+        
+        Used on upgrade to sync TFM with current service state.
+        """
+        activity = {
+            'active_searches': [],
+            'queue_items': 0,
+            'stuck_items': 0,
+            'active_commands': []
+        }
+        
+        # Get active commands from Sonarr
+        for name, client in self.sonarr_clients.items():
+            try:
+                commands = client.get_active_commands()
+                for cmd in commands:
+                    activity['active_commands'].append({
+                        'source': 'sonarr',
+                        'instance': name,
+                        'name': cmd.get('name'),
+                        'status': cmd.get('status'),
+                        'started': cmd.get('started')
+                    })
+                    # If there's an active search, update activity state
+                    if cmd.get('name') in ('EpisodeSearch', 'SeriesSearch', 'SeasonSearch'):
+                        activity['active_searches'].append({
+                            'source': 'sonarr',
+                            'instance': name,
+                            'type': cmd.get('name')
+                        })
+            except Exception as e:
+                self.log.error(f"Failed to get Sonarr ({name}) commands: {e}")
+        
+        # Get active commands from Radarr
+        for name, client in self.radarr_clients.items():
+            try:
+                commands = client.get_active_commands()
+                for cmd in commands:
+                    activity['active_commands'].append({
+                        'source': 'radarr',
+                        'instance': name,
+                        'name': cmd.get('name'),
+                        'status': cmd.get('status'),
+                        'started': cmd.get('started')
+                    })
+                    # If there's an active search, update activity state
+                    if cmd.get('name') in ('MoviesSearch',):
+                        activity['active_searches'].append({
+                            'source': 'radarr',
+                            'instance': name,
+                            'type': cmd.get('name')
+                        })
+            except Exception as e:
+                self.log.error(f"Failed to get Radarr ({name}) commands: {e}")
+        
+        # Get queue counts
+        for name, client in self.sonarr_clients.items():
+            try:
+                queue = client.get_queue()
+                activity['queue_items'] += len(queue)
+            except:
+                pass
+        
+        for name, client in self.radarr_clients.items():
+            try:
+                queue = client.get_queue()
+                activity['queue_items'] += len(queue)
+            except:
+                pass
+        
+        # Get stuck items count
+        activity['stuck_items'] = len(self.queue_monitor.get_stuck_items())
+        
+        # Update global activity state if searches are in progress
+        if activity['active_searches']:
+            with self._activity_lock:
+                self._activity_state['status'] = 'searching'
+                self._activity_state['message'] = f"{len(activity['active_searches'])} searches in progress"
+                self._activity_state['detail'] = ', '.join([s['type'] for s in activity['active_searches'][:3]])
+        
+        self.log.info(f"Activity refresh: {len(activity['active_commands'])} active commands, {activity['queue_items']} queue items")
+        
+        return activity

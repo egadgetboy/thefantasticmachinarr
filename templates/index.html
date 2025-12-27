@@ -3156,7 +3156,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.68';
+        const CURRENT_VERSION = '1.0.69';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3200,10 +3200,23 @@
                         }
                     }, 10000);
                 } else {
-                    // Upgrade - just refresh data, don't trigger new searches
-                    updateActivityBar('cataloging', reason, 'Refreshing data from Sonarr/Radarr...');
+                    // Upgrade - refresh data and sync activity state
+                    updateActivityBar('cataloging', reason, 'Syncing with Sonarr/Radarr...');
                     
-                    // Refresh all panels to validate current state
+                    // First, refresh activity state (active searches, commands)
+                    try {
+                        const activity = await api('activity/refresh', 'POST');
+                        if (activity.active_searches && activity.active_searches.length > 0) {
+                            updateActivityBar('searching', 
+                                `${activity.active_searches.length} search(es) in progress`, 
+                                'Synced from Sonarr/Radarr');
+                        }
+                        console.log('Activity refresh:', activity);
+                    } catch (e) {
+                        console.error('Activity refresh failed:', e);
+                    }
+                    
+                    // Then refresh all panels to validate current state
                     await Promise.all([
                         loadDashboard(),
                         loadQueue(),
@@ -3212,7 +3225,11 @@
                         loadSearches()
                     ]);
                     
-                    updateActivityBar('idle', 'Upgrade complete', 'Data refreshed - queue issues validated');
+                    // Only show idle if no active searches
+                    const currentStatus = document.getElementById('activity-text')?.textContent || '';
+                    if (!currentStatus.includes('search')) {
+                        updateActivityBar('idle', 'Upgrade complete', 'Data synced with Sonarr/Radarr');
+                    }
                 }
                 
             } catch (e) {
@@ -3233,6 +3250,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.68</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.69</div>
 </body>
 </html>
