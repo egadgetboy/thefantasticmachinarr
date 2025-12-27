@@ -749,6 +749,108 @@
         
         .modal-actions .btn { flex: 1; }
         
+        /* Initialization Overlay */
+        .init-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(12, 15, 26, 0.95);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        
+        .init-overlay.hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
+        
+        .init-content {
+            text-align: center;
+            max-width: 400px;
+            padding: 40px;
+        }
+        
+        .init-logo {
+            font-size: 64px;
+            margin-bottom: 24px;
+            animation: pulse 2s ease-in-out infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+        
+        .init-title {
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.5px;
+        }
+        
+        .init-status {
+            color: var(--text2);
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+        
+        .init-progress {
+            width: 100%;
+            height: 6px;
+            background: var(--bg3);
+            border-radius: 3px;
+            overflow: hidden;
+            margin-bottom: 16px;
+        }
+        
+        .init-progress-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent-hover));
+            border-radius: 3px;
+            transition: width 0.3s ease;
+            width: 0%;
+        }
+        
+        .init-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+            font-size: 13px;
+        }
+        
+        .init-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text3);
+            transition: color 0.3s ease;
+        }
+        
+        .init-step.active {
+            color: var(--text);
+        }
+        
+        .init-step.done {
+            color: var(--success);
+        }
+        
+        .init-step-icon {
+            width: 20px;
+            text-align: center;
+        }
+        
+        .init-timer {
+            margin-top: 20px;
+            font-size: 12px;
+            color: var(--text3);
+        }
+        
         /* Settings modal inputs */
         .settings-field {
             margin-bottom: 18px;
@@ -885,6 +987,37 @@
     </style>
 </head>
 <body>
+    <!-- Initialization Overlay -->
+    <div class="init-overlay" id="init-overlay">
+        <div class="init-content">
+            <div class="init-logo">🎬</div>
+            <div class="init-title">The Fantastic Machinarr</div>
+            <div class="init-status" id="init-status">Initializing...</div>
+            <div class="init-progress">
+                <div class="init-progress-bar" id="init-progress"></div>
+            </div>
+            <div class="init-steps">
+                <div class="init-step" id="init-step-config">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Loading configuration</span>
+                </div>
+                <div class="init-step" id="init-step-services">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Connecting to services</span>
+                </div>
+                <div class="init-step" id="init-step-data">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Fetching library data</span>
+                </div>
+                <div class="init-step" id="init-step-ui">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Preparing dashboard</span>
+                </div>
+            </div>
+            <div class="init-timer" id="init-timer"></div>
+        </div>
+    </div>
+
     <header>
         <div class="logo"><span>🎬</span> The Fantastic Machinarr</div>
         <div class="header-right">
@@ -2065,23 +2198,153 @@
             if (e.target === this) closeSettingsModal();
         });
         
-        // Initial load
-        loadStatus();
-        loadDashboard();
-        loadQueue();
-        loadInterventions();
-        // loadStorage(); // Disabled - storage panel removed
-        loadFinds();
-        loadSearches();
-        loadLogs();
+        // ============ Initialization System ============
+        const initState = {
+            startTime: Date.now(),
+            steps: {
+                config: false,
+                services: false,
+                data: false,
+                ui: false
+            },
+            estimatedTime: 5000, // 5 seconds estimate
+            errors: []
+        };
         
-        // Refresh periodically
-        setInterval(loadStatus, 30000);
-        setInterval(loadDashboard, 60000);
-        setInterval(loadQueue, 60000);
-        setInterval(loadFinds, 60000);
-        setInterval(loadLogs, 30000);
+        function updateInitStep(step, status) {
+            const el = document.getElementById(`init-step-${step}`);
+            if (!el) return;
+            
+            const icon = el.querySelector('.init-step-icon');
+            el.classList.remove('active', 'done');
+            
+            if (status === 'active') {
+                el.classList.add('active');
+                icon.textContent = '🔄';
+            } else if (status === 'done') {
+                el.classList.add('done');
+                icon.textContent = '✓';
+                initState.steps[step] = true;
+            } else if (status === 'error') {
+                el.classList.add('done');
+                icon.textContent = '✗';
+                el.style.color = 'var(--error)';
+            }
+            
+            updateInitProgress();
+        }
+        
+        function updateInitProgress() {
+            const completed = Object.values(initState.steps).filter(Boolean).length;
+            const total = Object.keys(initState.steps).length;
+            const percent = Math.round((completed / total) * 100);
+            
+            const progressBar = document.getElementById('init-progress');
+            if (progressBar) {
+                progressBar.style.width = `${percent}%`;
+            }
+            
+            // Update timer
+            const elapsed = Date.now() - initState.startTime;
+            const remaining = Math.max(0, initState.estimatedTime - elapsed);
+            const timerEl = document.getElementById('init-timer');
+            if (timerEl && remaining > 0) {
+                timerEl.textContent = `Estimated ${Math.ceil(remaining / 1000)}s remaining...`;
+            } else if (timerEl) {
+                timerEl.textContent = '';
+            }
+        }
+        
+        function setInitStatus(text) {
+            const el = document.getElementById('init-status');
+            if (el) el.textContent = text;
+        }
+        
+        function hideInitOverlay() {
+            const overlay = document.getElementById('init-overlay');
+            if (overlay) {
+                overlay.classList.add('hidden');
+                // Remove from DOM after animation
+                setTimeout(() => {
+                    overlay.style.display = 'none';
+                }, 500);
+            }
+        }
+        
+        function showInitError(message) {
+            setInitStatus(`Error: ${message}`);
+            const timerEl = document.getElementById('init-timer');
+            if (timerEl) {
+                timerEl.innerHTML = '<span style="color:var(--error)">Initialization failed. Please check your configuration.</span>';
+            }
+        }
+        
+        // Progress timer update
+        const initTimerInterval = setInterval(updateInitProgress, 100);
+        
+        async function initializeApp() {
+            try {
+                // Step 1: Load configuration
+                updateInitStep('config', 'active');
+                setInitStatus('Loading configuration...');
+                await loadStatus();
+                updateInitStep('config', 'done');
+                
+                // Step 2: Check services
+                updateInitStep('services', 'active');
+                setInitStatus('Connecting to Sonarr & Radarr...');
+                // loadStatus already checks services, give it a moment to display
+                await new Promise(r => setTimeout(r, 500));
+                updateInitStep('services', 'done');
+                
+                // Step 3: Fetch library data
+                updateInitStep('data', 'active');
+                setInitStatus('Fetching missing content & tiers...');
+                await loadDashboard();
+                await loadQueue();
+                await loadInterventions();
+                updateInitStep('data', 'done');
+                
+                // Step 4: Prepare UI
+                updateInitStep('ui', 'active');
+                setInitStatus('Preparing dashboard...');
+                await loadFinds();
+                await loadSearches();
+                await loadLogs();
+                updateInitStep('ui', 'done');
+                
+                // All done!
+                setInitStatus('Ready!');
+                clearInterval(initTimerInterval);
+                
+                // Brief pause to show completion
+                await new Promise(r => setTimeout(r, 500));
+                hideInitOverlay();
+                
+            } catch (error) {
+                console.error('Initialization error:', error);
+                showInitError(error.message || 'Unknown error');
+                clearInterval(initTimerInterval);
+                
+                // Still hide overlay after delay so user can see the UI
+                setTimeout(() => {
+                    hideInitOverlay();
+                }, 3000);
+            }
+        }
+        
+        // Start initialization
+        initializeApp();
+        
+        // Refresh periodically (after init)
+        setTimeout(() => {
+            setInterval(loadStatus, 30000);
+            setInterval(loadDashboard, 60000);
+            setInterval(loadQueue, 60000);
+            setInterval(loadFinds, 60000);
+            setInterval(loadLogs, 30000);
+        }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.19</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.20</div>
 </body>
 </html>
