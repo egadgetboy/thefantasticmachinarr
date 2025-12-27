@@ -2700,12 +2700,23 @@
                 }
             });
             
-            document.getElementById('downloads-count').textContent = `${filtered.length} of ${downloadsData.length} items`;
+            document.getElementById('downloads-count').textContent = `${filtered.length} items`;
             
             if (!filtered.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Nothing downloading</p></div>';
                 return;
             }
+            
+            // Limit to 5 items for panel display
+            const totalCount = filtered.length;
+            const displayItems = filtered.slice(0, 5);
+            const remaining = totalCount - 5;
+            
+            const expandHint = remaining > 0 ? `
+                <div class="expand-hint" onclick="openExpandedPanel('downloads')">
+                    📋 ${remaining} more item${remaining > 1 ? 's' : ''} — click to expand
+                </div>
+            ` : '';
             
             el.innerHTML = `
                 <table class="data-table">
@@ -2720,7 +2731,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        ${filtered.map((item, idx) => {
+                        ${displayItems.map((item, idx) => {
                             const progress = Math.round(item.progress || 0);
                             const progressColor = progress > 75 ? 'var(--success)' : progress > 25 ? 'var(--warn)' : 'var(--accent)';
                             const eta = item.timeleft || '-';
@@ -2768,6 +2779,7 @@
                         `}).join('')}
                     </tbody>
                 </table>
+                ${expandHint}
             `;
         }
         
@@ -4053,7 +4065,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.100';
+        const CURRENT_VERSION = '1.0.100a';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4208,6 +4220,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.100</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.100a</div>
 </body>
 </html>
