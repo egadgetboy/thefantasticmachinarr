@@ -1615,6 +1615,7 @@
         <span class="activity-icon" id="activity-icon">💤</span>
         <span class="activity-text" id="activity-text">Idle</span>
         <span class="activity-detail" id="activity-detail"></span>
+        <button class="btn btn-sm" id="stop-btn" onclick="stopOperations()" style="display:none;margin-left:auto;background:var(--danger);color:white;padding:4px 12px;">⏹ Stop</button>
     </div>
     
     <main>
@@ -2586,8 +2587,13 @@
             const icon = document.getElementById('activity-icon');
             const text = document.getElementById('activity-text');
             const detailEl = document.getElementById('activity-detail');
+            const stopBtn = document.getElementById('stop-btn');
             
             bar.className = 'activity-bar';
+            
+            // Show stop button when searching or cataloging
+            const showStop = ['searching', 'cataloging'].includes(state);
+            stopBtn.style.display = showStop ? 'block' : 'none';
             
             switch(state) {
                 case 'searching':
@@ -3568,6 +3574,16 @@
             document.getElementById('manual-update-modal').style.display = 'none';
         }
         
+        async function stopOperations() {
+            try {
+                const data = await api('stop', 'POST');
+                updateActivityBar('idle', 'Stopped', 'Operations cancelled');
+                document.getElementById('stop-btn').style.display = 'none';
+            } catch (e) {
+                console.error('Stop failed:', e);
+            }
+        }
+        
         async function runSearchOnly() {
             closeManualUpdateModal();
             
@@ -4181,7 +4197,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.112';
+        const CURRENT_VERSION = '1.0.113';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4336,6 +4352,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.112</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.113</div>
 </body>
 </html>
