@@ -122,6 +122,29 @@ class TierManager:
         else:
             return Tier.COLD
     
+    def classify_from_date_str(self, date_str: Optional[str]) -> str:
+        """Fast tier classification from date string - returns tier value string."""
+        if not date_str:
+            return 'cold'
+        
+        try:
+            air_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+            if air_date.tzinfo:
+                air_date = air_date.replace(tzinfo=None)
+            tier = self.classify(air_date)
+            return tier.value
+        except:
+            return 'cold'
+    
+    def classify_movie_date(self, movie: Dict) -> str:
+        """Fast tier classification for movie from release dates - returns tier value string."""
+        # Find earliest release date
+        for date_field in ['digitalRelease', 'physicalRelease', 'inCinemas']:
+            date_str = movie.get(date_field)
+            if date_str:
+                return self.classify_from_date_str(date_str)
+        return 'cold'
+    
     def classify_episode(self, episode: Dict, series: Dict, 
                         instance_name: str) -> TieredItem:
         """Create TieredItem from Sonarr episode."""

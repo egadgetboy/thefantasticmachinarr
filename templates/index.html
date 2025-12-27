@@ -2207,11 +2207,15 @@
                 data: false,
                 ui: false
             },
-            estimatedTime: 5000, // 5 seconds estimate
-            errors: []
+            maxWaitTime: 15000, // Max 15 seconds before auto-dismiss
+            dataTimeout: 12000, // Skip data step after 12 seconds
+            errors: [],
+            dismissed: false
         };
         
         function updateInitStep(step, status) {
+            if (initState.dismissed) return;
+            
             const el = document.getElementById(`init-step-${step}`);
             if (!el) return;
             
@@ -2225,6 +2229,11 @@
                 el.classList.add('done');
                 icon.textContent = '✓';
                 initState.steps[step] = true;
+            } else if (status === 'skipped') {
+                el.classList.add('done');
+                icon.textContent = '⏭️';
+                el.style.color = 'var(--warn)';
+                initState.steps[step] = true;
             } else if (status === 'error') {
                 el.classList.add('done');
                 icon.textContent = '✗';
@@ -2235,6 +2244,8 @@
         }
         
         function updateInitProgress() {
+            if (initState.dismissed) return;
+            
             const completed = Object.values(initState.steps).filter(Boolean).length;
             const total = Object.keys(initState.steps).length;
             const percent = Math.round((completed / total) * 100);
@@ -2244,43 +2255,70 @@
                 progressBar.style.width = `${percent}%`;
             }
             
-            // Update timer
+            // Update timer with elapsed time
             const elapsed = Date.now() - initState.startTime;
-            const remaining = Math.max(0, initState.estimatedTime - elapsed);
             const timerEl = document.getElementById('init-timer');
-            if (timerEl && remaining > 0) {
-                timerEl.textContent = `Estimated ${Math.ceil(remaining / 1000)}s remaining...`;
-            } else if (timerEl) {
-                timerEl.textContent = '';
+            if (timerEl) {
+                const secs = Math.floor(elapsed / 1000);
+                if (elapsed > 5000) {
+                    timerEl.innerHTML = `${secs}s elapsed... <a href="#" onclick="skipInit(); return false;" style="color:var(--accent);text-decoration:underline;">Skip</a>`;
+                } else {
+                    timerEl.textContent = `${secs}s...`;
+                }
             }
         }
         
         function setInitStatus(text) {
+            if (initState.dismissed) return;
             const el = document.getElementById('init-status');
             if (el) el.textContent = text;
         }
         
         function hideInitOverlay() {
+            if (initState.dismissed) return;
+            initState.dismissed = true;
+            
             const overlay = document.getElementById('init-overlay');
             if (overlay) {
                 overlay.classList.add('hidden');
-                // Remove from DOM after animation
                 setTimeout(() => {
                     overlay.style.display = 'none';
                 }, 500);
             }
+            clearInterval(initTimerInterval);
+        }
+        
+        function skipInit() {
+            console.log('Init skipped by user');
+            setInitStatus('Skipped - loading in background...');
+            hideInitOverlay();
+            // Continue loading in background
+            loadFinds();
+            loadSearches();
+            loadLogs();
         }
         
         function showInitError(message) {
+            if (initState.dismissed) return;
             setInitStatus(`Error: ${message}`);
             const timerEl = document.getElementById('init-timer');
             if (timerEl) {
-                timerEl.innerHTML = '<span style="color:var(--error)">Initialization failed. Please check your configuration.</span>';
+                timerEl.innerHTML = '<span style="color:var(--warn)">Loading anyway...</span>';
             }
         }
         
         // Progress timer update
-        const initTimerInterval = setInterval(updateInitProgress, 100);
+        const initTimerInterval = setInterval(() => {
+            updateInitProgress();
+            
+            // Auto-dismiss after max wait time
+            const elapsed = Date.now() - initState.startTime;
+            if (elapsed > initState.maxWaitTime && !initState.dismissed) {
+                console.log('Init auto-dismissed after timeout');
+                setInitStatus('Ready (some data still loading)');
+                hideInitOverlay();
+            }
+        }, 200);
         
         async function initializeApp() {
             try {
@@ -2290,61 +2328,88 @@
                 await loadStatus();
                 updateInitStep('config', 'done');
                 
+                if (initState.dismissed) return;
+                
                 // Step 2: Check services
                 updateInitStep('services', 'active');
                 setInitStatus('Connecting to Sonarr & Radarr...');
-                // loadStatus already checks services, give it a moment to display
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 300));
                 updateInitStep('services', 'done');
                 
-                // Step 3: Fetch library data
+                if (initState.dismissed) return;
+                
+                // Step 3: Fetch library data (with timeout)
                 updateInitStep('data', 'active');
                 setInitStatus('Fetching missing content & tiers...');
-                await loadDashboard();
-                await loadQueue();
-                await loadInterventions();
-                updateInitStep('data', 'done');
+                
+                const dataPromise = Promise.all([
+                    loadDashboard(),
+                    loadQueue(),
+                    loadInterventions()
+                ]);
+                
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('timeout')), initState.dataTimeout)
+                );
+                
+                try {
+                    await Promise.race([dataPromise, timeoutPromise]);
+                    updateInitStep('data', 'done');
+                } catch (e) {
+                    if (e.message === 'timeout') {
+                        console.log('Data fetch timed out, continuing...');
+                        updateInitStep('data', 'skipped');
+                        setInitStatus('Data still loading in background...');
+                        // Let it continue in background
+                        dataPromise.catch(err => console.error('Background data load error:', err));
+                    } else {
+                        throw e;
+                    }
+                }
+                
+                if (initState.dismissed) return;
                 
                 // Step 4: Prepare UI
                 updateInitStep('ui', 'active');
                 setInitStatus('Preparing dashboard...');
-                await loadFinds();
-                await loadSearches();
-                await loadLogs();
+                await Promise.all([
+                    loadFinds(),
+                    loadSearches(),
+                    loadLogs()
+                ]);
                 updateInitStep('ui', 'done');
                 
                 // All done!
                 setInitStatus('Ready!');
                 clearInterval(initTimerInterval);
                 
-                // Brief pause to show completion
-                await new Promise(r => setTimeout(r, 500));
+                await new Promise(r => setTimeout(r, 400));
                 hideInitOverlay();
                 
             } catch (error) {
                 console.error('Initialization error:', error);
                 showInitError(error.message || 'Unknown error');
-                clearInterval(initTimerInterval);
                 
-                // Still hide overlay after delay so user can see the UI
+                // Still hide overlay after delay
                 setTimeout(() => {
                     hideInitOverlay();
-                }, 3000);
+                }, 2000);
             }
         }
         
         // Start initialization
         initializeApp();
         
-        // Refresh periodically (after init)
+        // Refresh periodically (starts after a delay to not conflict with init)
         setTimeout(() => {
             setInterval(loadStatus, 30000);
             setInterval(loadDashboard, 60000);
             setInterval(loadQueue, 60000);
             setInterval(loadFinds, 60000);
+            setInterval(loadSearches, 60000);
             setInterval(loadLogs, 30000);
-        }, 5000);
+        }, 10000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.20</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.21</div>
 </body>
 </html>

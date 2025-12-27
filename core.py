@@ -246,29 +246,35 @@ class MachinarrCore:
                 counts['sonarr_missing'] += len(missing)
                 self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
                 
-                # Count ALL items by tier, but only classify limited set for display
+                # Fast tier counting without full classification
                 for i, ep in enumerate(missing):
-                    item = self.tier_manager.classify_episode(ep, {}, name)
-                    item.search_type = 'missing'
-                    tier_counts[item.tier.value]['sonarr'] += 1
-                    tier_counts[item.tier.value]['total'] += 1
+                    # Quick tier determination from air date only
+                    tier = self.tier_manager.classify_from_date_str(
+                        ep.get('airDateUtc') or ep.get('airDate')
+                    )
+                    tier_counts[tier]['sonarr'] += 1
+                    tier_counts[tier]['total'] += 1
+                    
+                    # Only do full classification for display items
                     if include_items and i < limit_per_instance:
+                        item = self.tier_manager.classify_episode(ep, {}, name)
+                        item.search_type = 'missing'
                         items.append(item)
             except Exception as e:
                 self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
         
-        # Upgrade episodes (cutoff unmet)
+        # Upgrade episodes (cutoff unmet) - just count, no tier tracking
         for name, client in self.sonarr_clients.items():
             try:
                 upgrades = client.get_cutoff_unmet()
                 counts['sonarr_upgrade'] += len(upgrades)
                 self.log.info(f"Sonarr ({name}): Found {len(upgrades)} episodes needing upgrade")
                 
-                for i, ep in enumerate(upgrades):
-                    item = self.tier_manager.classify_episode(ep, {}, name)
-                    item.search_type = 'upgrade'
-                    # Note: Upgrades don't add to tier counts (they already have the content)
-                    if include_items and i < limit_per_instance:
+                # Only classify display items
+                if include_items:
+                    for i, ep in enumerate(upgrades[:limit_per_instance]):
+                        item = self.tier_manager.classify_episode(ep, {}, name)
+                        item.search_type = 'upgrade'
                         items.append(item)
             except Exception as e:
                 self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
@@ -280,27 +286,31 @@ class MachinarrCore:
                 counts['radarr_missing'] += len(missing)
                 self.log.info(f"Radarr ({name}): Found {len(missing)} missing movies")
                 
+                # Fast tier counting
                 for i, movie in enumerate(missing):
-                    item = self.tier_manager.classify_movie(movie, name)
-                    item.search_type = 'missing'
-                    tier_counts[item.tier.value]['radarr'] += 1
-                    tier_counts[item.tier.value]['total'] += 1
+                    # Quick tier from release dates
+                    tier = self.tier_manager.classify_movie_date(movie)
+                    tier_counts[tier]['radarr'] += 1
+                    tier_counts[tier]['total'] += 1
+                    
                     if include_items and i < limit_per_instance:
+                        item = self.tier_manager.classify_movie(movie, name)
+                        item.search_type = 'missing'
                         items.append(item)
             except Exception as e:
                 self.log.error(f"Radarr ({name}) missing movies error: {e}")
         
-        # Upgrade movies (cutoff unmet)
+        # Upgrade movies (cutoff unmet) - just count
         for name, client in self.radarr_clients.items():
             try:
                 upgrades = client.get_cutoff_unmet()
                 counts['radarr_upgrade'] += len(upgrades)
                 self.log.info(f"Radarr ({name}): Found {len(upgrades)} movies needing upgrade")
                 
-                for i, movie in enumerate(upgrades):
-                    item = self.tier_manager.classify_movie(movie, name)
-                    item.search_type = 'upgrade'
-                    if include_items and i < limit_per_instance:
+                if include_items:
+                    for i, movie in enumerate(upgrades[:limit_per_instance]):
+                        item = self.tier_manager.classify_movie(movie, name)
+                        item.search_type = 'upgrade'
                         items.append(item)
             except Exception as e:
                 self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
