@@ -2344,35 +2344,13 @@
         }
         
         async function initializeApp() {
+            const overlay = document.getElementById('init-overlay');
             const statusEl = document.getElementById('init-status');
             const timerEl = document.getElementById('init-timer');
             const progressBar = document.getElementById('init-progress');
             
-            // Countdown timer from 60
-            const updateTimer = setInterval(() => {
-                if (initState.dismissed) {
-                    clearInterval(updateTimer);
-                    return;
-                }
-                const elapsed = Date.now() - initState.startTime;
-                const remaining = Math.max(0, Math.ceil((initState.maxTime - elapsed) / 1000));
-                if (timerEl) timerEl.textContent = `${remaining}s`;
-            }, 200);
-            
+            // Quick check - try to load status silently first
             try {
-                // Step 1: Load configuration
-                updateInitStep('config', 'active');
-                if (statusEl) statusEl.textContent = 'Loading configuration...';
-                if (progressBar) progressBar.style.width = '10%';
-                
-                await loadStatus();
-                updateInitStep('config', 'done');
-                
-                // Step 2: Connect to services
-                updateInitStep('services', 'active');
-                if (statusEl) statusEl.textContent = 'Connecting to services...';
-                if (progressBar) progressBar.style.width = '25%';
-                
                 const status = await api('status');
                 
                 let sonarrOk = false;
@@ -2385,118 +2363,57 @@
                     }
                 }
                 
-                if (!sonarrOk && !radarrOk) {
-                    updateInitStep('services', 'done');
-                    if (statusEl) statusEl.textContent = 'No services connected - check settings';
-                    if (progressBar) {
-                        progressBar.style.width = '100%';
-                        progressBar.style.background = 'var(--warn)';
-                    }
-                    clearInterval(updateTimer);
-                    await new Promise(r => setTimeout(r, 2000));
+                if (sonarrOk || radarrOk) {
+                    // Services are connected - skip the overlay entirely
                     hideInitOverlay();
+                    
+                    // Load everything in background
+                    loadStatus();
                     loadDashboard();
                     loadQueue();
+                    loadInterventions();
                     loadFinds();
                     loadSearches();
                     loadLogs();
+                    
+                    // Trigger first search if this looks like a fresh start (no searches yet)
+                    try {
+                        const searchData = await api('searches');
+                        if (!searchData.searches || searchData.searches.length === 0) {
+                            setTimeout(() => runSearch(), 2000);
+                        }
+                    } catch (e) {}
+                    
                     return;
                 }
                 
+                // No services connected - show the overlay with warning
+                if (statusEl) statusEl.textContent = 'No services connected - check settings';
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = 'var(--warn)';
+                }
+                updateInitStep('config', 'done');
                 updateInitStep('services', 'done');
                 
-                // Load scoreboard data
-                if (progressBar) progressBar.style.width = '35%';
-                try {
-                    const data = await api('scoreboard');
-                    if (data.scoreboard) {
-                        document.getElementById('finds-today').textContent = data.scoreboard.finds_today || 0;
-                        document.getElementById('finds-total').textContent = data.scoreboard.finds_total || 0;
-                        document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
-                        document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
-                        
-                        if (data.scoreboard.finds_by_source) {
-                            const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
-                            const radarr = data.scoreboard.finds_by_source.radarr || 0;
-                            const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
-                            const todayBreakdown = document.getElementById('finds-today-breakdown');
-                            const totalBreakdown = document.getElementById('finds-total-breakdown');
-                            if (todayBreakdown) todayBreakdown.textContent = breakdownText;
-                            if (totalBreakdown) totalBreakdown.textContent = breakdownText;
-                        }
-                        
-                        updateStatusIndicator(data.scoreboard, data.scheduler);
-                    }
-                } catch (e) {
-                    console.warn('Scoreboard load failed:', e);
-                }
-                
-                // Step 3: Fetch library data (the potentially slow part)
-                updateInitStep('data', 'active');
-                if (statusEl) statusEl.textContent = 'Counting missing content (this may take a moment)...';
-                if (progressBar) progressBar.style.width = '50%';
-                
-                // Calculate remaining time for tier data
-                const elapsed = Date.now() - initState.startTime;
-                const remainingTime = Math.max(5000, initState.maxTime - elapsed);
-                
-                const tierPromise = loadDashboard();
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('timeout')), remainingTime)
-                );
-                
-                try {
-                    await Promise.race([tierPromise, timeoutPromise]);
-                    updateInitStep('data', 'done');
-                    if (progressBar) progressBar.style.width = '75%';
-                } catch (e) {
-                    if (e.message === 'timeout') {
-                        console.warn('Tier data timeout - proceeding without');
-                        updateInitStep('data', 'skip');
-                        document.getElementById('tier-total-label').textContent = 'Loading in background...';
-                    }
-                }
-                
-                // Load queue
-                await loadQueue();
-                
-                // Step 4: Prepare dashboard
-                updateInitStep('ui', 'active');
-                if (statusEl) statusEl.textContent = 'Preparing dashboard...';
-                if (progressBar) progressBar.style.width = '90%';
-                
-                await Promise.all([
-                    loadInterventions(),
-                    loadFinds(),
-                    loadSearches(),
-                    loadLogs()
-                ]);
-                
-                updateInitStep('ui', 'done');
-                
-                // Done!
-                if (progressBar) progressBar.style.width = '100%';
-                if (statusEl) statusEl.textContent = 'Ready!';
-                
-                clearInterval(updateTimer);
-                if (timerEl) timerEl.textContent = '✓';
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 2000));
                 hideInitOverlay();
                 
-                // Trigger first search automatically after a short delay
-                setTimeout(() => {
-                    console.log('Triggering initial search cycle...');
-                    runSearch();
-                }, 2000);
+                // Still load what we can
+                loadDashboard();
+                loadQueue();
+                loadFinds();
+                loadSearches();
+                loadLogs();
                 
             } catch (error) {
+                // API error - show overlay with error
                 console.error('Initialization error:', error);
-                if (statusEl) statusEl.textContent = 'Error - ' + (error.message || 'check settings');
+                if (statusEl) statusEl.textContent = 'Error connecting - check settings';
                 if (progressBar) {
                     progressBar.style.width = '100%';
                     progressBar.style.background = 'var(--error)';
                 }
-                clearInterval(updateTimer);
                 
                 await new Promise(r => setTimeout(r, 2000));
                 hideInitOverlay();
@@ -2522,6 +2439,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.37</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.38</div>
 </body>
 </html>
