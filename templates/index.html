@@ -3037,6 +3037,9 @@
                     loadFinds();
                     loadSearches();
                     loadLogs();
+                    
+                    // Check for version upgrade - auto-search after 10 seconds
+                    checkVersionAndAutoSearch();
                     return;
                 }
                 
@@ -3059,6 +3062,9 @@
                         setTimeout(() => runSearch(), 2000);
                     }
                 } catch (e) {}
+                
+                // Check for version upgrade - auto-search after 10 seconds
+                checkVersionAndAutoSearch();
                 
             } catch (error) {
                 // API error - show overlay with error
@@ -3083,7 +3089,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.61';
+        const CURRENT_VERSION = '1.0.62';
         
         async function checkVersionAndAutoSearch() {
             const lastVersion = localStorage.getItem('tfm-last-version');
@@ -3097,7 +3103,11 @@
                 shouldAutoSearch = true;
                 reason = 'First run - automatically searching for missing content...';
                 localStorage.setItem('tfm-first-run-complete', 'true');
-            } else if (lastVersion && lastVersion !== CURRENT_VERSION) {
+            } else if (!lastVersion) {
+                // First time with version tracking (upgrading from older version)
+                shouldAutoSearch = true;
+                reason = `Upgraded to ${CURRENT_VERSION} - refreshing data...`;
+            } else if (lastVersion !== CURRENT_VERSION) {
                 // Version upgrade detected
                 shouldAutoSearch = true;
                 reason = `Upgraded from ${lastVersion} to ${CURRENT_VERSION} - refreshing data...`;
@@ -3107,6 +3117,8 @@
             localStorage.setItem('tfm-last-version', CURRENT_VERSION);
             
             if (shouldAutoSearch) {
+                console.log('Auto-search triggered:', reason);
+                
                 // Show countdown in activity bar
                 updateActivityBar('cataloging', reason, 'Auto-search starting in 10 seconds...');
                 
@@ -3125,7 +3137,7 @@
                     
                     try {
                         const data = await api('search', 'POST', {type: 'cycle'});
-                        updateActivityBar('idle', 'Auto-search complete', `Found ${data.searched || 0} items to search`);
+                        updateActivityBar('idle', 'Auto-search complete', `Searched ${data.searched || 0} items`);
                         
                         // Refresh all data
                         loadDashboard();
@@ -3151,6 +3163,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.61</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.62</div>
 </body>
 </html>
