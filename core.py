@@ -11,7 +11,7 @@ import threading
 from .config import Config, ServiceInstance
 from .logger import Logger
 from .clients import SonarrClient, RadarrClient, SABnzbdClient
-from .automation import TierManager, QueueMonitor, SmartSearcher, Scheduler
+from .automation import TierManager, QueueMonitor, SmartSearcher, Scheduler, Tier
 from .notifier import EmailNotifier
 
 
@@ -582,15 +582,35 @@ class MachinarrCore:
         search_queue = queue.Queue()
         search_worker_done = threading.Event()
         
-        # Calculate search rate based on API limit
-        # Spread searches across the day, but cap at reasonable rate
+        # Calculate search rate based on user's pacing preset
+        # The catalog search should use the SAME pace as normal searches
+        # so it respects the user's daily_api_limit setting
         daily_limit = self.config.search.daily_api_limit
-        # Use 20% of daily limit during initial catalog (reserve rest for scheduled searches)
-        catalog_budget = int(daily_limit * 0.2)
-        # Rate: 1 search per N seconds (minimum 2 seconds to not overwhelm)
-        search_interval = max(2.0, 3600 / max(catalog_budget, 1))  # At least 2 sec between searches
         
-        self.log.info(f"Catalog search budget: {catalog_budget} searches, interval: {search_interval:.1f}s")
+        # Budget scales with user's limit:
+        # - steady (≤500): 20% = 100 searches max during catalog
+        # - fast (≤2000): 25% = 500 searches max
+        # - faster (≤5000): 30% = 1500 searches max  
+        # - blazing (>5000): 40% = unlimited practically
+        if daily_limit <= 500:
+            budget_percent = 0.20
+        elif daily_limit <= 2000:
+            budget_percent = 0.25
+        elif daily_limit <= 5000:
+            budget_percent = 0.30
+        else:
+            budget_percent = 0.40
+        
+        catalog_budget = int(daily_limit * budget_percent)
+        
+        # Use the user's HOT tier cooldown as the minimum interval
+        # This ensures catalog searches respect their pacing preference
+        preset = self.searcher._get_pacing_preset()
+        hot_cooldown_min = self.searcher.PACING_CONFIGS[preset][Tier.HOT]['cooldown']
+        # Convert minutes to seconds, but minimum 2 sec for API friendliness
+        search_interval = max(2.0, hot_cooldown_min * 60 / 10)  # 1/10th of cooldown during catalog burst
+        
+        self.log.info(f"Catalog search: budget={catalog_budget}, interval={search_interval:.1f}s (preset={preset})")
         
         def search_worker():
             """Worker thread that searches items from queue with rate limiting."""
@@ -650,9 +670,17 @@ class MachinarrCore:
                 self.log.info(f"Catalog searching complete: {searches_done} items searched")
         
         def queue_for_search(item):
-            """Add item to search queue if eligible."""
-            # Only queue HOT items during catalog (highest priority)
-            if item.tier.value == 'hot':
+            """Add item to search queue if eligible based on user's pacing preset.
+            
+            - steady/fast: Only HOT items (conservative, save API for scheduled)
+            - faster/blazing: HOT and WARM (aggressive, user wants speed)
+            """
+            tier_value = item.tier.value
+            
+            if tier_value == 'hot':
+                search_queue.put(item)
+            elif tier_value == 'warm' and preset in ('faster', 'blazing'):
+                # User has high API limit - also search Warm during catalog
                 search_queue.put(item)
         
         def fetch_sonarr_missing(name, client):
