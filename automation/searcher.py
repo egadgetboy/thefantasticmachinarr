@@ -226,8 +226,26 @@ class SmartSearcher:
             self.searched_series.clear()
     
     def _can_search(self) -> Tuple[bool, str]:
-        """Check if we can perform searches based on rate limits."""
+        """Check if we can perform searches based on rate limits and quiet hours."""
         self._reset_daily_counters()
+        
+        # Check quiet hours
+        if hasattr(self.config, 'quiet_hours') and self.config.quiet_hours:
+            qh = self.config.quiet_hours
+            if qh.get('enabled', False):
+                start_hour = qh.get('start_hour', 2)
+                end_hour = qh.get('end_hour', 6)
+                current_hour = datetime.utcnow().hour
+                
+                # Handle overnight ranges (e.g., 22:00 to 06:00)
+                if start_hour > end_hour:
+                    # Quiet hours span midnight
+                    if current_hour >= start_hour or current_hour < end_hour:
+                        return False, f"Quiet hours active ({start_hour}:00 - {end_hour}:00)"
+                else:
+                    # Normal range (e.g., 02:00 to 06:00)
+                    if start_hour <= current_hour < end_hour:
+                        return False, f"Quiet hours active ({start_hour}:00 - {end_hour}:00)"
         
         if self.api_hits_today >= self.config.search.daily_api_limit:
             return False, f"Daily API limit reached ({self.api_hits_today}/{self.config.search.daily_api_limit})"
