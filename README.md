@@ -46,6 +46,12 @@ Choose how aggressive TFM should be based on your indexer limits (or create your
 ### 🔄 Smart Cooldowns
 TFM remembers what it's searched and doesn't waste API calls on recently searched items.
 
+### 🎲 Randomized Selection with Tier Priority
+Items are selected randomly within each tier, so your library gets fair coverage over time. However, tier priority is always respected—Hot items get searched more frequently than Cold items. This prevents the same items from being searched repeatedly while still prioritizing recent content.
+
+### 📺 Series-Level Searching
+When searching for TV content, TFM triggers a **full series search** in Sonarr rather than searching for individual episodes. This is more efficient and catches all missing episodes at once. Season packs are not specifically targeted—Sonarr handles release selection based on your quality profiles.
+
 ### 🚨 Intelligent Escalation
 When searching isn't working, TFM knows when to ask for help with manual interventions.
 
