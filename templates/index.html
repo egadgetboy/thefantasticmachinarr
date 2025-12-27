@@ -196,6 +196,55 @@
             gap: 16px;
         }
         
+        /* Update Banner */
+        .update-banner {
+            display: none;
+            background: linear-gradient(135deg, var(--accent) 0%, #8b5cf6 100%);
+            color: white;
+            padding: 10px 20px;
+            text-align: center;
+            font-size: 14px;
+            font-weight: 500;
+            animation: slideDown 0.3s ease;
+        }
+        
+        .update-banner.visible {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .update-banner a {
+            color: white;
+            text-decoration: underline;
+            font-weight: 600;
+        }
+        
+        .update-banner a:hover {
+            opacity: 0.9;
+        }
+        
+        .update-banner .dismiss-btn {
+            background: rgba(255,255,255,0.2);
+            border: none;
+            color: white;
+            padding: 4px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 8px;
+        }
+        
+        .update-banner .dismiss-btn:hover {
+            background: rgba(255,255,255,0.3);
+        }
+        
+        @keyframes slideDown {
+            from { transform: translateY(-100%); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+        
         .status-dots {
             display: flex;
             gap: 10px;
@@ -1409,6 +1458,13 @@
             <button class="settings-btn" onclick="openSettingsModal()" title="Settings">⚙️</button>
         </div>
     </header>
+    
+    <!-- Update Notification Banner -->
+    <div class="update-banner" id="update-banner">
+        <span>🎉 <strong>Update Available!</strong> Version <span id="latest-version"></span> is ready.</span>
+        <a href="https://github.com/egadgetboy/thefantasticmachinarr/releases" target="_blank">View Release Notes</a>
+        <button class="dismiss-btn" onclick="dismissUpdate()">Dismiss</button>
+    </div>
     
     <!-- Compact Scoreboard -->
     <div class="scoreboard compact">
@@ -3631,7 +3687,64 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.96';
+        const CURRENT_VERSION = '1.0.97';
+        const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
+        const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
+        
+        async function checkForUpdates() {
+            // Check GitHub releases for newer version
+            try {
+                const response = await fetch('https://api.github.com/repos/egadgetboy/thefantasticmachinarr/releases/latest', {
+                    headers: { 'Accept': 'application/vnd.github.v3+json' }
+                });
+                
+                if (!response.ok) return;
+                
+                const release = await response.json();
+                const latestVersion = release.tag_name.replace(/^v/, '');
+                
+                // Compare versions (simple string compare works for semver)
+                if (isNewerVersion(latestVersion, CURRENT_VERSION)) {
+                    const dismissed = localStorage.getItem(DISMISSED_UPDATE_KEY);
+                    if (dismissed === latestVersion) return; // User dismissed this version
+                    
+                    showUpdateBanner(latestVersion);
+                }
+            } catch (e) {
+                console.log('Update check failed:', e.message);
+            }
+        }
+        
+        function isNewerVersion(latest, current) {
+            // Parse version strings (e.g., "1.0.96" -> [1, 0, 96])
+            const latestParts = latest.split('.').map(Number);
+            const currentParts = current.split('.').map(Number);
+            
+            for (let i = 0; i < Math.max(latestParts.length, currentParts.length); i++) {
+                const l = latestParts[i] || 0;
+                const c = currentParts[i] || 0;
+                if (l > c) return true;
+                if (l < c) return false;
+            }
+            return false;
+        }
+        
+        function showUpdateBanner(version) {
+            const banner = document.getElementById('update-banner');
+            document.getElementById('latest-version').textContent = 'v' + version;
+            banner.classList.add('visible');
+        }
+        
+        function dismissUpdate() {
+            const banner = document.getElementById('update-banner');
+            const version = document.getElementById('latest-version').textContent.replace(/^v/, '');
+            localStorage.setItem(DISMISSED_UPDATE_KEY, version);
+            banner.classList.remove('visible');
+        }
+        
+        // Check for updates on load and periodically
+        setTimeout(checkForUpdates, 5000); // Check 5 seconds after load
+        setInterval(checkForUpdates, UPDATE_CHECK_INTERVAL);
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3729,6 +3842,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.96</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.97</div>
 </body>
 </html>
