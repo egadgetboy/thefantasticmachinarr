@@ -1652,6 +1652,23 @@
     </div>
     
     <script>
+        /*
+         * IMPORTANT: localStorage rules for multi-browser/device support
+         * ================================================================
+         * localStorage is per-browser/device, NOT shared across devices.
+         * 
+         * ALLOWED in localStorage (personal display preferences):
+         *   - tfm-theme: Color theme preference (OK to differ per device)
+         *   - UI state like collapsed panels, sort preferences
+         * 
+         * NEVER store in localStorage (must be server-side):
+         *   - Version tracking (would trigger auto-search on every device)
+         *   - App state that affects behavior
+         *   - Anything that triggers actions or API calls
+         * 
+         * Use /config/*.json files or API endpoints for shared state.
+         */
+        
         // Theme management - 3 themes: dark, light, win98
         function toggleTheme() {
             const current = document.documentElement.getAttribute('data-theme');
@@ -3089,7 +3106,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.64';
+        const CURRENT_VERSION = '1.0.65';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if auto-search should run
@@ -3152,6 +3169,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.64</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.65</div>
 </body>
 </html>
