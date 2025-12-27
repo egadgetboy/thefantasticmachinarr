@@ -89,6 +89,8 @@ class QueueMonitor:
         'import_failed': 'blocklist_retry',
         'download_failed': 'blocklist_retry',
         'path_not_valid': None,  # Needs manual fix
+        'warning': 'blocklist_retry',  # Generic warning
+        'delay': None,  # Delay profile - let it wait
     }
     
     def __init__(self, config, logger):
@@ -103,9 +105,32 @@ class QueueMonitor:
         """Analyze a queue item and determine if it's stuck."""
         parsed = client.parse_queue_status(queue_item)
         
-        # Skip if no issues detected
-        if not parsed['issues'] and parsed['tracked_status'] == 'ok':
+        # Check for problems:
+        # 1. Has specific issues detected
+        # 2. trackedDownloadStatus is 'warning' or 'error'
+        # 3. status is 'delay' or 'warning'
+        has_issues = bool(parsed['issues'])
+        tracked_status = (parsed.get('tracked_status') or '').lower()
+        status = (parsed.get('status') or '').lower()
+        
+        is_problematic = (
+            has_issues or 
+            tracked_status in ('warning', 'error') or
+            status in ('delay', 'warning', 'failed')
+        )
+        
+        # Skip if no problems detected
+        if not is_problematic:
             return None
+        
+        # If no specific issues but has warning status, add generic issue
+        if not has_issues and tracked_status == 'warning':
+            # Try to get more info from status messages
+            messages = parsed.get('messages', [])
+            if messages:
+                parsed['issues'] = ['warning: ' + messages[0][:50]]
+            else:
+                parsed['issues'] = ['warning']
         
         # Check if we've seen this before
         key = f"{source}:{parsed['id']}"
