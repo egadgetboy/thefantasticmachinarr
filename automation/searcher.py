@@ -160,12 +160,12 @@ class SmartSearcher:
                         self.api_hits_today = 0
                         self.finds_today = 0
                 
-                # Load searched_series cache (short-term deduplication only)
+                # Load searched_series cache (prevents duplicate series searches)
                 #
                 # PURPOSE: If TFM restarts, don't re-search series we just did.
-                # This is NOT for tier-based pacing - that's handled by the tier system.
-                # Just prevents wasted API calls from searching same show twice.
-                cutoff = datetime.utcnow() - timedelta(hours=4)
+                # The actual cooldown check happens in _prioritize_series() using
+                # the user's configured pacing preset.
+                cutoff = datetime.utcnow() - timedelta(days=30)
                 for key, ts_str in data.get('searched_series', {}).items():
                     try:
                         ts = datetime.fromisoformat(ts_str)
@@ -246,10 +246,10 @@ class SmartSearcher:
             
             # Save searched_series cache (prevents duplicate series searches)
             #
-            # PURPOSE: If TFM restarts mid-cycle, don't re-search series we just did.
-            # Only keep last 4 hours - this is purely for deduplication, not pacing.
-            # Tier-based search frequency is handled by the tier system, not here.
-            cutoff = datetime.utcnow() - timedelta(hours=4)
+            # PURPOSE: If TFM restarts, don't re-search series we just did.
+            # Keep entries long enough for the longest possible cooldown (Cold tier
+            # in steady preset = 43200 min = 30 days). Most will expire sooner.
+            cutoff = datetime.utcnow() - timedelta(days=30)
             recent_series = {
                 k: v.isoformat() 
                 for k, v in self.searched_series.items() 
@@ -637,9 +637,9 @@ class SmartSearcher:
         SOLUTION: Pick ONE episode per series. Sonarr's series search will find
         all missing episodes in one API call.
         
-        NOTE: This is purely about efficiency within a search cycle. The actual
-        search FREQUENCY for Hot vs Cold items is controlled by the tier system
-        in _select_items_for_search().
+        RESPECTS USER TUNING: The series dedup cooldown uses the SAME cooldown
+        as the user's pacing preset. If user sets blazing (10 min Hot cooldown),
+        series cache also uses 10 min for Hot series.
         """
         # Separate Sonarr (has series) from Radarr (individual movies)
         series_groups: Dict[str, List[TieredItem]] = {}
@@ -659,14 +659,18 @@ class SmartSearcher:
         prioritized = []
         
         for key, series_items in series_groups.items():
-            # Skip if we already searched this series in the current cycle
-            # This prevents searching "Breaking Bad" twice if it appears in
-            # both HOT and WARM tiers (edge case with ongoing shows)
+            # Get the tier of items in this series
+            item_tier = series_items[0].tier
+            
+            # Get the user's configured cooldown for this tier (in minutes)
+            # This respects the user's pacing preset (steady/fast/faster/blazing)
+            tier_config = self._get_tier_config(item_tier)
+            cooldown_minutes = tier_config['cooldown']
+            
+            # Skip if we recently searched this series
             if key in self.searched_series:
                 last_search = self.searched_series[key]
-                # Simple 1-hour dedup - just prevents rapid re-searching
-                # Actual tier-based pacing is handled elsewhere
-                if datetime.utcnow() - last_search < timedelta(hours=1):
+                if datetime.utcnow() - last_search < timedelta(minutes=cooldown_minutes):
                     continue
             
             # Pick lowest season/episode (S01E01 more likely to exist than S05E12)
