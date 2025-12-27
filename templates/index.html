@@ -1838,7 +1838,7 @@
     </div>
     
     <!-- Intervention Modal -->
-    <div class="modal" id="modal">
+    <div class="modal" id="modal" onclick="if(event.target === this) closeModal()">
         <div class="modal-content">
             <h3 id="modal-title">Manual Intervention</h3>
             <p id="modal-desc"></p>
@@ -1848,7 +1848,7 @@
     </div>
     
     <!-- Manual Update Modal -->
-    <div class="modal" id="manual-update-modal">
+    <div class="modal" id="manual-update-modal" onclick="if(event.target === this) closeManualUpdateModal()">
         <div class="modal-content" style="max-width: 500px;">
             <h3>⟳ Manual Update</h3>
             
@@ -1880,7 +1880,7 @@
     </div>
     
     <!-- Settings Modal -->
-    <div class="modal" id="settings-modal">
+    <div class="modal" id="settings-modal" onclick="if(event.target === this) closeSettingsModal()">
         <div class="modal-content" style="max-width: 680px; max-height: 85vh; overflow-y: auto;">
             <h3>⚙️ Settings</h3>
             
@@ -2708,6 +2708,18 @@
         async function refreshDownloads() {
             try {
                 const data = await api('queue');
+                
+                // Update stuck items too
+                document.getElementById('stuck-count').textContent = `${data.total_stuck || 0} items`;
+                if (!data.stuck_items?.length) {
+                    document.getElementById('stuck-list').innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>';
+                    paginationState.queue.items = [];
+                } else {
+                    paginationState.queue.items = data.stuck_items.slice(0, MAX_ITEMS);
+                    renderQueuePage();
+                }
+                
+                // Update downloads
                 downloadsData = [
                     ...(data.active_downloads || []),
                     ...(data.sabnzbd_downloads || [])
