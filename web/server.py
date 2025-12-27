@@ -208,18 +208,27 @@ class WebServer:
         def api_save_settings():
             data = request.get_json() or {}
             try:
+                # Update search config
                 if 'search' in data:
-                    if not hasattr(self.config, 'search') or not self.config.search:
-                        self.config.search = {}
-                    self.config.search.update(data['search'])
+                    for key, value in data['search'].items():
+                        if hasattr(self.config.search, key):
+                            setattr(self.config.search, key, value)
+                
+                # Update tier config
                 if 'tiers' in data:
-                    if not hasattr(self.config, 'tiers') or not self.config.tiers:
-                        self.config.tiers = {}
-                    self.config.tiers.update(data['tiers'])
+                    for tier_name, tier_data in data['tiers'].items():
+                        if hasattr(self.config.tiers, tier_name):
+                            tier = getattr(self.config.tiers, tier_name)
+                            for key, value in tier_data.items():
+                                if hasattr(tier, key):
+                                    setattr(tier, key, value)
+                
+                # Update quiet hours config
                 if 'quiet_hours' in data:
-                    if not hasattr(self.config, 'quiet_hours') or not self.config.quiet_hours:
-                        self.config.quiet_hours = {}
-                    self.config.quiet_hours.update(data['quiet_hours'])
+                    for key, value in data['quiet_hours'].items():
+                        if hasattr(self.config.quiet_hours, key):
+                            setattr(self.config.quiet_hours, key, value)
+                
                 self.config.save()
                 return jsonify({'success': True})
             except Exception as e:
