@@ -113,11 +113,18 @@ class SmartSearcher:
     # Milestone notifications for long-missing items (in months)
     MILESTONE_MONTHS = [1, 3, 6, 12, 18, 24]  # Notify at these milestones
     
-    def __init__(self, config, tier_manager: TierManager, logger, results_path: str = "/config/search_results.json"):
+    def __init__(self, config, tier_manager: TierManager, logger, results_path: str = None):
         self.config = config
         self.tier_manager = tier_manager
         self.log = logger.get_logger('searcher')
-        self.results_path = results_path
+        
+        # Use config.data_dir if available, otherwise default to /config
+        if results_path:
+            self.results_path = results_path
+        elif hasattr(config, 'data_dir') and config.data_dir:
+            self.results_path = str(config.data_dir / 'search_results.json')
+        else:
+            self.results_path = "/config/search_results.json"
         
         # Rate limiting
         self.api_hits_today = 0

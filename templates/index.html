@@ -2035,6 +2035,16 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.querySelector('.theme-btn').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
         
+        // Format file size to human readable (MB, GB)
+        function formatSize(bytes) {
+            if (!bytes || isNaN(bytes)) return '-';
+            const num = parseFloat(bytes);
+            if (num >= 1073741824) return (num / 1073741824).toFixed(2) + ' GB';
+            if (num >= 1048576) return (num / 1048576).toFixed(1) + ' MB';
+            if (num >= 1024) return (num / 1024).toFixed(0) + ' KB';
+            return num + ' B';
+        }
+        
         // Pagination state - store up to 500 items, show 5 per page in panels
         const PAGE_SIZE = 5;
         const MAX_ITEMS = 500;
@@ -2247,7 +2257,7 @@
                         <td>${sourceIcon} ${item.source || '-'}</td>
                         <td><div class="progress-bar" style="width:100px;height:16px;background:var(--bg3);border-radius:4px;overflow:hidden"><div style="width:${progress}%;height:100%;background:var(--success)"></div></div> ${progress.toFixed(0)}%</td>
                         <td>${item.timeleft || item.eta || '-'}</td>
-                        <td>${item.size || '-'}</td>
+                        <td>${formatSize(item.size)}</td>
                     </tr>`;
                 });
                 html += '</tbody></table>';
@@ -4065,7 +4075,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.100a';
+        const CURRENT_VERSION = '1.0.101';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4220,6 +4230,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.100a</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.101</div>
 </body>
 </html>
