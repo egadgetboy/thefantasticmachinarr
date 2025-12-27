@@ -94,6 +94,11 @@ class WebServer:
             """Quick endpoint to get just item counts (for init estimation)."""
             return jsonify(self.core.get_quick_counts())
         
+        @self.app.route('/api/scoreboard')
+        def api_scoreboard():
+            """Quick endpoint to get scoreboard data only (no tier classification)."""
+            return jsonify(self.core.get_scoreboard_quick())
+        
         @self.app.route('/api/dashboard')
         def api_dashboard():
             return jsonify(self.core.get_dashboard_data())

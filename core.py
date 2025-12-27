@@ -215,6 +215,33 @@ class MachinarrCore:
             'total_upgrades': counts['sonarr_upgrade'] + counts['radarr_upgrade'],
         }
     
+    def get_scoreboard_quick(self) -> Dict[str, Any]:
+        """Get just scoreboard data quickly (no tier classification)."""
+        finds_by_source = {'sonarr': 0, 'radarr': 0}
+        for find in self.recent_finds:
+            source = find.get('source', '').lower()
+            if source in finds_by_source:
+                finds_by_source[source] += 1
+        
+        scheduler_info = None
+        if hasattr(self, 'scheduler') and self.scheduler:
+            scheduler_info = {
+                'tasks': [t.to_dict() for t in self.scheduler.tasks.values()]
+            }
+        
+        return {
+            'scoreboard': {
+                'finds_today': self.searcher.finds_today,
+                'finds_total': self.searcher.finds_total,
+                'api_hits_today': self.searcher.api_hits_today,
+                'api_limit': self.config.search.daily_api_limit,
+                'finds_by_source': finds_by_source,
+            },
+            'scheduler': scheduler_info,
+            'stuck_count': len(self.queue_monitor.get_stuck_items()),
+            'intervention_count': len(self.queue_monitor.get_pending_interventions()),
+        }
+    
     def get_dashboard_data(self) -> Dict[str, Any]:
         """Get data for dashboard display."""
         # Scoreboard with finds breakdown

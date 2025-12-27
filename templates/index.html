@@ -829,35 +829,6 @@
             width: 0%;
         }
         
-        .init-steps {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            text-align: left;
-            font-size: 13px;
-        }
-        
-        .init-step {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            color: var(--text3);
-            transition: color 0.3s ease;
-        }
-        
-        .init-step.active {
-            color: var(--text);
-        }
-        
-        .init-step.done {
-            color: var(--success);
-        }
-        
-        .init-step-icon {
-            width: 20px;
-            text-align: center;
-        }
-        
         .init-timer {
             margin-top: 20px;
             font-size: 12px;
@@ -2237,14 +2208,13 @@
             }, 200);
             
             try {
-                // Step 1: Load and validate configuration/API
-                if (statusEl) statusEl.textContent = 'Checking configuration...';
+                // Step 1: Check API connectivity
+                if (statusEl) statusEl.textContent = 'Connecting to services...';
                 if (progressBar) progressBar.style.width = '20%';
                 
                 const status = await api('status');
                 
                 // Check if services are connected
-                // services is a flat object like {sonarr_main: {connected: true}, radarr_main: {connected: true}}
                 let sonarrOk = false;
                 let radarrOk = false;
                 
@@ -2257,12 +2227,13 @@
                 
                 if (!sonarrOk && !radarrOk) {
                     if (statusEl) statusEl.textContent = 'No services connected - check settings';
-                    if (progressBar) progressBar.style.width = '100%';
-                    progressBar.style.background = 'var(--warn)';
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                        progressBar.style.background = 'var(--warn)';
+                    }
                     clearInterval(updateTimer);
                     await new Promise(r => setTimeout(r, 2000));
                     hideInitOverlay();
-                    // Still load what we can
                     loadDashboard();
                     loadQueue();
                     loadFinds();
@@ -2271,25 +2242,56 @@
                     return;
                 }
                 
-                if (progressBar) progressBar.style.width = '50%';
-                if (statusEl) statusEl.textContent = 'Services connected!';
-                
-                // Step 2: Quick load of status bar data (fast)
-                if (progressBar) progressBar.style.width = '75%';
+                // Step 2: Load status bar
+                if (progressBar) progressBar.style.width = '40%';
+                if (statusEl) statusEl.textContent = 'Loading status...';
                 await loadStatus();
                 
-                // Step 3: Done with critical checks - show UI
-                if (statusEl) statusEl.textContent = 'Ready!';
+                // Step 3: Load scoreboard/quick data
+                if (progressBar) progressBar.style.width = '60%';
+                if (statusEl) statusEl.textContent = 'Loading dashboard...';
+                
+                // Get quick scoreboard (no tier classification)
+                try {
+                    const data = await api('scoreboard');
+                    if (data.scoreboard) {
+                        document.getElementById('finds-today').textContent = data.scoreboard.finds_today || 0;
+                        document.getElementById('finds-total').textContent = data.scoreboard.finds_total || 0;
+                        document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
+                        document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
+                        
+                        // Update finds breakdown
+                        if (data.scoreboard.finds_by_source) {
+                            const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
+                            const radarr = data.scoreboard.finds_by_source.radarr || 0;
+                            const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
+                            const todayBreakdown = document.getElementById('finds-today-breakdown');
+                            const totalBreakdown = document.getElementById('finds-total-breakdown');
+                            if (todayBreakdown) todayBreakdown.textContent = breakdownText;
+                            if (totalBreakdown) totalBreakdown.textContent = breakdownText;
+                        }
+                        
+                        updateStatusIndicator(data.scoreboard, data.scheduler);
+                    }
+                } catch (e) {
+                    console.warn('Scoreboard load failed:', e);
+                }
+                
+                // Step 4: Load queue (usually fast)
+                if (progressBar) progressBar.style.width = '80%';
+                if (statusEl) statusEl.textContent = 'Loading queue...';
+                await loadQueue();
+                
+                // Step 5: Ready!
                 if (progressBar) progressBar.style.width = '100%';
+                if (statusEl) statusEl.textContent = 'Ready!';
                 
                 clearInterval(updateTimer);
-                await new Promise(r => setTimeout(r, 400));
+                await new Promise(r => setTimeout(r, 500));
                 hideInitOverlay();
                 
-                // Step 4: Load all data in background (UI is now visible)
-                // These will populate panels as they complete
-                loadDashboard();  // This is the slow one - runs in background
-                loadQueue();
+                // Load remaining data in background
+                loadDashboard();  // Full dashboard with tiers (slow)
                 loadInterventions();
                 loadFinds();
                 loadSearches();
@@ -2297,7 +2299,7 @@
                 
             } catch (error) {
                 console.error('Initialization error:', error);
-                if (statusEl) statusEl.textContent = 'Error connecting - check settings';
+                if (statusEl) statusEl.textContent = 'Error - ' + (error.message || 'check settings');
                 if (progressBar) {
                     progressBar.style.width = '100%';
                     progressBar.style.background = 'var(--error)';
@@ -2307,7 +2309,6 @@
                 await new Promise(r => setTimeout(r, 2000));
                 hideInitOverlay();
                 
-                // Still try to load data
                 loadDashboard();
                 loadQueue();
                 loadFinds();
@@ -2329,6 +2330,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.28</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.29</div>
 </body>
 </html>
