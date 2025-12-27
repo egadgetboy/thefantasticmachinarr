@@ -55,6 +55,14 @@ TFM also searches for **quality upgrades** (cutoff unmet) to improve your existi
 ### ⏰ Quiet Hours
 Pause searching during specific hours to reduce load during maintenance windows.
 
+### 🎨 Color Themes
+TFM includes three built-in color themes to suit your preference:
+- 🌙 **Dark** - Modern dark theme (default)
+- ☀️ **Light** - Warm tan and brown tones
+- 🪟 **Windows 98** - Classic retro styling with teal background and 3D beveled buttons
+
+Click the theme button in the header to cycle through themes.
+
 ### 🔧 Queue Management
 Automatically detects and handles stuck downloads with auto-resolution capabilities.
 
@@ -73,6 +81,22 @@ TFM supports multiple instances of Sonarr, Radarr, and SABnzbd. This is perfect 
 - **SABnzbd** instances for each
 
 All instances are managed from a single TFM dashboard, with tier counts and search activity shown per-instance.
+
+---
+
+## 📸 Screenshots
+
+### Dark Theme (Default)
+![Dark Theme Dashboard](screenshots/dark-theme.png)
+
+### Light Theme
+![Light Theme Dashboard](screenshots/light-theme.png)
+
+### Windows 98 Theme
+![Windows 98 Theme Dashboard](screenshots/win98-theme.png)
+
+### Setup Wizard
+![Setup Wizard](screenshots/setup-wizard.png)
 
 ---
 
