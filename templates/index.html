@@ -35,26 +35,83 @@
         }
         
         [data-theme="light"] {
-            --bg: #f5f0e8;
-            --bg2: #ebe5d9;
-            --bg3: #ddd6c8;
-            --bg-hover: #d0c9bb;
-            --text: #2c2416;
-            --text2: #4a4030;
-            --text3: #6b604a;
-            --accent: #7c5c3c;
-            --accent-hover: #8c6c4c;
-            --accent-glow: rgba(124, 92, 60, 0.3);
-            --success: #4a7c52;
-            --success-bg: rgba(74, 124, 82, 0.2);
-            --warn: #9a7820;
-            --warn-bg: rgba(154, 120, 32, 0.2);
-            --error: #9c4040;
-            --error-bg: rgba(156, 64, 64, 0.2);
-            --border: #c5bba8;
-            --border-focus: #7c5c3c;
-            --card-shadow: 0 4px 24px rgba(44, 36, 22, 0.1);
-            --glow: 0 0 20px rgba(124, 92, 60, 0.15);
+            --bg: #c0c0c0;
+            --bg2: #dfdfdf;
+            --bg3: #808080;
+            --bg-hover: #b0b0b0;
+            --text: #000000;
+            --text2: #222222;
+            --text3: #444444;
+            --accent: #000080;
+            --accent-hover: #0000aa;
+            --accent-glow: rgba(0, 0, 128, 0.3);
+            --success: #008000;
+            --success-bg: rgba(0, 128, 0, 0.2);
+            --warn: #808000;
+            --warn-bg: rgba(128, 128, 0, 0.2);
+            --error: #800000;
+            --error-bg: rgba(128, 0, 0, 0.2);
+            --border: #808080;
+            --border-focus: #000080;
+            --card-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+            --glow: none;
+        }
+        
+        /* Windows 98 specific styling for light mode */
+        [data-theme="light"] .panel,
+        [data-theme="light"] .score-card,
+        [data-theme="light"] .modal-content {
+            border-radius: 0;
+            border: none;
+            box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+        }
+        
+        [data-theme="light"] .panel-head {
+            background: linear-gradient(90deg, #000080, #1084d0);
+            color: #ffffff;
+            font-weight: bold;
+        }
+        
+        [data-theme="light"] .panel-title {
+            color: #ffffff;
+        }
+        
+        [data-theme="light"] .btn {
+            border-radius: 0;
+            box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+        }
+        
+        [data-theme="light"] .btn:active {
+            box-shadow: inset 1px 1px #0a0a0a, inset -1px -1px #ffffff, inset 2px 2px #808080, inset -2px -2px #dfdfdf;
+        }
+        
+        [data-theme="light"] .btn-pri {
+            background: #c0c0c0;
+            color: #000000;
+        }
+        
+        [data-theme="light"] .btn-sec {
+            background: #c0c0c0;
+            color: #000000;
+            border: none;
+        }
+        
+        [data-theme="light"] header {
+            background: #c0c0c0;
+            box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff;
+        }
+        
+        [data-theme="light"] .activity-bar {
+            border-radius: 0;
+            box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff;
+            background: #c0c0c0;
+        }
+        
+        [data-theme="light"] input,
+        [data-theme="light"] select {
+            border-radius: 0;
+            box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff, inset 2px 2px #0a0a0a, inset -2px -2px #dfdfdf;
+            background: #ffffff;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2834,6 +2891,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.54</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.55</div>
 </body>
 </html>
