@@ -87,16 +87,16 @@ All instances are managed from a single TFM dashboard, with tier counts and sear
 ## 📸 Screenshots
 
 ### Dark Theme (Default)
-![Dark Theme Dashboard](screenshots/dark-theme.png)
+*(Coming soon)*
 
 ### Light Theme
-![Light Theme Dashboard](screenshots/light-theme.png)
+*(Coming soon)*
 
 ### Windows 98 Theme
-![Windows 98 Theme Dashboard](screenshots/win98-theme.png)
+*(Coming soon)*
 
 ### Setup Wizard
-![Setup Wizard](screenshots/setup-wizard.png)
+*(Coming soon)*
 
 ---
 

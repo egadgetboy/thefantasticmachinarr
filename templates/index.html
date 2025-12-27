@@ -2011,7 +2011,7 @@
                                     ${autoResolveHtml}
                                 </td>
                                 <td class="col-action">
-                                    <button class="btn btn-sm btn-sec" onclick="resolveItem('${item.source}',${item.queue_id})">Resolve</button>
+                                    <button class="btn btn-sm btn-sec" onclick="showQueueIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Resolve</button>
                                 </td>
                             </tr>
                         `}).join('')}
@@ -2019,6 +2019,141 @@
                 </table>
                 ${paginationHtml}
             `;
+        }
+        
+        function showQueueIntervention(item) {
+            // Convert queue item to intervention format and show modal
+            const intervention = {
+                source: item.source,
+                id: item.queue_id,
+                title: item.title,
+                reason: item.status_messages?.join(', ') || 'Queue issue detected',
+                intervention_type: 'queue_stuck',
+                details: {
+                    tier: 'unknown',
+                    tier_emoji: '⚠️',
+                    age_days: Math.round((Date.now() - new Date(item.added || Date.now()).getTime()) / (1000 * 60 * 60 * 24)),
+                    search_count: 0,
+                    instance_name: item.instance_name,
+                    queue_id: item.queue_id,
+                    can_auto_resolve: item.can_auto_resolve,
+                    status_messages: item.status_messages
+                }
+            };
+            showQueueInterventionModal(intervention);
+        }
+        
+        function showQueueInterventionModal(item) {
+            const modal = document.getElementById('modal');
+            const isMovie = item.source === 'radarr';
+            const serviceName = isMovie ? 'Radarr' : 'Sonarr';
+            
+            // Generate smart suggestions based on the issue
+            const suggestions = [];
+            const issues = item.details?.status_messages || [item.reason];
+            const issueText = issues.join(' ').toLowerCase();
+            
+            if (issueText.includes('no files') || issueText.includes('sample')) {
+                suggestions.push('Release may only contain sample files - try a different release');
+                suggestions.push('Check if other releases are available in ' + serviceName);
+            }
+            if (issueText.includes('import') || issueText.includes('failed')) {
+                suggestions.push('Import failed - check file permissions and disk space');
+                suggestions.push('Verify the download completed successfully');
+            }
+            if (issueText.includes('path') || issueText.includes('not valid')) {
+                suggestions.push('Destination path may not exist or be accessible');
+                suggestions.push('Check ' + serviceName + ' root folder settings');
+            }
+            if (issueText.includes('upgrade') || issueText.includes('not an upgrade')) {
+                suggestions.push('File exists but doesn\'t meet quality cutoff');
+                suggestions.push('May need to adjust quality profile settings');
+            }
+            
+            // Default suggestions
+            if (suggestions.length === 0) {
+                suggestions.push('Try blocklisting this release and searching for another');
+                suggestions.push('Check ' + serviceName + ' logs for more details');
+            }
+            suggestions.push('Open in ' + serviceName + ' for manual intervention');
+            
+            // Build modal content
+            document.getElementById('modal-title').innerHTML = `
+                <span style="margin-right:8px">⚠️</span>${esc(item.title)}
+            `;
+            
+            document.getElementById('modal-desc').innerHTML = `
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--warn)">
+                    <strong>Issue:</strong> ${esc(item.reason)}
+                </div>
+            `;
+            
+            document.getElementById('modal-details').innerHTML = `
+                <div style="margin-bottom:16px">
+                    <div style="font-weight:600;margin-bottom:8px">💡 Suggestions:</div>
+                    <ul style="margin:0;padding-left:20px;color:var(--text2);font-size:13px;line-height:1.8">
+                        ${suggestions.map(s => '<li>' + esc(s) + '</li>').join('')}
+                    </ul>
+                </div>
+            `;
+            
+            // Build action buttons
+            const actions = [];
+            
+            // Blocklist & Retry (primary action)
+            actions.push(`<button class="btn btn-sm btn-pri" onclick="queueBlocklistRetry('${item.source}', ${item.details.queue_id}, '${esc(item.title).replace(/'/g, "\\'")}')">🔄 Blocklist & Retry</button>`);
+            
+            // Search Now
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="queueSearchNow('${item.source}', ${item.details.queue_id}, '${esc(item.title).replace(/'/g, "\\'")}')">🔍 Search Now</button>`);
+            
+            // Open in Sonarr/Radarr  
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionOpenIn('${item.source}', ${item.details.queue_id}, '${item.details?.instance_name || ''}')">🔗 Open in ${serviceName}</button>`);
+            
+            // Remove (no blocklist)
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="queueRemove('${item.source}', ${item.details.queue_id}, '${esc(item.title).replace(/'/g, "\\'")}')">🗑️ Remove Only</button>`);
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">
+                    ${actions.join('')}
+                </div>
+            `;
+            
+            modal.classList.add('show');
+        }
+        
+        async function queueBlocklistRetry(source, queueId, title) {
+            updateActivityBar('searching', 'Resolving: ' + title.substring(0, 30) + '...', 'Blocklisting and triggering retry...');
+            const data = await api('resolve', 'POST', {source, queue_id: queueId, action: 'blocklist_retry'});
+            if (data.success) {
+                updateActivityBar('idle', 'Resolved: ' + title.substring(0, 30) + '...', data.message || 'Blocklisted and retry triggered');
+            } else {
+                updateActivityBar('idle', 'Failed to resolve', data.message || 'Check logs for details');
+            }
+            closeModal();
+            setTimeout(() => loadQueue(), 1500);
+        }
+        
+        async function queueSearchNow(source, queueId, title) {
+            updateActivityBar('searching', 'Searching: ' + title.substring(0, 30) + '...', 'Manual search triggered');
+            // First remove from queue, then search
+            await api('resolve', 'POST', {source, queue_id: queueId, action: 'blocklist_retry'});
+            updateActivityBar('idle', 'Search triggered', title);
+            closeModal();
+            setTimeout(() => loadQueue(), 1500);
+        }
+        
+        async function queueRemove(source, queueId, title) {
+            if (!confirm('Remove from queue WITHOUT blocklisting?\n\nThis release may be grabbed again.')) {
+                return;
+            }
+            const data = await api('resolve', 'POST', {source, queue_id: queueId, action: 'remove'});
+            if (data.success) {
+                updateActivityBar('idle', 'Removed: ' + title.substring(0, 30) + '...', 'Removed from queue (not blocklisted)');
+            } else {
+                updateActivityBar('idle', 'Failed to remove', data.message || 'Check logs for details');
+            }
+            closeModal();
+            setTimeout(() => loadQueue(), 1500);
         }
         
         async function loadInterventions() {
@@ -2948,7 +3083,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.60';
+        const CURRENT_VERSION = '1.0.61';
         
         async function checkVersionAndAutoSearch() {
             const lastVersion = localStorage.getItem('tfm-last-version');
@@ -3016,6 +3151,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.60</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.61</div>
 </body>
 </html>
