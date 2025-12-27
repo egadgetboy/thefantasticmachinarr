@@ -1178,7 +1178,7 @@
             <div class="score-breakdown" id="finds-total-breakdown"></div>
         </div>
         <div class="score-card api">
-            <div class="score-val"><span id="api-used">0</span><span style="color:var(--text3);font-size:16px"> / <span id="api-limit">500</span></span></div>
+            <div class="score-val"><span id="api-used">-</span><span style="color:var(--text3);font-size:16px"> / <span id="api-limit">-</span></span></div>
             <div class="score-label">API Calls</div>
         </div>
         <div class="score-card status" id="status-card">
@@ -1650,7 +1650,7 @@
             const text = document.getElementById('status-text');
             
             const apiUsed = scoreboard.api_hits_today || 0;
-            const apiLimit = scoreboard.api_limit || 500;
+            const apiLimit = scoreboard.api_limit || 0;
             const apiRemaining = apiLimit - apiUsed;
             
             // Check if API exhausted
@@ -2557,6 +2557,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.41</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.42</div>
 </body>
 </html>
