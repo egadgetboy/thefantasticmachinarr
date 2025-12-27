@@ -1056,17 +1056,20 @@
     </div>
     
     <main>
-        <!-- Row 1: Missing Content by Tier -->
+        <!-- Row 1: Missing Content by Tier (no title) -->
         <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🎯 Missing Content by Tier</span>
-                <span id="tier-total" style="color:var(--text2);font-size:13px"></span>
-            </div>
             <div class="panel-body" style="padding: 16px;">
-                <div style="font-size: 12px; color: var(--text3); margin-bottom: 12px; text-align: center;">
-                    Episodes and movies waiting to be found, grouped by age
-                </div>
                 <div class="tiers">
+                    <div class="tier" style="background: linear-gradient(135deg, var(--bg3), var(--bg2)); border-color: var(--accent);">
+                        <div class="tier-emoji">📊</div>
+                        <div class="tier-count" id="tier-total-count">-</div>
+                        <div class="tier-name">Total</div>
+                        <div class="tier-desc">Missing</div>
+                        <div class="tier-breakdown">
+                            <span>📺 <span id="tier-total-sonarr">0</span></span>
+                            <span>🎬 <span id="tier-total-radarr">0</span></span>
+                        </div>
+                    </div>
                     <div class="tier">
                         <div class="tier-emoji">🔥</div>
                         <div class="tier-count" id="tier-hot">-</div>
@@ -1114,7 +1117,10 @@
         <!-- Row 2: Search Activity (full width table with filters) -->
         <div class="panel">
             <div class="panel-head">
-                <span class="panel-title">🔄 Search Activity</span>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span class="panel-title">🔄 Search Activity</span>
+                    <button class="btn btn-sm btn-pri" onclick="runSearch()">Search Now</button>
+                </div>
                 <div style="display:flex;gap:12px;align-items:center">
                     <input type="text" id="search-filter-text" placeholder="Search by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
                     <select id="search-filter-tier" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterSearchActivity()">
@@ -1129,7 +1135,6 @@
                         <option value="sonarr">📺 Sonarr</option>
                         <option value="radarr">🎬 Radarr</option>
                     </select>
-                    <button class="btn btn-sm btn-pri" onclick="runSearch()">Run Now</button>
                 </div>
             </div>
             <div class="panel-body flush">
@@ -1477,10 +1482,17 @@
                 document.getElementById('tier-cold-sonarr').textContent = tiers.cold?.sonarr ?? 0;
                 document.getElementById('tier-cold-radarr').textContent = tiers.cold?.radarr ?? 0;
                 
-                // Update total
+                // Calculate and update Total counter
                 const total = (tiers.hot?.total ?? 0) + (tiers.warm?.total ?? 0) + 
                              (tiers.cool?.total ?? 0) + (tiers.cold?.total ?? 0);
-                document.getElementById('tier-total').textContent = `${total.toLocaleString()} missing items`;
+                const totalSonarr = (tiers.hot?.sonarr ?? 0) + (tiers.warm?.sonarr ?? 0) + 
+                                   (tiers.cool?.sonarr ?? 0) + (tiers.cold?.sonarr ?? 0);
+                const totalRadarr = (tiers.hot?.radarr ?? 0) + (tiers.warm?.radarr ?? 0) + 
+                                   (tiers.cool?.radarr ?? 0) + (tiers.cold?.radarr ?? 0);
+                
+                document.getElementById('tier-total-count').textContent = total.toLocaleString();
+                document.getElementById('tier-total-sonarr').textContent = totalSonarr.toLocaleString();
+                document.getElementById('tier-total-radarr').textContent = totalRadarr.toLocaleString();
             }
         }
         
@@ -2018,7 +2030,7 @@
             const data = await api('search', 'POST', {type: 'cycle'});
             
             btn.disabled = false;
-            btn.textContent = '🔍 Run Search';
+            btn.textContent = 'Search Now';
             
             if (data.searched > 0) {
                 updateActivityBar('finding', `Searched ${data.searched} items`, `${data.successful || 0} searches triggered successfully`);
@@ -2207,32 +2219,29 @@
                 data: false,
                 ui: false
             },
-            maxWaitTime: 15000, // Max 15 seconds before auto-dismiss
-            dataTimeout: 12000, // Skip data step after 12 seconds
             errors: [],
-            dismissed: false
+            dismissed: false,
+            itemsProcessed: 0,
+            totalItems: 0
         };
         
-        function updateInitStep(step, status) {
+        function updateInitStep(step, status, detail = '') {
             if (initState.dismissed) return;
             
             const el = document.getElementById(`init-step-${step}`);
             if (!el) return;
             
             const icon = el.querySelector('.init-step-icon');
+            const textSpan = el.querySelector('span:last-child');
             el.classList.remove('active', 'done');
             
             if (status === 'active') {
                 el.classList.add('active');
                 icon.textContent = '🔄';
+                if (detail) textSpan.textContent = detail;
             } else if (status === 'done') {
                 el.classList.add('done');
                 icon.textContent = '✓';
-                initState.steps[step] = true;
-            } else if (status === 'skipped') {
-                el.classList.add('done');
-                icon.textContent = '⏭️';
-                el.style.color = 'var(--warn)';
                 initState.steps[step] = true;
             } else if (status === 'error') {
                 el.classList.add('done');
@@ -2260,11 +2269,7 @@
             const timerEl = document.getElementById('init-timer');
             if (timerEl) {
                 const secs = Math.floor(elapsed / 1000);
-                if (elapsed > 5000) {
-                    timerEl.innerHTML = `${secs}s elapsed... <a href="#" onclick="skipInit(); return false;" style="color:var(--accent);text-decoration:underline;">Skip</a>`;
-                } else {
-                    timerEl.textContent = `${secs}s...`;
-                }
+                timerEl.textContent = `${secs}s elapsed`;
             }
         }
         
@@ -2288,90 +2293,46 @@
             clearInterval(initTimerInterval);
         }
         
-        function skipInit() {
-            console.log('Init skipped by user');
-            setInitStatus('Skipped - loading in background...');
-            hideInitOverlay();
-            // Continue loading in background
-            loadFinds();
-            loadSearches();
-            loadLogs();
-        }
-        
         function showInitError(message) {
             if (initState.dismissed) return;
             setInitStatus(`Error: ${message}`);
             const timerEl = document.getElementById('init-timer');
             if (timerEl) {
-                timerEl.innerHTML = '<span style="color:var(--warn)">Loading anyway...</span>';
+                timerEl.innerHTML = '<span style="color:var(--warn)">Retrying...</span>';
             }
         }
         
         // Progress timer update
-        const initTimerInterval = setInterval(() => {
-            updateInitProgress();
-            
-            // Auto-dismiss after max wait time
-            const elapsed = Date.now() - initState.startTime;
-            if (elapsed > initState.maxWaitTime && !initState.dismissed) {
-                console.log('Init auto-dismissed after timeout');
-                setInitStatus('Ready (some data still loading)');
-                hideInitOverlay();
-            }
-        }, 200);
+        const initTimerInterval = setInterval(updateInitProgress, 200);
         
         async function initializeApp() {
             try {
                 // Step 1: Load configuration
-                updateInitStep('config', 'active');
+                updateInitStep('config', 'active', 'Loading configuration...');
                 setInitStatus('Loading configuration...');
                 await loadStatus();
                 updateInitStep('config', 'done');
                 
-                if (initState.dismissed) return;
-                
                 // Step 2: Check services
-                updateInitStep('services', 'active');
+                updateInitStep('services', 'active', 'Connecting to services...');
                 setInitStatus('Connecting to Sonarr & Radarr...');
                 await new Promise(r => setTimeout(r, 300));
                 updateInitStep('services', 'done');
                 
-                if (initState.dismissed) return;
+                // Step 3: Fetch library data (the slow part)
+                updateInitStep('data', 'active', 'Fetching library data...');
+                setInitStatus('Counting missing content (this may take a moment)...');
                 
-                // Step 3: Fetch library data (with timeout)
-                updateInitStep('data', 'active');
-                setInitStatus('Fetching missing content & tiers...');
-                
-                const dataPromise = Promise.all([
-                    loadDashboard(),
-                    loadQueue(),
-                    loadInterventions()
-                ]);
-                
-                const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('timeout')), initState.dataTimeout)
-                );
-                
-                try {
-                    await Promise.race([dataPromise, timeoutPromise]);
-                    updateInitStep('data', 'done');
-                } catch (e) {
-                    if (e.message === 'timeout') {
-                        console.log('Data fetch timed out, continuing...');
-                        updateInitStep('data', 'skipped');
-                        setInitStatus('Data still loading in background...');
-                        // Let it continue in background
-                        dataPromise.catch(err => console.error('Background data load error:', err));
-                    } else {
-                        throw e;
-                    }
-                }
-                
-                if (initState.dismissed) return;
+                // Load dashboard which does the tier counting
+                await loadDashboard();
+                setInitStatus('Loading queue status...');
+                await loadQueue();
+                await loadInterventions();
+                updateInitStep('data', 'done');
                 
                 // Step 4: Prepare UI
-                updateInitStep('ui', 'active');
-                setInitStatus('Preparing dashboard...');
+                updateInitStep('ui', 'active', 'Preparing dashboard...');
+                setInitStatus('Loading recent activity...');
                 await Promise.all([
                     loadFinds(),
                     loadSearches(),
@@ -2393,7 +2354,7 @@
                 // Still hide overlay after delay
                 setTimeout(() => {
                     hideInitOverlay();
-                }, 2000);
+                }, 3000);
             }
         }
         
@@ -2410,6 +2371,6 @@
             setInterval(loadLogs, 30000);
         }, 10000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.21</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.22</div>
 </body>
 </html>
