@@ -16,23 +16,50 @@ from .notifier import EmailNotifier
 
 
 class MachinarrCore:
-    """Core application coordinator."""
+    """
+    Core application coordinator - the brain of The Fantastic Machinarr.
+    
+    RESPONSIBILITIES:
+        - Manages connections to Sonarr, Radarr, and SABnzbd instances
+        - Coordinates searching, queue monitoring, and scheduling
+        - Handles data persistence (caching tier counts, finds, etc.)
+        - Provides API endpoints for the web UI
+    
+    ARCHITECTURE:
+        MachinarrCore
+        ├── sonarr_clients     - Dict of Sonarr API clients (supports multiple instances)
+        ├── radarr_clients     - Dict of Radarr API clients
+        ├── sabnzbd_clients    - Dict of SABnzbd API clients (optional)
+        ├── tier_manager       - Classifies content by age (Hot/Warm/Cool/Cold)
+        ├── queue_monitor      - Detects stuck downloads
+        ├── searcher           - Smart search logic with rate limiting
+        ├── scheduler          - Cron-like task scheduling
+        └── notifier           - Email notifications
+    
+    DATA FLOW:
+        1. Progressive loading fetches missing/upgrade counts from Sonarr/Radarr
+        2. Tier manager classifies items by age
+        3. Searcher prioritizes HOT items, respects API limits
+        4. Queue monitor watches for stuck downloads
+        5. Web UI polls for updates via API endpoints
+    """
     
     def __init__(self, config: Config, logger: Logger):
         self.config = config
         self.logger = logger
         self.log = logger.get_logger('core')
         
-        # Clients (lazy init)
+        # API Clients - support multiple instances of each service
+        # Example: {'Main': SonarrClient(...), '4K': SonarrClient(...)}
         self.sonarr_clients: Dict[str, SonarrClient] = {}
         self.radarr_clients: Dict[str, RadarrClient] = {}
         self.sabnzbd_clients: Dict[str, SABnzbdClient] = {}
         
-        # Components
-        self.tier_manager = TierManager(config)
-        self.queue_monitor = QueueMonitor(config, logger)
-        self.searcher = SmartSearcher(config, self.tier_manager, logger)
-        self.scheduler = Scheduler(config, logger)
+        # Core components
+        self.tier_manager = TierManager(config)      # Classifies content by age
+        self.queue_monitor = QueueMonitor(config, logger)  # Watches for stuck items
+        self.searcher = SmartSearcher(config, self.tier_manager, logger)  # Search logic
+        self.scheduler = Scheduler(config, logger)   # Task scheduling
         self.notifier = EmailNotifier(config, logger)
         
         # Find tracking with resolution reasons
@@ -507,7 +534,35 @@ class MachinarrCore:
             return False
     
     def _start_progressive_load(self):
-        """Start progressive loading in background thread with concurrent searching."""
+        """
+        Start progressive loading in background thread with concurrent searching.
+        
+        PROBLEM: Large libraries (100k+ items) take 10+ minutes to fully catalog.
+        Users shouldn't stare at a loading screen that long.
+        
+        SOLUTION: Progressive loading with parallel fetching and streaming searches.
+        
+        ARCHITECTURE:
+            ┌─────────────────────────────────────────────────────────┐
+            │                  PARALLEL FETCH THREADS                  │
+            │  ┌──────────┐ ┌──────────┐ ┌──────────┐ ┌──────────┐   │
+            │  │ Sonarr   │ │ Sonarr   │ │ Radarr   │ │ Radarr   │   │
+            │  │ Missing  │ │ Upgrades │ │ Missing  │ │ Upgrades │   │
+            │  └────┬─────┘ └────┬─────┘ └────┬─────┘ └────┬─────┘   │
+            │       │ HOT items  │            │            │         │
+            │       └────────────┴─────┬──────┴────────────┘         │
+            │                          ↓                              │
+            │                   ┌──────────────┐                      │
+            │                   │ SEARCH QUEUE │ Rate-limited         │
+            │                   └──────┬───────┘                      │
+            │                          ↓                              │
+            │                   ┌──────────────┐                      │
+            │                   │SEARCH WORKER │ Searches HOT items   │
+            │                   └──────────────┘ as they're found     │
+            └─────────────────────────────────────────────────────────┘
+        
+        PERSISTENCE: Saves progress every 30 seconds, so restarts don't lose work.
+        """
         import threading
         from concurrent.futures import ThreadPoolExecutor
         import queue

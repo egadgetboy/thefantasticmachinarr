@@ -1,6 +1,11 @@
 """
 Base HTTP client for API communication.
-Uses urllib to avoid external dependencies.
+
+WHY URLLIB: Uses Python's built-in urllib instead of requests/httpx to avoid
+external dependencies. TFM aims to be lightweight and easy to deploy.
+
+RESPONSE TIME TRACKING: Every API call is timed. This data enables future
+auto-tuning (adjusting timeouts, batch sizes based on server performance).
 """
 
 import json
@@ -12,7 +17,12 @@ from abc import ABC, abstractmethod
 
 
 class APIError(Exception):
-    """Exception raised for API errors."""
+    """
+    Exception raised for API errors.
+    
+    Captures HTTP status code and response body for debugging.
+    Example: APIError("HTTP 401: Unauthorized", status_code=401)
+    """
     def __init__(self, message: str, status_code: int = 0, response: str = ""):
         self.message = message
         self.status_code = status_code
@@ -21,13 +31,21 @@ class APIError(Exception):
 
 
 class BaseClient(ABC):
-    """Base class for API clients."""
+    """
+    Base class for API clients (Sonarr, Radarr, SABnzbd).
+    
+    INHERITANCE: Sonarr/Radarr/SABnzbd clients extend this class,
+    implementing their specific endpoints.
+    
+    METRICS: Tracks response times using exponential moving average.
+    Access via client.get_avg_response_ms() for auto-tuning.
+    """
     
     def __init__(self, url: str, api_key: str, name: str = ""):
         self.base_url = url.rstrip('/')
         self.api_key = api_key
         self.name = name or self.__class__.__name__
-        self.timeout = 120  # Increased for large libraries
+        self.timeout = 120  # Increased for large libraries (100k+ items)
     
     @property
     @abstractmethod

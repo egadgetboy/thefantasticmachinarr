@@ -56,7 +56,25 @@ class SearchResult:
 
 
 class SmartSearcher:
-    """Intelligent tier-based searcher with rate limiting."""
+    """
+    Intelligent tier-based searcher with rate limiting.
+    
+    CORE CONCEPT: Not all missing content is equal. A show that aired yesterday
+    is more likely to be available than one from 2005. TFM prioritizes searches
+    based on content age (tiers) and respects API limits.
+    
+    TIERS:
+        HOT  (0-90 days)   - New content, search aggressively
+        WARM (90-365 days) - Recent content, search regularly  
+        COOL (1-3 years)   - Older content, search occasionally
+        COLD (3+ years)    - Very old, search infrequently
+    
+    PACING: Based on daily API limit, TFM adjusts how frequently each tier
+    is searched. Higher limits = more aggressive searching.
+    
+    SERIES DEDUPLICATION: Sonarr searches by series, not episode. TFM tracks
+    which series were searched recently to avoid wasting API calls.
+    """
     
     # Pacing presets based on daily API limit
     # Format: cooldown (minutes), max_attempts before phase change, escalate_to (new cooldown or 'manual')
@@ -142,8 +160,15 @@ class SmartSearcher:
                         self.api_hits_today = 0
                         self.finds_today = 0
                 
-                # Load searched_series cache (prevents duplicate series searches)
-                cutoff = datetime.utcnow() - timedelta(hours=24)
+                # Load searched_series cache
+                #
+                # PURPOSE: Prevents duplicate series searches after restart.
+                # Sonarr searches by SERIES, so searching the same show multiple
+                # times in a short window wastes API calls.
+                #
+                # EXPIRY: Keep entries up to 72 hours (Cold tier max cooldown).
+                # Tier-specific filtering happens later in _prioritize_items().
+                cutoff = datetime.utcnow() - timedelta(hours=72)
                 for key, ts_str in data.get('searched_series', {}).items():
                     try:
                         ts = datetime.fromisoformat(ts_str)
@@ -222,8 +247,14 @@ class SmartSearcher:
             path = Path(self.results_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             
-            # Convert searched_series to serializable format (keep only recent, <24h)
-            cutoff = datetime.utcnow() - timedelta(hours=24)
+            # Convert searched_series to serializable format
+            # 
+            # PERSISTENCE: Saves which series were recently searched to prevent
+            # duplicate searches after restart. Key = "instance:seriesId"
+            #
+            # EXPIRY: Keep entries up to 72 hours (Cold tier max cooldown).
+            # On load, tier-aware filtering happens in _prioritize_items().
+            cutoff = datetime.utcnow() - timedelta(hours=72)
             recent_series = {
                 k: v.isoformat() 
                 for k, v in self.searched_series.items() 
@@ -604,18 +635,43 @@ class SmartSearcher:
         prioritized = []
         
         # Add one representative from each series (will trigger series search)
+        # 
+        # WHY: Sonarr searches by SERIES, not episode. Searching 50 episodes of 
+        # the same show = 50 wasted API calls. Instead, we pick ONE episode per 
+        # series and let Sonarr's series search find all missing episodes.
+        #
+        # TIER-AWARE COOLDOWN: Hot items get re-searched more frequently than Cold.
+        # This respects the app's core goal: prioritize recent content.
         for key, series_items in series_groups.items():
-            # Skip if we recently searched this series
+            # Get the tier of the first item (all items in series share same tier)
+            item_tier = series_items[0].tier
+            
+            # Skip if we recently searched this series (tier-aware cooldown)
             if key in self.searched_series:
                 last_search = self.searched_series[key]
-                if datetime.utcnow() - last_search < timedelta(hours=6):
+                
+                # Tier-aware series search cooldowns (in hours)
+                # Hot: 2 hours - search frequently for new content
+                # Warm: 6 hours - moderate frequency
+                # Cool: 24 hours - daily is enough for older content
+                # Cold: 72 hours - very old content, weekly-ish
+                tier_cooldowns = {
+                    Tier.HOT: 2,
+                    Tier.WARM: 6,
+                    Tier.COOL: 24,
+                    Tier.COLD: 72,
+                }
+                cooldown_hours = tier_cooldowns.get(item_tier, 6)
+                
+                if datetime.utcnow() - last_search < timedelta(hours=cooldown_hours):
                     continue
             
             # Pick the highest priority (lowest episode number) item
+            # WHY: Season 1 Episode 1 is more likely to exist than S5E12
             series_items.sort(key=lambda x: (x.season_number or 0, x.episode_number or 0))
             prioritized.append(series_items[0])
         
-        # Add Radarr items
+        # Add Radarr items (movies don't need series deduplication)
         prioritized.extend(radarr_items)
         
         return prioritized
