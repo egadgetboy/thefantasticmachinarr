@@ -484,9 +484,11 @@ class MachinarrCore:
             return False
     
     def _start_progressive_load(self):
-        """Start progressive loading in background thread."""
+        """Start progressive loading in background thread with concurrent searching."""
         import threading
         from concurrent.futures import ThreadPoolExecutor
+        import queue
+        import time
         
         if self._progressive_loading:
             return  # Already loading
@@ -498,11 +500,90 @@ class MachinarrCore:
         # Lock for thread-safe counter updates
         self._progress_lock = threading.Lock()
         
+        # Search queue - items discovered during catalog go here for immediate searching
+        search_queue = queue.Queue()
+        search_worker_done = threading.Event()
+        
+        # Calculate search rate based on API limit
+        # Spread searches across the day, but cap at reasonable rate
+        daily_limit = self.config.search.daily_api_limit
+        # Use 20% of daily limit during initial catalog (reserve rest for scheduled searches)
+        catalog_budget = int(daily_limit * 0.2)
+        # Rate: 1 search per N seconds (minimum 2 seconds to not overwhelm)
+        search_interval = max(2.0, 3600 / max(catalog_budget, 1))  # At least 2 sec between searches
+        
+        self.log.info(f"Catalog search budget: {catalog_budget} searches, interval: {search_interval:.1f}s")
+        
+        def search_worker():
+            """Worker thread that searches items from queue with rate limiting."""
+            searches_done = 0
+            last_search_time = 0
+            
+            while not search_worker_done.is_set() or not search_queue.empty():
+                try:
+                    # Get item with timeout so we can check if done
+                    try:
+                        item = search_queue.get(timeout=1.0)
+                    except queue.Empty:
+                        continue
+                    
+                    # Check if we've exhausted our catalog budget
+                    if searches_done >= catalog_budget:
+                        search_queue.task_done()
+                        continue
+                    
+                    # Rate limiting - wait if needed
+                    now = time.time()
+                    elapsed = now - last_search_time
+                    if elapsed < search_interval:
+                        time.sleep(search_interval - elapsed)
+                    
+                    # Perform the search
+                    try:
+                        result = self.searcher._search_item(
+                            item, 
+                            self.sonarr_clients, 
+                            self.radarr_clients
+                        )
+                        self.searcher.search_results.append(result)
+                        
+                        # Save periodically (every 10 searches)
+                        if searches_done % 10 == 0:
+                            self.searcher._save_results()
+                        
+                        searches_done += 1
+                        last_search_time = time.time()
+                        
+                        # Update activity
+                        short_title = item.title[:30] + '...' if len(item.title) > 30 else item.title
+                        self.set_activity('searching', f'Catalog search ({searches_done})', short_title)
+                        
+                    except Exception as e:
+                        self.log.error(f"Search error during catalog: {e}")
+                    
+                    search_queue.task_done()
+                    
+                except Exception as e:
+                    self.log.error(f"Search worker error: {e}")
+            
+            # Final save
+            if searches_done > 0:
+                self.searcher._save_results(force=True)
+                self.log.info(f"Catalog searching complete: {searches_done} items searched")
+        
+        def queue_for_search(item):
+            """Add item to search queue if eligible."""
+            # Only queue HOT items during catalog (highest priority)
+            if item.tier.value == 'hot':
+                search_queue.put(item)
+        
         def fetch_sonarr_missing(name, client):
             """Fetch missing episodes from one Sonarr instance."""
             try:
                 page = 1
                 page_size = 1000
+                series_cache = {}  # Cache series data
+                
                 while True:
                     episodes = client.get_missing_episodes(page=page, page_size=page_size)
                     if not episodes:
@@ -510,12 +591,28 @@ class MachinarrCore:
                     
                     with self._progress_lock:
                         self._progressive_counts['sonarr_missing'] += len(episodes)
+                        
                         for ep in episodes:
                             tier = self.tier_manager.classify_from_date_str(
                                 ep.get('airDateUtc') or ep.get('airDate')
                             )
                             self._progressive_tiers[tier]['sonarr_missing'] += 1
                             self._progressive_tiers[tier]['total_missing'] += 1
+                            
+                            # Queue HOT items for immediate search
+                            if tier == 'hot':
+                                series_id = ep.get('seriesId')
+                                if series_id and series_id not in series_cache:
+                                    try:
+                                        series_cache[series_id] = client.get_series_by_id(series_id)
+                                    except:
+                                        series_cache[series_id] = {}
+                                
+                                item = self.tier_manager.classify_episode(
+                                    ep, series_cache.get(series_id, {}), name
+                                )
+                                item.search_type = 'missing'
+                                queue_for_search(item)
                     
                     if len(episodes) < page_size:
                         break
@@ -528,6 +625,8 @@ class MachinarrCore:
             try:
                 page = 1
                 page_size = 1000
+                series_cache = {}
+                
                 while True:
                     episodes = client.get_cutoff_unmet(page=page, page_size=page_size)
                     if not episodes:
@@ -541,6 +640,21 @@ class MachinarrCore:
                             )
                             self._progressive_tiers[tier]['sonarr_upgrade'] += 1
                             self._progressive_tiers[tier]['total_upgrade'] += 1
+                            
+                            # Queue HOT upgrades for immediate search
+                            if tier == 'hot':
+                                series_id = ep.get('seriesId')
+                                if series_id and series_id not in series_cache:
+                                    try:
+                                        series_cache[series_id] = client.get_series_by_id(series_id)
+                                    except:
+                                        series_cache[series_id] = {}
+                                
+                                item = self.tier_manager.classify_episode(
+                                    ep, series_cache.get(series_id, {}), name
+                                )
+                                item.search_type = 'upgrade'
+                                queue_for_search(item)
                     
                     if len(episodes) < page_size:
                         break
@@ -564,6 +678,12 @@ class MachinarrCore:
                             tier = self.tier_manager.classify_movie_date(movie)
                             self._progressive_tiers[tier]['radarr_missing'] += 1
                             self._progressive_tiers[tier]['total_missing'] += 1
+                            
+                            # Queue HOT movies for immediate search
+                            if tier == 'hot':
+                                item = self.tier_manager.classify_movie(movie, name)
+                                item.search_type = 'missing'
+                                queue_for_search(item)
                     
                     if len(movies) < page_size:
                         break
@@ -587,6 +707,12 @@ class MachinarrCore:
                             tier = self.tier_manager.classify_movie_date(movie)
                             self._progressive_tiers[tier]['radarr_upgrade'] += 1
                             self._progressive_tiers[tier]['total_upgrade'] += 1
+                            
+                            # Queue HOT upgrade movies for immediate search
+                            if tier == 'hot':
+                                item = self.tier_manager.classify_movie(movie, name)
+                                item.search_type = 'upgrade'
+                                queue_for_search(item)
                     
                     if len(movies) < page_size:
                         break
@@ -605,6 +731,10 @@ class MachinarrCore:
         def load_progressively():
             try:
                 self.set_activity('cataloging', 'Cataloging library', 'Starting parallel fetch...')
+                
+                # Start the search worker thread
+                search_thread = threading.Thread(target=search_worker, daemon=True)
+                search_thread.start()
                 
                 # Submit all fetch tasks in parallel
                 with ThreadPoolExecutor(max_workers=8) as executor:
@@ -631,6 +761,10 @@ class MachinarrCore:
                     self._progressive_stage = update_stage()
                     self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
                 
+                # Signal search worker to finish
+                search_worker_done.set()
+                search_thread.join(timeout=30)  # Wait up to 30s for searches to complete
+                
                 # Cache the final result and save to disk
                 self._tier_cache = self._get_progressive_state()
                 self._tier_cache_time = datetime.now()
@@ -644,6 +778,7 @@ class MachinarrCore:
             finally:
                 self._progressive_loading = False
                 self._progressive_stage = ''
+                search_worker_done.set()  # Ensure worker stops
         
         thread = threading.Thread(target=load_progressively, daemon=True)
         thread.start()
