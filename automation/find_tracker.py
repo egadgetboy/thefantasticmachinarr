@@ -5,33 +5,28 @@ Tracks successful "finds" - items that TFM's searching helped locate.
 This is THE key value proposition: finding content that Sonarr/Radarr's
 RSS-only approach would never find automatically.
 
-DEFINITIVE ATTRIBUTION VIA TAGS:
-TFM uses tags to definitively mark what it's searching for:
+ID-BASED ATTRIBUTION:
+TFM tracks exactly which episode_ids/movie_ids it searches for:
 
-1. BEFORE SEARCH: Add "tfm-searching" tag to series/movie
+1. BEFORE SEARCH: Record the episode_id or movie_id being searched
 2. TRIGGER SEARCH: Sonarr/Radarr searches indexers
-3. CHECK QUEUE: If item in queue has the tag → TFM caused it
-4. RECORD FIND: Credit TFM for the find
-5. CLEANUP: Remove tag after search cycle
+3. CHECK QUEUE: If that exact ID appears in queue → TFM caused it
+4. VERIFY IMPORT: Only count as find when hasFile=true
+5. CLEANUP: Remove tracking after timeout (e.g., 2 hours)
 
-WHY TAGS ARE DEFINITIVE:
-- If RSS grabs something, it won't have the TFM tag (we only tag what we search)
-- If TFM searches and finds, the series/movie will have the tag
-- No ambiguity about whether TFM or RSS caused the grab
-
-This works for ALL tiers, including hot content where RSS might also be active.
+WHY ID-BASED WORKS:
+- TFM searches for specific episode_ids (Sonarr) or movie_ids (Radarr)
+- If that exact ID appears in queue within minutes of search → TFM caused it
+- RSS grabs happen independently and won't match our tracked IDs timing
+- No tags needed, works at episode level
 """
 
 import json
 from pathlib import Path
-from typing import Dict, Any, List, Optional, Set, Tuple
+from typing import Dict, Any, List, Optional, Set
 from datetime import datetime, timedelta
 from dataclasses import dataclass
 import logging
-
-
-# Tag used to mark series/movies TFM is actively searching
-TFM_SEARCHING_TAG = "tfm-find"
 
 
 @dataclass
@@ -41,8 +36,8 @@ class Find:
     source: str  # 'sonarr' or 'radarr'
     instance_name: str
     item_id: int  # episode_id or movie_id
-    series_id: Optional[int]  # For Sonarr (series that was tagged)
-    movie_id: Optional[int]  # For Radarr (movie that was tagged)
+    series_id: Optional[int]  # For Sonarr
+    movie_id: Optional[int]  # For Radarr
     tier: str
     resolution_type: str  # 'tfm_search', 'auto_resolve'
     search_type: str  # 'missing' or 'upgrade'
@@ -80,7 +75,7 @@ class Find:
             series_id=data.get('series_id'),
             movie_id=data.get('movie_id'),
             tier=data.get('tier', 'unknown'),
-            resolution_type=data['resolution_type'],
+            resolution_type=data.get('resolution_type', 'tfm_search'),
             search_type=data.get('search_type', 'missing'),
             found_at=datetime.fromisoformat(data['found_at']),
             searched_at=datetime.fromisoformat(data['searched_at']),
@@ -90,55 +85,52 @@ class Find:
         )
 
 
-@dataclass
-class ActiveSearch:
-    """A search that TFM has tagged and is tracking."""
+@dataclass 
+class TrackedSearch:
+    """A search that TFM triggered and is tracking."""
     source: str  # 'sonarr' or 'radarr'
     instance_name: str
+    item_id: int  # episode_id for Sonarr, movie_id for Radarr
     series_id: Optional[int]  # For Sonarr
-    movie_id: Optional[int]  # For Radarr
     title: str
     tier: str
     search_type: str  # 'missing' or 'upgrade'
     searched_at: datetime
-    tag_id: int  # The tag ID used
     
     def to_dict(self) -> Dict[str, Any]:
         return {
             'source': self.source,
             'instance_name': self.instance_name,
+            'item_id': self.item_id,
             'series_id': self.series_id,
-            'movie_id': self.movie_id,
             'title': self.title,
             'tier': self.tier,
             'search_type': self.search_type,
             'searched_at': self.searched_at.isoformat(),
-            'tag_id': self.tag_id,
         }
     
     @classmethod
-    def from_dict(cls, data: Dict) -> 'ActiveSearch':
+    def from_dict(cls, data: Dict) -> 'TrackedSearch':
         return cls(
             source=data['source'],
             instance_name=data['instance_name'],
+            item_id=data['item_id'],
             series_id=data.get('series_id'),
-            movie_id=data.get('movie_id'),
             title=data['title'],
             tier=data.get('tier', 'unknown'),
             search_type=data.get('search_type', 'missing'),
             searched_at=datetime.fromisoformat(data['searched_at']),
-            tag_id=data.get('tag_id', 0),
         )
 
 
 class FindTracker:
     """
-    Tracks what TFM has found using tag-based attribution.
+    Tracks what TFM has found using ID-based attribution.
     
-    This provides DEFINITIVE tracking of TFM finds by:
-    1. Tagging series/movies before searching
-    2. Checking if queue items belong to tagged series/movies
-    3. Only crediting TFM when the tag is present
+    Simple approach:
+    1. When TFM searches, record the item_id
+    2. When item_id appears in queue, mark as pending find
+    3. When hasFile=true, confirm as real find
     """
     
     def __init__(self, config, logger, data_dir: Path = None):
@@ -150,21 +142,15 @@ class FindTracker:
         self.finds: List[Find] = []
         self.max_finds_history = 1000
         
-        # Active searches - items we've tagged and are watching
-        # Key: "source:instance:series_id" or "source:instance:movie:movie_id"
-        self.active_searches: Dict[str, ActiveSearch] = {}
+        # Tracked searches - items TFM has searched for
+        # Key: "source:instance:item_id" -> TrackedSearch
+        self.tracked_searches: Dict[str, TrackedSearch] = {}
         
-        # Pending finds - items in queue that MIGHT become finds
-        # Key: "source:instance:item_id" -> {find_data, queue_id}
-        # These are confirmed as real finds only when file exists after download
+        # Pending finds - items grabbed, waiting for file import
+        # Key: "source:instance:item_id" -> {find_data}
         self.pending_finds: Dict[str, Dict[str, Any]] = {}
         
-        # Tag IDs per instance (cached)
-        # Key: "source:instance" -> tag_id
-        self.tag_ids: Dict[str, int] = {}
-        
         # Items we've already credited (prevent double-counting)
-        # Key: "source:instance:item_id"
         self.credited_items: Set[str] = set()
         
         # Daily/total counters
@@ -197,6 +183,19 @@ class FindTracker:
                 self.finds_total = data.get('finds_total', len(self.finds))
                 self.finds_today = data.get('finds_today', 0)
                 
+                # Load tracked searches
+                for key, search_data in data.get('tracked_searches', {}).items():
+                    try:
+                        self.tracked_searches[key] = TrackedSearch.from_dict(search_data)
+                    except Exception as e:
+                        self.log.debug(f"Could not load tracked search: {e}")
+                
+                # Load pending finds
+                self.pending_finds = data.get('pending_finds', {})
+                
+                # Load credited items
+                self.credited_items = set(data.get('credited_items', []))
+                
                 # Check for daily reset
                 last_date_str = data.get('last_reset_date')
                 if last_date_str:
@@ -204,23 +203,11 @@ class FindTracker:
                         last_date = datetime.fromisoformat(last_date_str).date()
                         if last_date < datetime.utcnow().date():
                             self.finds_today = 0
+                            self.last_reset_date = datetime.utcnow().date()
                     except:
                         pass
                 
-                # Load active searches (in case of restart)
-                for key, search_data in data.get('active_searches', {}).items():
-                    try:
-                        self.active_searches[key] = ActiveSearch.from_dict(search_data)
-                    except:
-                        pass
-                
-                # Load credited items (keep recent ones)
-                self.credited_items = set(data.get('credited_items', [])[-5000:])
-                
-                # Load cached tag IDs
-                self.tag_ids = data.get('tag_ids', {})
-                
-                self.log.info(f"Loaded {len(self.finds)} finds ({self.finds_total} total, {self.finds_today} today)")
+                self.log.info(f"Loaded {len(self.finds)} finds, {len(self.tracked_searches)} tracked searches")
         except Exception as e:
             self.log.warning(f"Could not load finds: {e}")
     
@@ -228,253 +215,195 @@ class FindTracker:
         """Save finds to disk."""
         try:
             path = self._get_finds_path()
-            path.parent.mkdir(parents=True, exist_ok=True)
-            
             data = {
                 'finds': [f.to_dict() for f in self.finds[-self.max_finds_history:]],
                 'finds_total': self.finds_total,
                 'finds_today': self.finds_today,
-                'last_reset_date': datetime.utcnow().date().isoformat(),
-                'active_searches': {k: v.to_dict() for k, v in self.active_searches.items()},
-                'credited_items': list(self.credited_items)[-5000:],
-                'tag_ids': self.tag_ids,
+                'last_reset_date': self.last_reset_date.isoformat(),
+                'tracked_searches': {k: v.to_dict() for k, v in self.tracked_searches.items()},
+                'pending_finds': self.pending_finds,
+                'credited_items': list(self.credited_items)[-5000:],  # Limit size
             }
-            
             with open(path, 'w') as f:
                 json.dump(data, f, indent=2)
         except Exception as e:
-            self.log.warning(f"Could not save finds: {e}")
+            self.log.error(f"Could not save finds: {e}")
     
     def _reset_daily_counters(self):
         """Reset daily counters if it's a new day."""
         today = datetime.utcnow().date()
         if today > self.last_reset_date:
-            self.log.info(f"Daily reset: {self.finds_today} finds yesterday")
             self.finds_today = 0
             self.last_reset_date = today
-    
-    def _get_tag_id(self, client, source: str, instance_name: str) -> int:
-        """Get or create the TFM searching tag for an instance."""
-        cache_key = f"{source}:{instance_name}"
-        
-        if cache_key in self.tag_ids:
-            return self.tag_ids[cache_key]
-        
-        try:
-            tag_id = client.get_or_create_tag(TFM_SEARCHING_TAG)
-            self.tag_ids[cache_key] = tag_id
             self._save()
-            return tag_id
-        except Exception as e:
-            self.log.error(f"Could not get/create TFM tag for {cache_key}: {e}")
-            return 0
     
-    def tag_for_search(self, client, source: str, instance_name: str,
-                       series_id: Optional[int], movie_id: Optional[int],
-                       title: str, tier: str, search_type: str) -> bool:
-        """Tag a series/movie before searching to track attribution.
-        
-        Call this BEFORE triggering the search command.
-        Returns True if tagging succeeded.
+    def track_search(self, source: str, instance_name: str, item_id: int,
+                     title: str, tier: str, search_type: str,
+                     series_id: int = None) -> str:
         """
-        tag_id = self._get_tag_id(client, source, instance_name)
-        if not tag_id:
-            return False
+        Record that TFM is searching for a specific item.
         
-        try:
-            if source == 'sonarr' and series_id:
-                success = client.add_tag_to_series(series_id, tag_id)
-                key = f"sonarr:{instance_name}:{series_id}"
-            elif source == 'radarr' and movie_id:
-                success = client.add_tag_to_movie(movie_id, tag_id)
-                key = f"radarr:{instance_name}:movie:{movie_id}"
-            else:
-                return False
-            
-            if success:
-                self.active_searches[key] = ActiveSearch(
-                    source=source,
-                    instance_name=instance_name,
-                    series_id=series_id,
-                    movie_id=movie_id,
-                    title=title,
-                    tier=tier,
-                    search_type=search_type,
-                    searched_at=datetime.utcnow(),
-                    tag_id=tag_id,
-                )
-                self.log.debug(f"Tagged for search: {title}")
-                return True
-        except Exception as e:
-            self.log.warning(f"Failed to tag {title}: {e}")
+        Call this BEFORE triggering the search in Sonarr/Radarr.
+        Returns the tracking key.
+        """
+        key = f"{source}:{instance_name}:{item_id}"
         
-        return False
+        self.tracked_searches[key] = TrackedSearch(
+            source=source,
+            instance_name=instance_name,
+            item_id=item_id,
+            series_id=series_id,
+            title=title,
+            tier=tier,
+            search_type=search_type,
+            searched_at=datetime.utcnow(),
+        )
+        
+        self.log.debug(f"Tracking search: {title} ({key})")
+        self._save()
+        return key
     
     def check_queue_for_finds(self, queue_items: List[Dict], source: str,
-                              instance_name: str, client) -> List[Find]:
-        """Check queue items and track pending finds.
+                              instance_name: str, client=None) -> List[Find]:
+        """
+        Check if any queue items match our tracked searches.
         
-        Items in queue with TFM tag become "pending finds".
-        They only become real finds when verified via verify_completed_finds().
+        Items that match become "pending finds" - they'll be confirmed
+        when the file actually imports (hasFile=true).
         """
         self._reset_daily_counters()
         now = datetime.utcnow()
         
-        tag_id = self._get_tag_id(client, source, instance_name)
-        if not tag_id:
-            return []
-        
-        # Track current queue item IDs to detect removed items
-        current_queue_ids = set()
-        
         for item in queue_items:
-            # Get identifiers
+            # Get the item ID
             if source == 'sonarr':
-                episode_id = item.get('episodeId')
+                item_id = item.get('episodeId')
                 series_id = item.get('seriesId')
-                if not episode_id or not series_id:
-                    continue
-                
-                item_key = f"sonarr:{instance_name}:{episode_id}"
-                search_key = f"sonarr:{instance_name}:{series_id}"
-                queue_id = item.get('id')
-                current_queue_ids.add(item_key)
-                
-                # Get title
-                title = item.get('title', '')
-                series_info = item.get('series', {})
-                episode_info = item.get('episode', {})
-                if series_info:
-                    series_title = series_info.get('title', '')
-                    if episode_info:
-                        season = episode_info.get('seasonNumber', 0)
-                        ep_num = episode_info.get('episodeNumber', 0)
-                        ep_title = episode_info.get('title', '')
-                        title = f"{series_title} - S{season:02d}E{ep_num:02d}"
-                        if ep_title:
-                            title += f" - {ep_title}"
-                    else:
-                        title = series_title
-                
             elif source == 'radarr':
-                movie_id = item.get('movieId')
-                if not movie_id:
-                    continue
-                
-                item_key = f"radarr:{instance_name}:{movie_id}"
-                search_key = f"radarr:{instance_name}:movie:{movie_id}"
-                queue_id = item.get('id')
-                current_queue_ids.add(item_key)
-                
-                # Get title
-                movie_info = item.get('movie', {})
-                title = movie_info.get('title', item.get('title', ''))
-                year = movie_info.get('year', '')
-                if year:
-                    title = f"{title} ({year})"
+                item_id = item.get('movieId')
+                series_id = None
             else:
                 continue
             
+            if not item_id:
+                continue
+            
+            key = f"{source}:{instance_name}:{item_id}"
+            
             # Skip if already credited or already pending
-            if item_key in self.credited_items or item_key in self.pending_finds:
+            if key in self.credited_items or key in self.pending_finds:
                 continue
             
-            # Check if this item's series/movie is in our active searches
-            active_search = self.active_searches.get(search_key)
-            if not active_search:
+            # Check if this matches a tracked search
+            tracked = self.tracked_searches.get(key)
+            if not tracked:
                 continue
             
-            # VERIFY the tag is still present (definitive check)
-            try:
-                if source == 'sonarr':
-                    has_tag = client.series_has_tag(series_id, tag_id)
-                else:
-                    has_tag = client.movie_has_tag(movie_id, tag_id)
-                
-                if not has_tag:
-                    continue
-            except Exception as e:
-                self.log.debug(f"Could not verify tag for {title}: {e}")
+            # Check timing - must be within 2 hours of search
+            time_since_search = (now - tracked.searched_at).total_seconds()
+            if time_since_search > 7200:  # 2 hours
                 continue
             
-            # Track as PENDING find (not confirmed yet)
-            search_to_find = int((now - active_search.searched_at).total_seconds())
+            # Get title from queue item
+            title = tracked.title
+            if source == 'sonarr':
+                series_info = item.get('series', {})
+                episode_info = item.get('episode', {})
+                if series_info and episode_info:
+                    series_title = series_info.get('title', '')
+                    season = episode_info.get('seasonNumber', 0)
+                    ep_num = episode_info.get('episodeNumber', 0)
+                    title = f"{series_title} - S{season:02d}E{ep_num:02d}"
+            elif source == 'radarr':
+                movie_info = item.get('movie', {})
+                if movie_info:
+                    title = movie_info.get('title', '')
+                    year = movie_info.get('year', '')
+                    if year:
+                        title = f"{title} ({year})"
+            
+            # Get quality/indexer info
             quality = item.get('quality', {}).get('quality', {}).get('name', '')
             indexer = item.get('indexer', '')
             
-            self.pending_finds[item_key] = {
-                'title': title or active_search.title,
+            # Track as PENDING find
+            self.pending_finds[key] = {
+                'title': title,
                 'source': source,
                 'instance_name': instance_name,
-                'item_id': episode_id if source == 'sonarr' else movie_id,
-                'series_id': series_id if source == 'sonarr' else None,
-                'movie_id': movie_id if source == 'radarr' else None,
-                'tier': active_search.tier,
-                'search_type': active_search.search_type,
-                'searched_at': active_search.searched_at,
-                'grabbed_at': now,
-                'search_to_find_seconds': search_to_find,
+                'item_id': item_id,
+                'series_id': series_id,
+                'tier': tracked.tier,
+                'search_type': tracked.search_type,
+                'searched_at': tracked.searched_at.isoformat(),
+                'grabbed_at': now.isoformat(),
+                'search_to_find_seconds': int(time_since_search),
                 'indexer': indexer,
                 'quality': quality,
             }
             
-            self.log.info(f"📥 TFM GRABBED: {title} ({active_search.tier} tier) - pending verification")
+            self.log.info(f"📥 GRABBED: {title} (tracked by TFM, pending verification)")
         
-        # Return empty - real finds are only returned by verify_completed_finds()
-        return []
+        self._save()
+        return []  # Real finds returned by verify_completed_finds
     
     def verify_completed_finds(self, source: str, instance_name: str, client) -> List[Find]:
-        """Verify pending finds have actually completed (file exists).
+        """
+        Verify pending finds have actually completed (file exists).
         
-        Call this periodically to check if pending downloads completed successfully.
         Only confirms finds when hasFile=true on the episode/movie.
         """
         self._reset_daily_counters()
         confirmed_finds = []
         now = datetime.utcnow()
         
-        # Check each pending find
         to_remove = []
-        for item_key, pending in list(self.pending_finds.items()):
+        for key, pending in list(self.pending_finds.items()):
             # Only check items from this source/instance
-            if not item_key.startswith(f"{source}:{instance_name}:"):
+            if not key.startswith(f"{source}:{instance_name}:"):
                 continue
             
             # Skip if too old (give up after 24 hours)
-            grabbed_at = pending.get('grabbed_at')
-            if grabbed_at and (now - grabbed_at).total_seconds() > 86400:
-                self.log.debug(f"Pending find expired: {pending['title']}")
-                to_remove.append(item_key)
-                continue
+            grabbed_at_str = pending.get('grabbed_at')
+            if grabbed_at_str:
+                try:
+                    grabbed_at = datetime.fromisoformat(grabbed_at_str)
+                    if (now - grabbed_at).total_seconds() > 86400:
+                        self.log.debug(f"Pending find expired: {pending['title']}")
+                        to_remove.append(key)
+                        continue
+                except:
+                    pass
             
             try:
                 has_file = False
+                item_id = pending.get('item_id')
                 
-                if source == 'sonarr' and pending.get('item_id'):
-                    # Check if episode has file
-                    episode = client.get_episode(pending['item_id'])
+                if source == 'sonarr' and item_id:
+                    episode = client.get_episode(item_id)
                     has_file = episode.get('hasFile', False) if episode else False
                     
-                elif source == 'radarr' and pending.get('movie_id'):
-                    # Check if movie has file
-                    movie = client.get_movie(pending['movie_id'])
+                elif source == 'radarr' and item_id:
+                    movie = client.get_movie(item_id)
                     has_file = movie.get('hasFile', False) if movie else False
                 
                 if has_file:
                     # CONFIRMED FIND! 🎉
+                    searched_at = datetime.fromisoformat(pending['searched_at'])
+                    
                     find = Find(
                         title=pending['title'],
                         source=source,
                         instance_name=instance_name,
-                        item_id=pending['item_id'],
+                        item_id=item_id,
                         series_id=pending.get('series_id'),
-                        movie_id=pending.get('movie_id'),
+                        movie_id=item_id if source == 'radarr' else None,
                         tier=pending['tier'],
                         resolution_type='tfm_search',
                         search_type=pending['search_type'],
                         found_at=now,
-                        searched_at=pending['searched_at'],
-                        search_to_find_seconds=pending['search_to_find_seconds'],
+                        searched_at=searched_at,
+                        search_to_find_seconds=pending.get('search_to_find_seconds', 0),
                         indexer=pending.get('indexer', ''),
                         quality=pending.get('quality', ''),
                     )
@@ -482,73 +411,56 @@ class FindTracker:
                     self.finds.append(find)
                     self.finds_today += 1
                     self.finds_total += 1
-                    self.credited_items.add(item_key)
+                    self.credited_items.add(key)
                     confirmed_finds.append(find)
-                    to_remove.append(item_key)
+                    to_remove.append(key)
                     
-                    self.log.info(f"🎉 TFM FIND CONFIRMED: {pending['title']} ({pending['tier']} tier, "
-                                f"{pending['search_type']}, file imported successfully)")
+                    self.log.info(f"🎉 TFM FIND CONFIRMED: {pending['title']} "
+                                f"({pending['tier']} tier, file imported!)")
                     
             except Exception as e:
-                self.log.debug(f"Could not verify {pending['title']}: {e}")
+                self.log.debug(f"Could not verify {pending.get('title', key)}: {e}")
         
-        # Remove processed pending finds
+        # Remove processed items
         for key in to_remove:
             self.pending_finds.pop(key, None)
+            self.tracked_searches.pop(key, None)
         
-        if confirmed_finds:
-            # Trim history
+        if confirmed_finds or to_remove:
             if len(self.finds) > self.max_finds_history:
                 self.finds = self.finds[-self.max_finds_history:]
             self._save()
         
         return confirmed_finds
     
-    def cleanup_tags(self, sonarr_clients: Dict, radarr_clients: Dict,
-                     max_age_minutes: int = 60):
-        """Remove TFM tags from series/movies after search cycle completes.
-        
-        Call this after checking for finds to clean up tags.
-        Only removes tags older than max_age_minutes.
-        """
-        cutoff = datetime.utcnow() - timedelta(minutes=max_age_minutes)
+    def cleanup_old_searches(self, max_age_hours: int = 2):
+        """Remove tracked searches older than max_age_hours."""
+        cutoff = datetime.utcnow() - timedelta(hours=max_age_hours)
         to_remove = []
         
-        for key, search in self.active_searches.items():
+        for key, search in self.tracked_searches.items():
             if search.searched_at < cutoff:
-                try:
-                    if search.source == 'sonarr' and search.series_id:
-                        client = sonarr_clients.get(search.instance_name)
-                        if client:
-                            client.remove_tag_from_series(search.series_id, search.tag_id)
-                    elif search.source == 'radarr' and search.movie_id:
-                        client = radarr_clients.get(search.instance_name)
-                        if client:
-                            client.remove_tag_from_movie(search.movie_id, search.tag_id)
-                    to_remove.append(key)
-                    self.log.debug(f"Removed TFM tag from: {search.title}")
-                except Exception as e:
-                    self.log.debug(f"Could not remove tag from {search.title}: {e}")
+                to_remove.append(key)
         
         for key in to_remove:
-            del self.active_searches[key]
+            del self.tracked_searches[key]
         
         if to_remove:
+            self.log.debug(f"Cleaned up {len(to_remove)} old tracked searches")
             self._save()
     
     def record_manual_find(self, title: str, source: str, instance_name: str,
-                          item_id: int, series_id: Optional[int] = None,
-                          movie_id: Optional[int] = None, tier: str = 'unknown',
+                          item_id: int, tier: str, search_type: str,
                           resolution_type: str = 'auto_resolve',
-                          resolution_detail: str = "") -> Find:
-        """Record a find from manual action (e.g., auto-resolution).
-        
-        This is for finds that didn't come from TFM's search cycle
-        but from other TFM actions like queue auto-resolution.
-        """
+                          series_id: int = None, movie_id: int = None):
+        """Record a find from auto-resolution or manual action."""
         self._reset_daily_counters()
-        now = datetime.utcnow()
         
+        key = f"{source}:{instance_name}:{item_id}"
+        if key in self.credited_items:
+            return
+        
+        now = datetime.utcnow()
         find = Find(
             title=title,
             source=source,
@@ -558,51 +470,50 @@ class FindTracker:
             movie_id=movie_id,
             tier=tier,
             resolution_type=resolution_type,
-            search_type='missing',
+            search_type=search_type,
             found_at=now,
             searched_at=now,
             search_to_find_seconds=0,
-            indexer=resolution_detail,
         )
         
         self.finds.append(find)
         self.finds_today += 1
         self.finds_total += 1
+        self.credited_items.add(key)
         
-        # Trim history
         if len(self.finds) > self.max_finds_history:
             self.finds = self.finds[-self.max_finds_history:]
         
-        self.log.info(f"🎉 Find ({resolution_type}): {title}")
         self._save()
-        
-        return find
+        self.log.info(f"📝 Manual find recorded: {title} ({resolution_type})")
     
     def get_recent_finds(self, limit: int = 50) -> List[Dict]:
-        """Get recent finds for display (newest first)."""
-        return [f.to_dict() for f in reversed(self.finds[-limit:])]
+        """Get recent finds for display."""
+        return [f.to_dict() for f in self.finds[-limit:]][::-1]
     
     def get_finds_by_tier(self) -> Dict[str, int]:
         """Get find counts by tier."""
-        counts = {'hot': 0, 'warm': 0, 'cool': 0, 'cold': 0, 'unknown': 0}
+        counts = {'hot': 0, 'warm': 0, 'cool': 0, 'cold': 0}
         for find in self.finds:
-            tier = find.tier if find.tier in counts else 'unknown'
-            counts[tier] += 1
+            tier = find.tier.lower()
+            if tier in counts:
+                counts[tier] += 1
         return counts
     
     def get_finds_by_type(self) -> Dict[str, int]:
-        """Get find counts by resolution type."""
-        counts = {}
+        """Get find counts by type (missing vs upgrade)."""
+        counts = {'missing': 0, 'upgrade': 0}
         for find in self.finds:
-            rt = find.resolution_type
-            counts[rt] = counts.get(rt, 0) + 1
+            search_type = find.search_type.lower()
+            if search_type in counts:
+                counts[search_type] += 1
         return counts
     
     def get_stats(self) -> Dict[str, Any]:
         """Get find statistics."""
         self._reset_daily_counters()
         
-        # Calculate average time to find (for tfm_search finds only)
+        # Calculate average time to find
         tfm_finds = [f for f in self.finds if f.resolution_type == 'tfm_search' and f.search_to_find_seconds > 0]
         avg_time = 0
         if tfm_finds:
@@ -613,7 +524,7 @@ class FindTracker:
             'finds_total': self.finds_total,
             'finds_by_tier': self.get_finds_by_tier(),
             'finds_by_type': self.get_finds_by_type(),
-            'active_searches': len(self.active_searches),
+            'tracked_searches': len(self.tracked_searches),
             'pending_finds': len(self.pending_finds),
             'avg_search_to_find_seconds': round(avg_time, 1),
         }
