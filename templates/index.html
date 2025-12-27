@@ -340,6 +340,7 @@
         
         .panel-head .collapse-icon {
             margin-left: 8px;
+            padding: 4px 12px;
             transition: transform 0.2s ease;
             opacity: 0.6;
         }
@@ -2491,7 +2492,7 @@
                                     ${autoResolveHtml}
                                 </td>
                                 <td class="col-action">
-                                    <button class="btn btn-sm btn-sec" onclick="showQueueIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Resolve</button>
+                                    <button class="btn btn-sm btn-sec" onclick="showQueueIntervention(${JSON.stringify(item).replace(/"/g, '&quot;')})">Actions</button>
                                 </td>
                             </tr>
                         `}).join('')}
@@ -3569,7 +3570,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.77';
+        const CURRENT_VERSION = '1.0.78';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3663,6 +3664,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.77</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.78</div>
 </body>
 </html>
