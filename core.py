@@ -327,10 +327,13 @@ class MachinarrCore:
         else:
             # Get missing/upgrade data with TRUE counts (expensive)
             self.log.info("Fetching fresh tier data from Sonarr/Radarr...")
+            self.set_activity('cataloging', 'Cataloging library', 'Fetching missing content from Sonarr/Radarr...')
             missing_data = self._get_all_missing(include_items=False)
             self._tier_cache = missing_data
             self._tier_cache_time = now
             self.log.info("Tier data cached")
+            # Reset to idle after cataloging
+            self.set_activity('idle', 'Ready', 'Library catalog updated')
         
         scoreboard = {
             'finds_today': self.searcher.finds_today,

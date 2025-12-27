@@ -1777,6 +1777,10 @@
                     bar.classList.add('finding');
                     icon.textContent = '🎉';
                     break;
+                case 'cataloging':
+                    bar.classList.add('searching');
+                    icon.textContent = '📊';
+                    break;
                 case 'sleeping':
                     icon.textContent = '💤';
                     break;
@@ -2276,6 +2280,9 @@
         async function resolveItem(source, queueId) {
             const btn = event.target;
             const originalText = btn.textContent;
+            const row = btn.closest('tr');
+            const title = row ? row.querySelector('.col-title')?.textContent?.trim() : 'Item';
+            
             btn.disabled = true;
             btn.textContent = '...';
             
@@ -2284,26 +2291,28 @@
                 if (data.success) {
                     btn.textContent = '✓';
                     btn.style.background = 'var(--success)';
-                    setTimeout(() => loadQueue(), 1000);
+                    // Show brief success in activity bar
+                    updateActivityBar('idle', `Resolved: ${title.substring(0, 30)}...`, data.message || 'Blocklisted and retry triggered');
+                    setTimeout(() => loadQueue(), 1500);
                 } else {
                     btn.textContent = '✗';
                     btn.style.background = 'var(--error)';
-                    alert('Failed: ' + (data.message || 'Unknown error'));
+                    updateActivityBar('idle', `Failed to resolve`, data.message || 'Check logs for details');
                     setTimeout(() => {
                         btn.textContent = originalText;
                         btn.style.background = '';
                         btn.disabled = false;
-                    }, 2000);
+                    }, 3000);
                 }
             } catch (e) {
                 btn.textContent = '✗';
                 btn.style.background = 'var(--error)';
-                alert('Error: ' + e.message);
+                updateActivityBar('idle', 'Resolve error', e.message);
                 setTimeout(() => {
                     btn.textContent = originalText;
                     btn.style.background = '';
                     btn.disabled = false;
-                }, 2000);
+                }, 3000);
             }
         }
         
@@ -2644,6 +2653,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.46</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.47</div>
 </body>
 </html>
