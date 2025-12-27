@@ -2399,8 +2399,8 @@
             // Open in Sonarr/Radarr
             actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionOpenIn('${item.source}', ${item.id}, '${item.details?.instance_name || ''}')">🔗 Open in ${isMovie ? 'Radarr' : 'Sonarr'}</button>`);
             
-            // Stop Searching (unmonitor)
-            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionStopSearching('${item.source}', ${item.id}, '${item.intervention_type}')" title="Unmonitor in ${isMovie ? 'Radarr' : 'Sonarr'} - keeps files">🚫 Stop Searching</button>`);
+            // Stop Searching (shows instructions, opens item page)
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionStopSearching('${item.source}', ${item.id}, '${item.intervention_type}')" title="Learn how to unmonitor in ${isMovie ? 'Radarr' : 'Sonarr'}">🚫 Stop Searching</button>`);
             
             // Delete from service (with confirmation)
             actions.push(`<button class="btn btn-sm" style="background:var(--error);color:white" onclick="interventionDelete('${item.source}', ${item.id}, '${item.intervention_type}', '${esc(item.title).replace(/'/g, "\\'")}')" title="DELETE from ${isMovie ? 'Radarr' : 'Sonarr'}">🗑️ Delete</button>`);
@@ -2449,19 +2449,26 @@
         
         async function interventionStopSearching(source, id, type) {
             const serviceName = source === 'radarr' ? 'Radarr' : 'Sonarr';
-            const warning = `⚠️ UNMONITOR in ${serviceName}?\n\nThis will:\n- Stop ${serviceName} from searching for this item\n- Keep all existing files\n\n⚠️ Note: If you use Overseerr, Ombi, or import lists, they may RE-MONITOR this item later.\n\nTo re-monitor manually: Open item in ${serviceName} and toggle monitoring back on.\n\nContinue?`;
+            const itemType = source === 'radarr' ? 'movie' : 'series';
             
-            if (!confirm(warning)) {
+            const instructions = `To stop searching for this item:\n\n` +
+                `1. Click OK to open the ${itemType} in ${serviceName}\n` +
+                `2. Find the "Monitored" toggle (usually near the top)\n` +
+                `3. Click it to turn monitoring OFF\n\n` +
+                `This gives you full control and you can easily re-enable monitoring later if needed.`;
+            
+            if (!confirm(instructions)) {
                 return;
             }
-            const data = await api('intervention/stop_searching', 'POST', {source, id, type});
-            if (data.success) {
-                updateActivityBar('idle', 'Stopped searching', data.message || 'Item unmonitored');
+            
+            // Open the item in Sonarr/Radarr
+            const data = await api('intervention/get_service_url', 'POST', {source, id});
+            if (data.success && data.url) {
+                window.open(data.url, '_blank');
             } else {
-                alert('Failed: ' + (data.message || 'Unknown error'));
+                alert('Could not get service URL: ' + (data.message || 'Unknown error'));
             }
             closeModal();
-            loadInterventions();
         }
         
         async function interventionDelete(source, id, type, title) {
@@ -2818,6 +2825,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.52</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.53</div>
 </body>
 </html>
