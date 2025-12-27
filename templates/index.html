@@ -2448,7 +2448,10 @@
         }
         
         async function interventionStopSearching(source, id, type) {
-            if (!confirm('This will UNMONITOR the item in ' + (source === 'radarr' ? 'Radarr' : 'Sonarr') + '. Continue?')) {
+            const serviceName = source === 'radarr' ? 'Radarr' : 'Sonarr';
+            const warning = `⚠️ UNMONITOR in ${serviceName}?\n\nThis will:\n- Stop ${serviceName} from searching for this item\n- Keep all existing files\n\n⚠️ Note: If you use Overseerr, Ombi, or import lists, they may RE-MONITOR this item later.\n\nTo re-monitor manually: Open item in ${serviceName} and toggle monitoring back on.\n\nContinue?`;
+            
+            if (!confirm(warning)) {
                 return;
             }
             const data = await api('intervention/stop_searching', 'POST', {source, id, type});
@@ -2815,6 +2818,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.51</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.52</div>
 </body>
 </html>

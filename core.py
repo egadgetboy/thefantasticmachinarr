@@ -745,7 +745,15 @@ class MachinarrCore:
                     if instance_name and name != instance_name:
                         continue
                     base_url = client.get_base_url()
-                    # For episodes, we'd need series_id - for now just return base
+                    # Get episode to find series ID
+                    try:
+                        episode = client.get_episode(item_id)
+                        if episode and 'seriesId' in episode:
+                            series_id = episode['seriesId']
+                            return {'success': True, 'url': f'{base_url}/series/{series_id}'}
+                    except:
+                        pass
+                    # Fallback to activity queue
                     return {'success': True, 'url': f'{base_url}/activity/queue'}
             
             elif source == 'radarr':
