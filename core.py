@@ -416,6 +416,7 @@ class MachinarrCore:
     def _start_progressive_load(self):
         """Start progressive loading in background thread."""
         import threading
+        from concurrent.futures import ThreadPoolExecutor
         
         if self._progressive_loading:
             return  # Already loading
@@ -424,121 +425,131 @@ class MachinarrCore:
         self._init_progressive_state()
         self._progressive_loading = True  # Re-set after init
         
+        # Lock for thread-safe counter updates
+        self._progress_lock = threading.Lock()
+        
+        def fetch_sonarr_missing(name, client):
+            """Fetch missing episodes from one Sonarr instance."""
+            try:
+                page = 1
+                page_size = 1000
+                while True:
+                    episodes = client.get_missing_episodes(page=page, page_size=page_size)
+                    if not episodes:
+                        break
+                    
+                    with self._progress_lock:
+                        self._progressive_counts['sonarr_missing'] += len(episodes)
+                        for ep in episodes:
+                            tier = self.tier_manager.classify_from_date_str(
+                                ep.get('airDateUtc') or ep.get('airDate')
+                            )
+                            self._progressive_tiers[tier]['sonarr'] += 1
+                            self._progressive_tiers[tier]['total'] += 1
+                    
+                    if len(episodes) < page_size:
+                        break
+                    page += 1
+            except Exception as e:
+                self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
+        
+        def fetch_sonarr_upgrades(name, client):
+            """Fetch upgrade episodes from one Sonarr instance."""
+            try:
+                page = 1
+                page_size = 1000
+                while True:
+                    episodes = client.get_cutoff_unmet(page=page, page_size=page_size)
+                    if not episodes:
+                        break
+                    
+                    with self._progress_lock:
+                        self._progressive_counts['sonarr_upgrade'] += len(episodes)
+                    
+                    if len(episodes) < page_size:
+                        break
+                    page += 1
+            except Exception as e:
+                self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
+        
+        def fetch_radarr_missing(name, client):
+            """Fetch missing movies from one Radarr instance."""
+            try:
+                page = 1
+                page_size = 1000
+                while True:
+                    movies = client.get_missing_movies(page=page, page_size=page_size)
+                    if not movies:
+                        break
+                    
+                    with self._progress_lock:
+                        self._progressive_counts['radarr_missing'] += len(movies)
+                        for movie in movies:
+                            tier = self.tier_manager.classify_movie_date(movie)
+                            self._progressive_tiers[tier]['radarr'] += 1
+                            self._progressive_tiers[tier]['total'] += 1
+                    
+                    if len(movies) < page_size:
+                        break
+                    page += 1
+            except Exception as e:
+                self.log.error(f"Radarr ({name}) missing movies error: {e}")
+        
+        def fetch_radarr_upgrades(name, client):
+            """Fetch upgrade movies from one Radarr instance."""
+            try:
+                page = 1
+                page_size = 1000
+                while True:
+                    movies = client.get_cutoff_unmet(page=page, page_size=page_size)
+                    if not movies:
+                        break
+                    
+                    with self._progress_lock:
+                        self._progressive_counts['radarr_upgrade'] += len(movies)
+                    
+                    if len(movies) < page_size:
+                        break
+                    page += 1
+            except Exception as e:
+                self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
+        
+        def update_stage():
+            """Update the stage display with current counts."""
+            sonarr_m = self._progressive_counts['sonarr_missing']
+            sonarr_u = self._progressive_counts['sonarr_upgrade']
+            radarr_m = self._progressive_counts['radarr_missing']
+            radarr_u = self._progressive_counts['radarr_upgrade']
+            return f"📺 {sonarr_m:,}+{sonarr_u:,} • 🎬 {radarr_m:,}+{radarr_u:,}"
+        
         def load_progressively():
             try:
-                self.set_activity('cataloging', 'Cataloging library', 'Starting...')
+                self.set_activity('cataloging', 'Cataloging library', 'Starting parallel fetch...')
                 
-                # Sonarr missing episodes (paginated)
-                for name, client in self.sonarr_clients.items():
-                    try:
-                        self._progressive_stage = f'Sonarr ({name}): missing episodes'
+                # Submit all fetch tasks in parallel
+                with ThreadPoolExecutor(max_workers=8) as executor:
+                    futures = []
+                    
+                    # Sonarr tasks
+                    for name, client in self.sonarr_clients.items():
+                        futures.append(executor.submit(fetch_sonarr_missing, name, client))
+                        futures.append(executor.submit(fetch_sonarr_upgrades, name, client))
+                    
+                    # Radarr tasks
+                    for name, client in self.radarr_clients.items():
+                        futures.append(executor.submit(fetch_radarr_missing, name, client))
+                        futures.append(executor.submit(fetch_radarr_upgrades, name, client))
+                    
+                    # Update UI while tasks are running
+                    import time
+                    while not all(f.done() for f in futures):
+                        self._progressive_stage = update_stage()
                         self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                        
-                        # Get paginated
-                        page = 1
-                        page_size = 1000
-                        while True:
-                            episodes = client.get_missing_episodes(page=page, page_size=page_size)
-                            if not episodes:
-                                break
-                            
-                            self._progressive_counts['sonarr_missing'] += len(episodes)
-                            
-                            # Tally tiers
-                            for ep in episodes:
-                                tier = self.tier_manager.classify_from_date_str(
-                                    ep.get('airDateUtc') or ep.get('airDate')
-                                )
-                                self._progressive_tiers[tier]['sonarr'] += 1
-                                self._progressive_tiers[tier]['total'] += 1
-                            
-                            self._progressive_stage = f'Sonarr ({name}): {self._progressive_counts["sonarr_missing"]} missing'
-                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                            
-                            if len(episodes) < page_size:
-                                break
-                            page += 1
-                            
-                    except Exception as e:
-                        self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
-                
-                # Sonarr upgrades (paginated)
-                for name, client in self.sonarr_clients.items():
-                    try:
-                        self._progressive_stage = f'Sonarr ({name}): upgrades'
-                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                        
-                        page = 1
-                        page_size = 1000
-                        while True:
-                            episodes = client.get_cutoff_unmet(page=page, page_size=page_size)
-                            if not episodes:
-                                break
-                            
-                            self._progressive_counts['sonarr_upgrade'] += len(episodes)
-                            self._progressive_stage = f'Sonarr ({name}): {self._progressive_counts["sonarr_upgrade"]} upgrades'
-                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                            
-                            if len(episodes) < page_size:
-                                break
-                            page += 1
-                            
-                    except Exception as e:
-                        self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
-                
-                # Radarr missing movies (paginated)
-                for name, client in self.radarr_clients.items():
-                    try:
-                        self._progressive_stage = f'Radarr ({name}): missing movies'
-                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                        
-                        page = 1
-                        page_size = 1000
-                        while True:
-                            movies = client.get_missing_movies(page=page, page_size=page_size)
-                            if not movies:
-                                break
-                            
-                            self._progressive_counts['radarr_missing'] += len(movies)
-                            
-                            for movie in movies:
-                                tier = self.tier_manager.classify_movie_date(movie)
-                                self._progressive_tiers[tier]['radarr'] += 1
-                                self._progressive_tiers[tier]['total'] += 1
-                            
-                            self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_missing"]} missing'
-                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                            
-                            if len(movies) < page_size:
-                                break
-                            page += 1
-                        
-                    except Exception as e:
-                        self.log.error(f"Radarr ({name}) missing movies error: {e}")
-                
-                # Radarr upgrades (paginated)
-                for name, client in self.radarr_clients.items():
-                    try:
-                        self._progressive_stage = f'Radarr ({name}): upgrades'
-                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                        
-                        page = 1
-                        page_size = 1000
-                        while True:
-                            movies = client.get_cutoff_unmet(page=page, page_size=page_size)
-                            if not movies:
-                                break
-                            
-                            self._progressive_counts['radarr_upgrade'] += len(movies)
-                            self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_upgrade"]} upgrades'
-                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
-                            
-                            if len(movies) < page_size:
-                                break
-                            page += 1
-                        
-                    except Exception as e:
-                        self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
+                        time.sleep(1)
+                    
+                    # Final update
+                    self._progressive_stage = update_stage()
+                    self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
                 
                 # Cache the final result
                 self._tier_cache = self._get_progressive_state()
