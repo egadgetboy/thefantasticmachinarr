@@ -456,7 +456,11 @@ class MachinarrCore:
             self.log.warning(f"Could not save catalog cache: {e}")
     
     def _load_catalog_cache(self) -> bool:
-        """Load catalog data from disk. Returns True if valid cache found."""
+        """Load catalog data from disk. Returns True if valid cache found.
+        
+        Handles both complete and partial (interrupted) catalog data.
+        Partial data is still useful - shows progress and avoids starting from zero.
+        """
         try:
             import json
             cache_path = self.config.data_dir / 'catalog_cache.json'
@@ -467,17 +471,28 @@ class MachinarrCore:
             with open(cache_path, 'r') as f:
                 data = json.load(f)
             
-            # Check if cache is fresh (less than 5 minutes old)
+            # Check cache age
             cache_time = datetime.fromisoformat(data['timestamp'])
-            if (datetime.now() - cache_time).total_seconds() > 300:
-                self.log.info("Catalog cache expired, will refresh")
+            cache_age = (datetime.now() - cache_time).total_seconds()
+            
+            # Accept cache if:
+            # - Less than 5 minutes old (fresh), OR
+            # - Less than 1 hour old AND has significant data (partial progress worth keeping)
+            has_data = sum(data.get('counts', {}).values()) > 0
+            is_fresh = cache_age < 300
+            is_recent_with_data = cache_age < 3600 and has_data
+            
+            if not (is_fresh or is_recent_with_data):
+                self.log.info(f"Catalog cache too old ({cache_age:.0f}s), will refresh")
                 return False
             
             self._progressive_counts = data['counts']
             self._progressive_tiers = data['tiers']
             self._tier_cache = self._get_progressive_state()
             self._tier_cache_time = cache_time
-            self.log.info("Loaded catalog cache from disk")
+            
+            total = sum(data['counts'].values())
+            self.log.info(f"Loaded catalog cache from disk ({total:,} items, {cache_age:.0f}s old)")
             return True
         except Exception as e:
             self.log.warning(f"Could not load catalog cache: {e}")
@@ -736,6 +751,9 @@ class MachinarrCore:
                 search_thread = threading.Thread(target=search_worker, daemon=True)
                 search_thread.start()
                 
+                # Track last save time for incremental persistence
+                last_catalog_save = time.time()
+                
                 # Submit all fetch tasks in parallel
                 with ThreadPoolExecutor(max_workers=8) as executor:
                     futures = []
@@ -750,11 +768,21 @@ class MachinarrCore:
                         futures.append(executor.submit(fetch_radarr_missing, name, client))
                         futures.append(executor.submit(fetch_radarr_upgrades, name, client))
                     
-                    # Update UI while tasks are running
-                    import time
+                    # Update UI while tasks are running + incremental saves
                     while not all(f.done() for f in futures):
                         self._progressive_stage = update_stage()
                         self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                        
+                        # Incremental save every 30 seconds during catalog
+                        # This ensures progress is saved even if interrupted
+                        now = time.time()
+                        if now - last_catalog_save >= 30:
+                            self._tier_cache = self._get_progressive_state()
+                            self._tier_cache_time = datetime.now()
+                            self._save_catalog_cache()
+                            last_catalog_save = now
+                            self.log.debug("Incremental catalog save")
+                        
                         time.sleep(1)
                     
                     # Final update
@@ -765,15 +793,23 @@ class MachinarrCore:
                 search_worker_done.set()
                 search_thread.join(timeout=30)  # Wait up to 30s for searches to complete
                 
-                # Cache the final result and save to disk
+                # Final cache save
                 self._tier_cache = self._get_progressive_state()
                 self._tier_cache_time = datetime.now()
-                self._save_catalog_cache()  # Persist for restart recovery
+                self._save_catalog_cache()
                 self.log.info("Tier data cached (progressive load complete)")
                 self.set_activity('idle', 'Ready', 'Library catalog updated')
                 
             except Exception as e:
                 self.log.error(f"Progressive load failed: {e}")
+                # Save whatever progress we have before reporting error
+                try:
+                    self._tier_cache = self._get_progressive_state()
+                    self._tier_cache_time = datetime.now()
+                    self._save_catalog_cache()
+                    self.log.info("Saved partial catalog progress before error")
+                except:
+                    pass
                 self.set_activity('idle', 'Error', str(e))
             finally:
                 self._progressive_loading = False
