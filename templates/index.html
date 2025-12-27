@@ -2443,12 +2443,41 @@
                 }
                 
                 if (sonarrOk || radarrOk) {
-                    // Services are connected - skip the overlay entirely
+                    // Services connected - load essential data first, then hide overlay
+                    
+                    // Load status bar
+                    loadStatus();
+                    
+                    // Load scoreboard quickly so it's not showing "Initializing..."
+                    try {
+                        const data = await api('scoreboard');
+                        if (data.scoreboard) {
+                            document.getElementById('finds-today').textContent = data.scoreboard.finds_today || 0;
+                            document.getElementById('finds-total').textContent = data.scoreboard.finds_total || 0;
+                            document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
+                            document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
+                            
+                            if (data.scoreboard.finds_by_source) {
+                                const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
+                                const radarr = data.scoreboard.finds_by_source.radarr || 0;
+                                const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
+                                const todayBreakdown = document.getElementById('finds-today-breakdown');
+                                const totalBreakdown = document.getElementById('finds-total-breakdown');
+                                if (todayBreakdown) todayBreakdown.textContent = breakdownText;
+                                if (totalBreakdown) totalBreakdown.textContent = breakdownText;
+                            }
+                            
+                            updateStatusIndicator(data.scoreboard, data.scheduler);
+                        }
+                    } catch (e) {
+                        console.warn('Scoreboard quick load failed:', e);
+                    }
+                    
+                    // NOW hide the overlay - scoreboard has data
                     hideInitOverlay();
                     
-                    // Load everything in background
-                    loadStatus();
-                    loadDashboard();
+                    // Load remaining data in background
+                    loadDashboard();  // Full tier data (slow)
                     loadQueue();
                     loadInterventions();
                     loadFinds();
@@ -2518,6 +2547,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.39</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.40</div>
 </body>
 </html>
