@@ -13,6 +13,7 @@ from .logger import Logger
 from .clients import SonarrClient, RadarrClient, SABnzbdClient
 from .automation import TierManager, QueueMonitor, SmartSearcher, Scheduler, Tier
 from .notifier import EmailNotifier
+from .library import LibraryManager
 
 
 class MachinarrCore:
@@ -27,6 +28,7 @@ class MachinarrCore:
     
     ARCHITECTURE:
         MachinarrCore
+        ├── library_manager    - Library sizing and catalog persistence
         ├── sonarr_clients     - Dict of Sonarr API clients (supports multiple instances)
         ├── radarr_clients     - Dict of Radarr API clients
         ├── sabnzbd_clients    - Dict of SABnzbd API clients (optional)
@@ -37,17 +39,21 @@ class MachinarrCore:
         └── notifier           - Email notifications
     
     DATA FLOW:
-        1. Progressive loading fetches missing/upgrade counts from Sonarr/Radarr
-        2. Tier manager classifies items by age
-        3. Searcher prioritizes HOT items, respects API limits
-        4. Queue monitor watches for stuck downloads
-        5. Web UI polls for updates via API endpoints
+        1. Library manager detects size and tunes performance settings
+        2. Catalog loaded from disk or built progressively
+        3. Tier manager classifies items by age
+        4. Searcher prioritizes HOT items, respects API limits
+        5. Queue monitor watches for stuck downloads
+        6. Web UI polls for updates via API endpoints
     """
     
     def __init__(self, config: Config, logger: Logger):
         self.config = config
         self.logger = logger
         self.log = logger.get_logger('core')
+        
+        # Library manager - handles sizing and catalog persistence
+        self.library_manager = LibraryManager(config.data_dir, logger)
         
         # API Clients - support multiple instances of each service
         # Example: {'Main': SonarrClient(...), '4K': SonarrClient(...)}
@@ -74,10 +80,9 @@ class MachinarrCore:
             'samples': 0,
         }
         
-        # Cache for tier data (expensive to compute)
+        # Cache for tier data - TTL now comes from library manager
         self._tier_cache = None
         self._tier_cache_time = None
-        self._tier_cache_ttl = 1800  # 30 minutes - avoid full catalog rebuilds
         
         # Progressive loading state
         self._progressive_loading = False
@@ -325,6 +330,39 @@ class MachinarrCore:
             'total_upgrades': counts['sonarr_upgrade'] + counts['radarr_upgrade'],
         }
     
+    def get_library_info(self) -> Dict[str, Any]:
+        """Get library metadata and performance settings for UI display."""
+        perf = self.library_manager.get_performance_settings()
+        meta = self.library_manager.metadata
+        
+        return {
+            'size_class': perf['size_class'],
+            'total_items': perf['total_items'],
+            'total_missing': meta.total_missing,
+            'sonarr': {
+                'series': meta.sonarr_series,
+                'episodes': meta.sonarr_episodes,
+                'missing': meta.sonarr_missing,
+            },
+            'radarr': {
+                'movies': meta.radarr_movies,
+                'missing': meta.radarr_missing,
+            },
+            'performance': {
+                'cache_ttl': perf['cache_ttl'],
+                'disk_cache_max_age': perf['disk_cache_max_age'],
+                'incremental_poll': perf['incremental_poll'],
+                'batch_size': perf['batch_size'],
+            },
+            'timestamps': {
+                'first_scan': meta.first_scan,
+                'last_full_scan': meta.last_full_scan,
+                'last_incremental': meta.last_incremental_check,
+            },
+            'needs_rescan': self.library_manager.needs_full_scan(),
+            'catalog_age': self.library_manager.get_catalog_age(),
+        }
+    
     def get_scoreboard_quick(self) -> Dict[str, Any]:
         """Get just scoreboard data quickly (no tier classification)."""
         finds_by_source = {'sonarr': 0, 'radarr': 0}
@@ -375,23 +413,34 @@ class MachinarrCore:
             if source in finds_by_source:
                 finds_by_source[source] += 1
         
-        # Check cache for tier data
+        # Check cache for tier data - TTL from library manager
         now = datetime.now()
+        cache_ttl = self.library_manager.metadata.cache_ttl_seconds
         if (self._tier_cache is not None and self._tier_cache_time is not None
-            and (now - self._tier_cache_time).total_seconds() < self._tier_cache_ttl):
+            and (now - self._tier_cache_time).total_seconds() < cache_ttl):
             missing_data = self._tier_cache
             self.log.debug("Using cached tier data")
         else:
-            # Try to load from disk cache first (for restart recovery)
-            if self._tier_cache is None and self._load_catalog_cache():
+            # Try to load from library manager's catalog first
+            catalog, is_fresh = self.library_manager.load_catalog()
+            if catalog and is_fresh:
+                # Use the persisted catalog
+                self._tier_cache = self._catalog_to_progressive_state(catalog)
+                self._tier_cache_time = datetime.fromisoformat(catalog['timestamp'])
                 missing_data = self._tier_cache
-                self.log.info("Restored tier data from disk cache")
-            else:
-                # Start progressive loading in background if not already running
+                self.log.info("Using persisted catalog from disk")
+            elif catalog and not is_fresh:
+                # Catalog exists but stale - use it but start background refresh
+                self._tier_cache = self._catalog_to_progressive_state(catalog)
+                self._tier_cache_time = datetime.fromisoformat(catalog['timestamp'])
+                missing_data = self._tier_cache
                 if not self._progressive_loading:
                     self._start_progressive_load()
-                
-                # Return current progressive state (partial data)
+                self.log.info("Using stale catalog, refreshing in background")
+            else:
+                # No catalog - start progressive loading
+                if not self._progressive_loading:
+                    self._start_progressive_load()
                 missing_data = self._get_progressive_state()
         
         scoreboard = {
@@ -471,22 +520,43 @@ class MachinarrCore:
             'total_upgrades': self._progressive_counts['sonarr_upgrade'] + self._progressive_counts['radarr_upgrade'],
         }
     
+    def _catalog_to_progressive_state(self, catalog: Dict[str, Any]) -> Dict[str, Any]:
+        """Convert library manager catalog format to progressive state format."""
+        # The catalog from library manager has same structure as our progressive state
+        counts = catalog.get('counts', {})
+        tiers = catalog.get('tiers', {})
+        
+        # Update internal state from catalog
+        self._progressive_counts = counts.copy()
+        self._progressive_tiers = tiers.copy()
+        
+        # Return in the expected format
+        return self._get_progressive_state()
+    
     def _save_catalog_cache(self):
         """Save catalog data to disk for persistence across restarts."""
         try:
-            import json
-            cache_path = self.config.data_dir / 'catalog_cache.json'
-            cache_path.parent.mkdir(parents=True, exist_ok=True)
-            
             data = {
                 'counts': self._progressive_counts,
                 'tiers': self._progressive_tiers,
-                'timestamp': datetime.now().isoformat(),
             }
             
-            with open(cache_path, 'w') as f:
-                json.dump(data, f)
-            self.log.debug("Catalog cache saved")
+            # Use library manager for persistence
+            self.library_manager.save_catalog(data)
+            
+            # Update library counts for adaptive tuning
+            self.library_manager.update_library_counts(
+                sonarr_series=0,  # We don't track this separately
+                sonarr_episodes=self._progressive_counts.get('sonarr_missing', 0) + 
+                               self._progressive_counts.get('sonarr_upgrade', 0),
+                sonarr_missing=self._progressive_counts.get('sonarr_missing', 0),
+                radarr_movies=self._progressive_counts.get('radarr_missing', 0) + 
+                             self._progressive_counts.get('radarr_upgrade', 0),
+                radarr_missing=self._progressive_counts.get('radarr_missing', 0),
+                is_full_scan=True,
+            )
+            
+            self.log.debug("Catalog saved via library manager")
         except Exception as e:
             self.log.warning(f"Could not save catalog cache: {e}")
     

@@ -99,6 +99,11 @@ class WebServer:
             """Quick endpoint to get scoreboard data only (no tier classification)."""
             return jsonify(self.core.get_scoreboard_quick())
         
+        @self.app.route('/api/library')
+        def api_library():
+            """Get library metadata and performance settings."""
+            return jsonify(self.core.get_library_info())
+        
         @self.app.route('/api/dashboard')
         def api_dashboard():
             return jsonify(self.core.get_dashboard_data())
