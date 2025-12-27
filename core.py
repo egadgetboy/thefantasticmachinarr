@@ -130,21 +130,89 @@ class MachinarrCore:
     def _on_library_change(self, change_info: Dict[str, Any]):
         """Callback when library manager detects changes.
         
-        Invalidates tier cache so Content Needing Action updates.
+        Cascades updates to ALL panels:
+        - Content Needing Action (tier cache)
+        - Download Problems (queue items may have imported)
+        - Needs Attention (interventions may be resolved)
         """
         change_type = change_info.get('type', 'unknown')
         changes = change_info.get('changes', {})
         
         self.log.info(f"Library change detected: {change_type}, delta={changes.get('total_delta', 0)}")
         
-        # Invalidate tier cache to force UI refresh
+        # 1. Invalidate tier cache to force Content Needing Action refresh
         self._tier_cache = None
         self._tier_cache_time = None
         
-        # Update activity state
+        # 2. Check queue for items that may have resolved
+        self._refresh_queue_status()
+        
+        # 3. Update activity state
         with self._activity_lock:
             self._activity_state['detail'] = f"Library updated ({change_type})"
             self._activity_state['updated'] = datetime.now().isoformat()
+    
+    def _refresh_queue_status(self):
+        """
+        Refresh queue status and clean up resolved items.
+        
+        Called when library changes to sync Download Problems and Needs Attention panels.
+        """
+        try:
+            # Gather current queue IDs from all services
+            current_queue_ids = {'sonarr': set(), 'radarr': set()}
+            
+            for name, client in self.sonarr_clients.items():
+                try:
+                    queue = client.get_queue()
+                    records = queue.get('records', [])
+                    for item in records:
+                        current_queue_ids['sonarr'].add(item.get('id'))
+                except Exception as e:
+                    self.log.debug(f"Could not get Sonarr queue from {name}: {e}")
+            
+            for name, client in self.radarr_clients.items():
+                try:
+                    queue = client.get_queue()
+                    records = queue.get('records', [])
+                    for item in records:
+                        current_queue_ids['radarr'].add(item.get('id'))
+                except Exception as e:
+                    self.log.debug(f"Could not get Radarr queue from {name}: {e}")
+            
+            # Clean up stuck items no longer in queue
+            resolved_queue = self.queue_monitor.cleanup_resolved_items(current_queue_ids)
+            if resolved_queue:
+                self.log.info(f"Cleaned up {resolved_queue} resolved queue items")
+            
+            # Gather current missing IDs for intervention cleanup
+            still_missing_ids = {'sonarr': set(), 'radarr': set()}
+            
+            for name, client in self.sonarr_clients.items():
+                try:
+                    # Get missing episode IDs
+                    missing = client.get_missing(page_size=1000)
+                    for record in missing.get('records', []):
+                        # Use series ID for interventions
+                        still_missing_ids['sonarr'].add(record.get('seriesId'))
+                except Exception as e:
+                    self.log.debug(f"Could not get Sonarr missing from {name}: {e}")
+            
+            for name, client in self.radarr_clients.items():
+                try:
+                    missing = client.get_missing(page_size=1000)
+                    for record in missing.get('records', []):
+                        still_missing_ids['radarr'].add(record.get('id'))
+                except Exception as e:
+                    self.log.debug(f"Could not get Radarr missing from {name}: {e}")
+            
+            # Clean up interventions for items no longer missing
+            resolved_missing = self.queue_monitor.cleanup_missing_interventions(still_missing_ids)
+            if resolved_missing:
+                self.log.info(f"Cleaned up {resolved_missing} resolved interventions")
+                
+        except Exception as e:
+            self.log.warning(f"Error refreshing queue status: {e}")
     
     def reinit_clients(self):
         """Initialize or reinitialize API clients."""

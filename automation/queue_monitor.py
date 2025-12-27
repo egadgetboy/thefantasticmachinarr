@@ -381,3 +381,61 @@ class QueueMonitor:
                     {'action': 'stop_searching', 'label': 'Stop Searching for This'},
                 ]
             )
+    
+    def cleanup_resolved_items(self, current_queue_ids: Dict[str, set]):
+        """
+        Remove stuck items and interventions that are no longer in the queue.
+        
+        Called when library changes detected - items may have imported successfully.
+        
+        Args:
+            current_queue_ids: Dict of {source: set of queue_ids still in queue}
+                               e.g. {'sonarr': {123, 456}, 'radarr': {789}}
+        """
+        # Clean up stuck items
+        to_remove = []
+        for key, stuck in self.stuck_items.items():
+            source_ids = current_queue_ids.get(stuck.source, set())
+            if stuck.queue_id not in source_ids:
+                to_remove.append(key)
+                self.log.info(f"Stuck item resolved (no longer in queue): {stuck.title}")
+        
+        for key in to_remove:
+            del self.stuck_items[key]
+        
+        # Clean up interventions for stuck_queue type
+        intervention_remove = []
+        for key, intervention in self.interventions.items():
+            if intervention.intervention_type == 'stuck_queue':
+                source_ids = current_queue_ids.get(intervention.source, set())
+                if intervention.id not in source_ids:
+                    intervention_remove.append(key)
+                    self.log.info(f"Intervention resolved (no longer in queue): {intervention.title}")
+        
+        for key in intervention_remove:
+            del self.interventions[key]
+        
+        return len(to_remove) + len(intervention_remove)
+    
+    def cleanup_missing_interventions(self, still_missing_ids: Dict[str, set]):
+        """
+        Remove interventions for items that are no longer missing.
+        
+        Called when library changes detected - items may have been found.
+        
+        Args:
+            still_missing_ids: Dict of {source: set of item_ids still missing}
+        """
+        to_remove = []
+        for key, intervention in self.interventions.items():
+            # Only check release_available interventions (for missing content)
+            if intervention.intervention_type == 'release_available':
+                source_ids = still_missing_ids.get(intervention.source, set())
+                if intervention.id not in source_ids:
+                    to_remove.append(key)
+                    self.log.info(f"Intervention resolved (no longer missing): {intervention.title}")
+        
+        for key in to_remove:
+            del self.interventions[key]
+        
+        return len(to_remove)
