@@ -861,10 +861,41 @@
             width: 0%;
         }
         
+        .init-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            text-align: left;
+            font-size: 13px;
+            margin-top: 16px;
+        }
+        
+        .init-step {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text3);
+            transition: color 0.3s ease;
+        }
+        
+        .init-step.active {
+            color: var(--text);
+        }
+        
+        .init-step.done {
+            color: var(--success);
+        }
+        
+        .init-step-icon {
+            width: 20px;
+            text-align: center;
+        }
+        
         .init-timer {
             margin-top: 20px;
-            font-size: 12px;
-            color: var(--text3);
+            font-size: 14px;
+            color: var(--text2);
+            font-weight: 500;
         }
         
         /* Settings modal inputs */
@@ -1012,7 +1043,25 @@
             <div class="init-progress">
                 <div class="init-progress-bar" id="init-progress"></div>
             </div>
-            <div class="init-timer" id="init-timer"></div>
+            <div class="init-steps">
+                <div class="init-step" id="init-step-config">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Loading configuration...</span>
+                </div>
+                <div class="init-step" id="init-step-services">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Connecting to services...</span>
+                </div>
+                <div class="init-step" id="init-step-data">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Fetching library data...</span>
+                </div>
+                <div class="init-step" id="init-step-ui">
+                    <span class="init-step-icon">⏳</span>
+                    <span>Preparing dashboard...</span>
+                </div>
+            </div>
+            <div class="init-timer" id="init-timer">60s</div>
         </div>
     </div>
 
@@ -2225,8 +2274,28 @@
         // ============ Initialization System ============
         const initState = {
             startTime: Date.now(),
-            dismissed: false
+            dismissed: false,
+            maxTime: 60000  // 60 second max
         };
+        
+        function updateInitStep(step, status) {
+            const el = document.getElementById(`init-step-${step}`);
+            if (!el) return;
+            
+            const icon = el.querySelector('.init-step-icon');
+            el.classList.remove('active', 'done');
+            
+            if (status === 'active') {
+                el.classList.add('active');
+                icon.textContent = '🔄';
+            } else if (status === 'done') {
+                el.classList.add('done');
+                icon.textContent = '✓';
+            } else if (status === 'skip') {
+                el.classList.add('done');
+                icon.textContent = '⏭️';
+            }
+        }
         
         function hideInitOverlay() {
             if (initState.dismissed) return;
@@ -2246,23 +2315,33 @@
             const timerEl = document.getElementById('init-timer');
             const progressBar = document.getElementById('init-progress');
             
+            // Countdown timer from 60
             const updateTimer = setInterval(() => {
                 if (initState.dismissed) {
                     clearInterval(updateTimer);
                     return;
                 }
-                const elapsed = Math.floor((Date.now() - initState.startTime) / 1000);
-                if (timerEl) timerEl.textContent = `${elapsed}s`;
+                const elapsed = Date.now() - initState.startTime;
+                const remaining = Math.max(0, Math.ceil((initState.maxTime - elapsed) / 1000));
+                if (timerEl) timerEl.textContent = `${remaining}s`;
             }, 200);
             
             try {
-                // Step 1: Check API connectivity
+                // Step 1: Load configuration
+                updateInitStep('config', 'active');
+                if (statusEl) statusEl.textContent = 'Loading configuration...';
+                if (progressBar) progressBar.style.width = '10%';
+                
+                await loadStatus();
+                updateInitStep('config', 'done');
+                
+                // Step 2: Connect to services
+                updateInitStep('services', 'active');
                 if (statusEl) statusEl.textContent = 'Connecting to services...';
-                if (progressBar) progressBar.style.width = '15%';
+                if (progressBar) progressBar.style.width = '25%';
                 
                 const status = await api('status');
                 
-                // Check if services are connected
                 let sonarrOk = false;
                 let radarrOk = false;
                 
@@ -2274,6 +2353,7 @@
                 }
                 
                 if (!sonarrOk && !radarrOk) {
+                    updateInitStep('services', 'done');
                     if (statusEl) statusEl.textContent = 'No services connected - check settings';
                     if (progressBar) {
                         progressBar.style.width = '100%';
@@ -2290,15 +2370,10 @@
                     return;
                 }
                 
-                // Step 2: Load status bar
-                if (progressBar) progressBar.style.width = '25%';
-                if (statusEl) statusEl.textContent = 'Loading status...';
-                await loadStatus();
+                updateInitStep('services', 'done');
                 
-                // Step 3: Load scoreboard (fast endpoint)
-                if (progressBar) progressBar.style.width = '40%';
-                if (statusEl) statusEl.textContent = 'Loading scoreboard...';
-                
+                // Load scoreboard data
+                if (progressBar) progressBar.style.width = '35%';
                 try {
                     const data = await api('scoreboard');
                     if (data.scoreboard) {
@@ -2323,45 +2398,57 @@
                     console.warn('Scoreboard load failed:', e);
                 }
                 
-                // Step 4: Load queue (usually fast)
-                if (progressBar) progressBar.style.width = '55%';
-                if (statusEl) statusEl.textContent = 'Loading queue...';
-                await loadQueue();
+                // Step 3: Fetch library data (the potentially slow part)
+                updateInitStep('data', 'active');
+                if (statusEl) statusEl.textContent = 'Counting missing content (this may take a moment)...';
+                if (progressBar) progressBar.style.width = '50%';
                 
-                // Step 5: Load tier data with 60s timeout
-                if (progressBar) progressBar.style.width = '70%';
-                if (statusEl) statusEl.textContent = 'Loading library data...';
+                // Calculate remaining time for tier data
+                const elapsed = Date.now() - initState.startTime;
+                const remainingTime = Math.max(5000, initState.maxTime - elapsed);
                 
                 const tierPromise = loadDashboard();
                 const timeoutPromise = new Promise((_, reject) => 
-                    setTimeout(() => reject(new Error('timeout')), 60000)
+                    setTimeout(() => reject(new Error('timeout')), remainingTime)
                 );
                 
                 try {
                     await Promise.race([tierPromise, timeoutPromise]);
-                    if (progressBar) progressBar.style.width = '90%';
+                    updateInitStep('data', 'done');
+                    if (progressBar) progressBar.style.width = '75%';
                 } catch (e) {
                     if (e.message === 'timeout') {
-                        console.warn('Tier data timeout after 60s - proceeding without');
-                        document.getElementById('tier-total-label').textContent = 'Large library - loading in background...';
+                        console.warn('Tier data timeout - proceeding without');
+                        updateInitStep('data', 'skip');
+                        document.getElementById('tier-total-label').textContent = 'Loading in background...';
                     }
                 }
                 
-                // Step 6: Ready!
+                // Load queue
+                await loadQueue();
+                
+                // Step 4: Prepare dashboard
+                updateInitStep('ui', 'active');
+                if (statusEl) statusEl.textContent = 'Preparing dashboard...';
+                if (progressBar) progressBar.style.width = '90%';
+                
+                await Promise.all([
+                    loadInterventions(),
+                    loadFinds(),
+                    loadSearches(),
+                    loadLogs()
+                ]);
+                
+                updateInitStep('ui', 'done');
+                
+                // Done!
                 if (progressBar) progressBar.style.width = '100%';
                 if (statusEl) statusEl.textContent = 'Ready!';
                 
                 clearInterval(updateTimer);
-                await new Promise(r => setTimeout(r, 500));
+                if (timerEl) timerEl.textContent = '✓';
+                await new Promise(r => setTimeout(r, 400));
                 hideInitOverlay();
-                
-                // Load remaining data in background
-                loadInterventions();
-                loadFinds();
-                loadSearches();
-                loadLogs();
-                
-                // If tier data timed out, it's still loading - let it finish in background
                 
             } catch (error) {
                 console.error('Initialization error:', error);
@@ -2396,6 +2483,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.31</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.32</div>
 </body>
 </html>
