@@ -412,18 +412,50 @@
         }
         .tier-breakdown span { display: flex; align-items: center; gap: 4px; }
         
-        /* Compact tiers */
-        .tiers.tiers-compact {
-            gap: 10px;
+        /* Horizontal tier layout */
+        .tiers.tiers-horizontal {
+            gap: 12px;
         }
-        .tiers.tiers-compact .tier {
-            padding: 10px 12px;
+        .tiers.tiers-horizontal .tier {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 14px 20px;
             border-radius: 10px;
+            text-align: left;
         }
-        .tiers.tiers-compact .tier-emoji { font-size: 20px; }
-        .tiers.tiers-compact .tier-count { font-size: 22px; margin: 3px 0; }
-        .tiers.tiers-compact .tier-name { font-size: 10px; }
-        .tiers.tiers-compact .tier-desc { font-size: 9px; margin-top: 2px; }
+        .tiers.tiers-horizontal .tier-emoji { 
+            font-size: 28px; 
+            flex-shrink: 0;
+        }
+        .tiers.tiers-horizontal .tier-info {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            flex: 1;
+        }
+        .tiers.tiers-horizontal .tier-count { 
+            font-size: 28px; 
+            font-weight: 700; 
+            margin: 0;
+            line-height: 1;
+        }
+        .tiers.tiers-horizontal .tier-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .tiers.tiers-horizontal .tier-name { 
+            font-size: 13px; 
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .tiers.tiers-horizontal .tier-desc { 
+            font-size: 11px; 
+            margin-top: 0;
+            color: var(--text3);
+        }
         
         /* Lifecycle states */
         .lifecycle-state {
@@ -1029,31 +1061,47 @@
                 <span class="panel-title">🎯 Missing Content by Tier</span>
                 <span id="tier-total-label" style="color:var(--text2);font-size:12px">Loading...</span>
             </div>
-            <div class="panel-body" style="padding: 10px 16px;">
-                <div class="tiers tiers-compact">
+            <div class="panel-body" style="padding: 12px 16px;">
+                <div class="tiers tiers-horizontal">
                     <div class="tier">
                         <div class="tier-emoji">🔥</div>
-                        <div class="tier-count" id="tier-hot">-</div>
-                        <div class="tier-name">Hot</div>
-                        <div class="tier-desc">0-90 days</div>
+                        <div class="tier-info">
+                            <div class="tier-count" id="tier-hot">-</div>
+                            <div class="tier-labels">
+                                <div class="tier-name">Hot</div>
+                                <div class="tier-desc">0-90 days</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">☀️</div>
-                        <div class="tier-count" id="tier-warm">-</div>
-                        <div class="tier-name">Warm</div>
-                        <div class="tier-desc">90-365 days</div>
+                        <div class="tier-info">
+                            <div class="tier-count" id="tier-warm">-</div>
+                            <div class="tier-labels">
+                                <div class="tier-name">Warm</div>
+                                <div class="tier-desc">90-365 days</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">❄️</div>
-                        <div class="tier-count" id="tier-cool">-</div>
-                        <div class="tier-name">Cool</div>
-                        <div class="tier-desc">1-3 years</div>
+                        <div class="tier-info">
+                            <div class="tier-count" id="tier-cool">-</div>
+                            <div class="tier-labels">
+                                <div class="tier-name">Cool</div>
+                                <div class="tier-desc">1-3 years</div>
+                            </div>
+                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">🧊</div>
-                        <div class="tier-count" id="tier-cold">-</div>
-                        <div class="tier-name">Cold</div>
-                        <div class="tier-desc">3+ years</div>
+                        <div class="tier-info">
+                            <div class="tier-count" id="tier-cold">-</div>
+                            <div class="tier-labels">
+                                <div class="tier-name">Cold</div>
+                                <div class="tier-desc">3+ years</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -2210,7 +2258,7 @@
             try {
                 // Step 1: Check API connectivity
                 if (statusEl) statusEl.textContent = 'Connecting to services...';
-                if (progressBar) progressBar.style.width = '20%';
+                if (progressBar) progressBar.style.width = '15%';
                 
                 const status = await api('status');
                 
@@ -2243,15 +2291,14 @@
                 }
                 
                 // Step 2: Load status bar
-                if (progressBar) progressBar.style.width = '40%';
+                if (progressBar) progressBar.style.width = '25%';
                 if (statusEl) statusEl.textContent = 'Loading status...';
                 await loadStatus();
                 
-                // Step 3: Load scoreboard/quick data
-                if (progressBar) progressBar.style.width = '60%';
-                if (statusEl) statusEl.textContent = 'Loading dashboard...';
+                // Step 3: Load scoreboard (fast endpoint)
+                if (progressBar) progressBar.style.width = '40%';
+                if (statusEl) statusEl.textContent = 'Loading scoreboard...';
                 
-                // Get quick scoreboard (no tier classification)
                 try {
                     const data = await api('scoreboard');
                     if (data.scoreboard) {
@@ -2260,7 +2307,6 @@
                         document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
                         document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
                         
-                        // Update finds breakdown
                         if (data.scoreboard.finds_by_source) {
                             const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
                             const radarr = data.scoreboard.finds_by_source.radarr || 0;
@@ -2278,11 +2324,30 @@
                 }
                 
                 // Step 4: Load queue (usually fast)
-                if (progressBar) progressBar.style.width = '80%';
+                if (progressBar) progressBar.style.width = '55%';
                 if (statusEl) statusEl.textContent = 'Loading queue...';
                 await loadQueue();
                 
-                // Step 5: Ready!
+                // Step 5: Load tier data with 60s timeout
+                if (progressBar) progressBar.style.width = '70%';
+                if (statusEl) statusEl.textContent = 'Loading library data...';
+                
+                const tierPromise = loadDashboard();
+                const timeoutPromise = new Promise((_, reject) => 
+                    setTimeout(() => reject(new Error('timeout')), 60000)
+                );
+                
+                try {
+                    await Promise.race([tierPromise, timeoutPromise]);
+                    if (progressBar) progressBar.style.width = '90%';
+                } catch (e) {
+                    if (e.message === 'timeout') {
+                        console.warn('Tier data timeout after 60s - proceeding without');
+                        document.getElementById('tier-total-label').textContent = 'Large library - loading in background...';
+                    }
+                }
+                
+                // Step 6: Ready!
                 if (progressBar) progressBar.style.width = '100%';
                 if (statusEl) statusEl.textContent = 'Ready!';
                 
@@ -2291,11 +2356,12 @@
                 hideInitOverlay();
                 
                 // Load remaining data in background
-                loadDashboard();  // Full dashboard with tiers (slow)
                 loadInterventions();
                 loadFinds();
                 loadSearches();
                 loadLogs();
+                
+                // If tier data timed out, it's still loading - let it finish in background
                 
             } catch (error) {
                 console.error('Initialization error:', error);
@@ -2330,6 +2396,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.30</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.31</div>
 </body>
 </html>
