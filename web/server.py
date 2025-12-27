@@ -104,6 +104,11 @@ class WebServer:
             """Get library metadata and performance settings."""
             return jsonify(self.core.get_library_info())
         
+        @self.app.route('/api/library/refresh', methods=['POST'])
+        def api_library_refresh():
+            """Manually trigger a library refresh."""
+            return jsonify(self.core.refresh_library())
+        
         @self.app.route('/api/dashboard')
         def api_dashboard():
             return jsonify(self.core.get_dashboard_data())

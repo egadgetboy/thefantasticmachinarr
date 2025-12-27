@@ -470,6 +470,47 @@ class MachinarrCore:
             },
         }
     
+    def refresh_library(self) -> Dict[str, Any]:
+        """
+        Manually refresh library data from Sonarr/Radarr.
+        
+        Forces a full catalog rebuild and updates all panels.
+        Returns information about changes detected.
+        """
+        self.log.info("Manual library refresh triggered")
+        
+        # Store old counts for comparison
+        old_missing = self.library_manager.metadata.total_missing
+        
+        # Invalidate cache to force full rebuild
+        self._tier_cache = None
+        self._tier_cache_time = None
+        
+        # Trigger progressive load (synchronous for manual refresh)
+        self._start_progressive_load()
+        
+        # Wait for it to complete (with timeout)
+        import time
+        timeout = 60  # 60 seconds max
+        start = time.time()
+        while self._progressive_loading and (time.time() - start) < timeout:
+            time.sleep(0.5)
+        
+        # Get new counts
+        new_missing = self.library_manager.metadata.total_missing
+        changes = new_missing - old_missing
+        
+        # Refresh queue status to cascade updates
+        self._refresh_queue_status()
+        
+        return {
+            'success': True,
+            'old_missing': old_missing,
+            'new_missing': new_missing,
+            'changes': abs(changes),
+            'direction': 'increased' if changes > 0 else ('decreased' if changes < 0 else 'unchanged'),
+        }
+    
     def get_scoreboard_quick(self) -> Dict[str, Any]:
         """Get just scoreboard data quickly (no tier classification)."""
         finds_by_source = {'sonarr': 0, 'radarr': 0}
