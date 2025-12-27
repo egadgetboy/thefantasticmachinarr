@@ -234,6 +234,17 @@ class MachinarrCore:
                 'tasks': [t.to_dict() for t in self.scheduler.tasks.values()]
             }
         
+        # Check if we have recent tier data cached (ready to display)
+        has_cached_data = (
+            self._tier_cache is not None and 
+            self._tier_cache_time is not None
+        )
+        
+        # Calculate cache age in seconds
+        cache_age = None
+        if self._tier_cache_time:
+            cache_age = (datetime.now() - self._tier_cache_time).total_seconds()
+        
         return {
             'scoreboard': {
                 'finds_today': self.searcher.finds_today,
@@ -245,6 +256,8 @@ class MachinarrCore:
             'scheduler': scheduler_info,
             'stuck_count': len(self.queue_monitor.get_stuck_items()),
             'intervention_count': len(self.queue_monitor.get_pending_interventions()),
+            'ready': has_cached_data,  # True if tier data is cached
+            'cache_age': cache_age,  # Seconds since last tier data fetch
         }
     
     def get_dashboard_data(self) -> Dict[str, Any]:

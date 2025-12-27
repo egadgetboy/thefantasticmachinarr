@@ -2428,10 +2428,12 @@
             const timerEl = document.getElementById('init-timer');
             const progressBar = document.getElementById('init-progress');
             
-            // Quick check - try to load status silently first
+            // Quick check - try to load scoreboard first to see if data is ready
             try {
-                const status = await api('status');
+                const data = await api('scoreboard');
                 
+                // Check if services are connected
+                const status = await api('status');
                 let sonarrOk = false;
                 let radarrOk = false;
                 
@@ -2442,77 +2444,85 @@
                     }
                 }
                 
-                if (sonarrOk || radarrOk) {
-                    // Services connected - load essential data first, then hide overlay
-                    
-                    // Load status bar
-                    loadStatus();
-                    
-                    // Load scoreboard quickly so it's not showing "Initializing..."
-                    try {
-                        const data = await api('scoreboard');
-                        if (data.scoreboard) {
-                            document.getElementById('finds-today').textContent = data.scoreboard.finds_today || 0;
-                            document.getElementById('finds-total').textContent = data.scoreboard.finds_total || 0;
-                            document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
-                            document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
-                            
-                            if (data.scoreboard.finds_by_source) {
-                                const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
-                                const radarr = data.scoreboard.finds_by_source.radarr || 0;
-                                const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
-                                const todayBreakdown = document.getElementById('finds-today-breakdown');
-                                const totalBreakdown = document.getElementById('finds-total-breakdown');
-                                if (todayBreakdown) todayBreakdown.textContent = breakdownText;
-                                if (totalBreakdown) totalBreakdown.textContent = breakdownText;
-                            }
-                            
-                            updateStatusIndicator(data.scoreboard, data.scheduler);
-                        }
-                    } catch (e) {
-                        console.warn('Scoreboard quick load failed:', e);
+                if (!sonarrOk && !radarrOk) {
+                    // No services connected - show warning overlay
+                    if (statusEl) statusEl.textContent = 'No services connected - check settings';
+                    if (progressBar) {
+                        progressBar.style.width = '100%';
+                        progressBar.style.background = 'var(--warn)';
                     }
+                    updateInitStep('config', 'done');
+                    updateInitStep('services', 'done');
                     
-                    // NOW hide the overlay - scoreboard has data
+                    await new Promise(r => setTimeout(r, 2000));
                     hideInitOverlay();
                     
-                    // Load remaining data in background
-                    loadDashboard();  // Full tier data (slow)
+                    loadDashboard();
+                    loadQueue();
+                    loadFinds();
+                    loadSearches();
+                    loadLogs();
+                    return;
+                }
+                
+                // Services connected - populate scoreboard immediately
+                if (data.scoreboard) {
+                    document.getElementById('finds-today').textContent = data.scoreboard.finds_today || 0;
+                    document.getElementById('finds-total').textContent = data.scoreboard.finds_total || 0;
+                    document.getElementById('api-used').textContent = data.scoreboard.api_hits_today || 0;
+                    document.getElementById('api-limit').textContent = data.scoreboard.api_limit || 500;
+                    
+                    if (data.scoreboard.finds_by_source) {
+                        const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
+                        const radarr = data.scoreboard.finds_by_source.radarr || 0;
+                        const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
+                        const todayBreakdown = document.getElementById('finds-today-breakdown');
+                        const totalBreakdown = document.getElementById('finds-total-breakdown');
+                        if (todayBreakdown) todayBreakdown.textContent = breakdownText;
+                        if (totalBreakdown) totalBreakdown.textContent = breakdownText;
+                    }
+                    
+                    updateStatusIndicator(data.scoreboard, data.scheduler);
+                }
+                
+                // Check if tier data is already cached (ready = true means no long init needed)
+                const dataReady = data.ready === true;
+                const cacheAge = data.cache_age || null;
+                const cacheIsFresh = cacheAge !== null && cacheAge < 300; // Less than 5 minutes old
+                
+                if (dataReady && cacheIsFresh) {
+                    // Data is cached and fresh - skip overlay entirely, just load everything
+                    hideInitOverlay();
+                    
+                    loadStatus();
+                    loadDashboard();
                     loadQueue();
                     loadInterventions();
                     loadFinds();
                     loadSearches();
                     loadLogs();
-                    
-                    // Trigger first search if this looks like a fresh start (no searches yet)
-                    try {
-                        const searchData = await api('searches');
-                        if (!searchData.searches || searchData.searches.length === 0) {
-                            setTimeout(() => runSearch(), 2000);
-                        }
-                    } catch (e) {}
-                    
                     return;
                 }
                 
-                // No services connected - show the overlay with warning
-                if (statusEl) statusEl.textContent = 'No services connected - check settings';
-                if (progressBar) {
-                    progressBar.style.width = '100%';
-                    progressBar.style.background = 'var(--warn)';
-                }
-                updateInitStep('config', 'done');
-                updateInitStep('services', 'done');
-                
-                await new Promise(r => setTimeout(r, 2000));
+                // Data not cached or stale - need to do full init
+                // But scoreboard is already populated, so hide overlay and load in background
                 hideInitOverlay();
                 
-                // Still load what we can
-                loadDashboard();
+                loadStatus();
+                loadDashboard();  // This will be slow but happens in background
                 loadQueue();
+                loadInterventions();
                 loadFinds();
                 loadSearches();
                 loadLogs();
+                
+                // Trigger first search if this looks like a fresh start (no searches yet)
+                try {
+                    const searchData = await api('searches');
+                    if (!searchData.searches || searchData.searches.length === 0) {
+                        setTimeout(() => runSearch(), 2000);
+                    }
+                } catch (e) {}
                 
             } catch (error) {
                 // API error - show overlay with error
@@ -2547,6 +2557,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.40</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.41</div>
 </body>
 </html>
