@@ -35,17 +35,29 @@ class SonarrClient(BaseClient):
         """Get a specific episode."""
         return self.get(f'episode/{episode_id}')
     
-    def get_missing_episodes(self) -> List[Dict]:
-        """Get all monitored missing episodes."""
-        # Use wanted/missing endpoint with pagination
+    def get_missing_episodes(self, page: int = None, page_size: int = None) -> List[Dict]:
+        """Get monitored missing episodes. If page specified, returns single page.
+        Otherwise returns all (paginated internally)."""
+        if page is not None:
+            # Single page mode
+            result = self.get('wanted/missing', params={
+                'page': page,
+                'pageSize': page_size or 1000,
+                'sortKey': 'airDateUtc',
+                'sortDirection': 'descending',
+                'monitored': True
+            })
+            return result.get('records', [])
+        
+        # All pages mode (original behavior)
         all_missing = []
-        page = 1
-        page_size = 100
+        current_page = 1
+        fetch_size = 100
         
         while True:
             result = self.get('wanted/missing', params={
-                'page': page,
-                'pageSize': page_size,
+                'page': current_page,
+                'pageSize': fetch_size,
                 'sortKey': 'airDateUtc',
                 'sortDirection': 'descending',
                 'monitored': True
@@ -54,26 +66,38 @@ class SonarrClient(BaseClient):
             records = result.get('records', [])
             all_missing.extend(records)
             
-            if len(records) < page_size:
+            if len(records) < fetch_size:
                 break
-            page += 1
+            current_page += 1
             
             # Safety limit - 500 pages = 50,000 items max
-            if page > 500:
+            if current_page > 500:
                 break
         
         return all_missing
     
-    def get_cutoff_unmet(self) -> List[Dict]:
-        """Get episodes that don't meet quality cutoff (upgrades wanted)."""
+    def get_cutoff_unmet(self, page: int = None, page_size: int = None) -> List[Dict]:
+        """Get episodes that don't meet quality cutoff. If page specified, returns single page."""
+        if page is not None:
+            # Single page mode
+            result = self.get('wanted/cutoff', params={
+                'page': page,
+                'pageSize': page_size or 1000,
+                'sortKey': 'airDateUtc',
+                'sortDirection': 'descending',
+                'monitored': True
+            })
+            return result.get('records', [])
+        
+        # All pages mode (original behavior)
         all_cutoff = []
-        page = 1
-        page_size = 100
+        current_page = 1
+        fetch_size = 100
         
         while True:
             result = self.get('wanted/cutoff', params={
-                'page': page,
-                'pageSize': page_size,
+                'page': current_page,
+                'pageSize': fetch_size,
                 'sortKey': 'airDateUtc',
                 'sortDirection': 'descending',
                 'monitored': True
@@ -82,12 +106,12 @@ class SonarrClient(BaseClient):
             records = result.get('records', [])
             all_cutoff.extend(records)
             
-            if len(records) < page_size:
+            if len(records) < fetch_size:
                 break
-            page += 1
+            current_page += 1
             
             # Safety limit - 500 pages = 50,000 items max
-            if page > 500:
+            if current_page > 500:
                 break
         
         return all_cutoff

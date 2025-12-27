@@ -1993,10 +1993,25 @@
                 
                 const tierLabel = document.getElementById('tier-total-label');
                 if (tierLabel) {
-                    tierLabel.textContent = `${total.toLocaleString()} total (📺 ${totalSonarr.toLocaleString()} • 🎬 ${totalRadarr.toLocaleString()})`;
+                    // Show loading indicator if still loading
+                    if (data.loading) {
+                        tierLabel.innerHTML = `<span style="color:var(--accent)">📊 ${data.loading_stage || 'Loading...'}</span>`;
+                    } else {
+                        tierLabel.textContent = `${total.toLocaleString()} total (📺 ${totalSonarr.toLocaleString()} • 🎬 ${totalRadarr.toLocaleString()})`;
+                    }
                 }
             }
+            
+            // If still loading, poll more frequently
+            if (data.loading && !dashboardPolling) {
+                dashboardPolling = setInterval(loadDashboard, 2000);
+            } else if (!data.loading && dashboardPolling) {
+                clearInterval(dashboardPolling);
+                dashboardPolling = null;
+            }
         }
+        
+        let dashboardPolling = null;
         
         function updateStatusIndicator(scoreboard, scheduler) {
             const card = document.getElementById('status-card');
@@ -3570,7 +3585,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.80';
+        const CURRENT_VERSION = '1.0.81';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3664,6 +3679,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.80</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.81</div>
 </body>
 </html>

@@ -44,6 +44,22 @@ class MachinarrCore:
         self._tier_cache_time = None
         self._tier_cache_ttl = 60  # seconds
         
+        # Progressive loading state
+        self._progressive_loading = False
+        self._progressive_stage = ''
+        self._progressive_counts = {
+            'sonarr_missing': 0,
+            'sonarr_upgrade': 0,
+            'radarr_missing': 0,
+            'radarr_upgrade': 0,
+        }
+        self._progressive_tiers = {
+            'hot': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'warm': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cool': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cold': {'sonarr': 0, 'radarr': 0, 'total': 0},
+        }
+        
         # Global activity state (shared across all browser sessions)
         self._activity_lock = threading.Lock()
         self._activity_state = {
@@ -325,15 +341,12 @@ class MachinarrCore:
             missing_data = self._tier_cache
             self.log.debug("Using cached tier data")
         else:
-            # Get missing/upgrade data with TRUE counts (expensive)
-            self.log.info("Fetching fresh tier data from Sonarr/Radarr...")
-            self.set_activity('cataloging', 'Cataloging library', 'Fetching missing content from Sonarr/Radarr...')
-            missing_data = self._get_all_missing(include_items=False)
-            self._tier_cache = missing_data
-            self._tier_cache_time = now
-            self.log.info("Tier data cached")
-            # Reset to idle after cataloging
-            self.set_activity('idle', 'Ready', 'Library catalog updated')
+            # Start progressive loading in background if not already running
+            if not self._progressive_loading:
+                self._start_progressive_load()
+            
+            # Return current progressive state (partial data)
+            missing_data = self._get_progressive_state()
         
         scoreboard = {
             'finds_today': self.searcher.finds_today,
@@ -364,7 +377,155 @@ class MachinarrCore:
             'stuck_count': len(self.queue_monitor.get_stuck_items()),
             'intervention_count': len(self.queue_monitor.get_pending_interventions()),
             'scheduler': scheduler_info,
+            'loading': self._progressive_loading,
+            'loading_stage': self._progressive_stage,
         }
+    
+    def _init_progressive_state(self):
+        """Initialize progressive loading state."""
+        self._progressive_loading = False
+        self._progressive_stage = ''
+        self._progressive_counts = {
+            'sonarr_missing': 0,
+            'sonarr_upgrade': 0,
+            'radarr_missing': 0,
+            'radarr_upgrade': 0,
+        }
+        self._progressive_tiers = {
+            'hot': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'warm': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cool': {'sonarr': 0, 'radarr': 0, 'total': 0},
+            'cold': {'sonarr': 0, 'radarr': 0, 'total': 0},
+        }
+    
+    def _get_progressive_state(self) -> Dict[str, Any]:
+        """Get current progressive loading state."""
+        return {
+            'counts': self._progressive_counts.copy(),
+            'tier_counts': {k: v.copy() for k, v in self._progressive_tiers.items()},
+            'total_missing': self._progressive_counts['sonarr_missing'] + self._progressive_counts['radarr_missing'],
+            'total_upgrades': self._progressive_counts['sonarr_upgrade'] + self._progressive_counts['radarr_upgrade'],
+        }
+    
+    def _start_progressive_load(self):
+        """Start progressive loading in background thread."""
+        import threading
+        
+        if self._progressive_loading:
+            return  # Already loading
+        
+        self._progressive_loading = True
+        self._init_progressive_state()
+        self._progressive_loading = True  # Re-set after init
+        
+        def load_progressively():
+            try:
+                self.set_activity('cataloging', 'Cataloging library', 'Starting...')
+                
+                # Sonarr missing episodes (paginated)
+                for name, client in self.sonarr_clients.items():
+                    try:
+                        self._progressive_stage = f'Sonarr ({name}): missing episodes'
+                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                        
+                        # Get paginated
+                        page = 1
+                        page_size = 1000
+                        while True:
+                            episodes = client.get_missing_episodes(page=page, page_size=page_size)
+                            if not episodes:
+                                break
+                            
+                            self._progressive_counts['sonarr_missing'] += len(episodes)
+                            
+                            # Tally tiers
+                            for ep in episodes:
+                                tier = self.tier_manager.classify_from_date_str(
+                                    ep.get('airDateUtc') or ep.get('airDate')
+                                )
+                                self._progressive_tiers[tier]['sonarr'] += 1
+                                self._progressive_tiers[tier]['total'] += 1
+                            
+                            self._progressive_stage = f'Sonarr ({name}): {self._progressive_counts["sonarr_missing"]} missing'
+                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                            
+                            if len(episodes) < page_size:
+                                break
+                            page += 1
+                            
+                    except Exception as e:
+                        self.log.error(f"Sonarr ({name}) missing episodes error: {e}")
+                
+                # Sonarr upgrades (paginated)
+                for name, client in self.sonarr_clients.items():
+                    try:
+                        self._progressive_stage = f'Sonarr ({name}): upgrades'
+                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                        
+                        page = 1
+                        page_size = 1000
+                        while True:
+                            episodes = client.get_cutoff_unmet(page=page, page_size=page_size)
+                            if not episodes:
+                                break
+                            
+                            self._progressive_counts['sonarr_upgrade'] += len(episodes)
+                            self._progressive_stage = f'Sonarr ({name}): {self._progressive_counts["sonarr_upgrade"]} upgrades'
+                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                            
+                            if len(episodes) < page_size:
+                                break
+                            page += 1
+                            
+                    except Exception as e:
+                        self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
+                
+                # Radarr missing movies
+                for name, client in self.radarr_clients.items():
+                    try:
+                        self._progressive_stage = f'Radarr ({name}): missing movies'
+                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                        
+                        movies = client.get_missing_movies()
+                        self._progressive_counts['radarr_missing'] += len(movies)
+                        
+                        for movie in movies:
+                            tier = self.tier_manager.classify_movie_date(movie)
+                            self._progressive_tiers[tier]['radarr'] += 1
+                            self._progressive_tiers[tier]['total'] += 1
+                        
+                        self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_missing"]} missing'
+                        
+                    except Exception as e:
+                        self.log.error(f"Radarr ({name}) missing movies error: {e}")
+                
+                # Radarr upgrades
+                for name, client in self.radarr_clients.items():
+                    try:
+                        self._progressive_stage = f'Radarr ({name}): upgrades'
+                        self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                        
+                        movies = client.get_cutoff_unmet()
+                        self._progressive_counts['radarr_upgrade'] += len(movies)
+                        
+                    except Exception as e:
+                        self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
+                
+                # Cache the final result
+                self._tier_cache = self._get_progressive_state()
+                self._tier_cache_time = datetime.now()
+                self.log.info("Tier data cached (progressive load complete)")
+                self.set_activity('idle', 'Ready', 'Library catalog updated')
+                
+            except Exception as e:
+                self.log.error(f"Progressive load failed: {e}")
+                self.set_activity('idle', 'Error', str(e))
+            finally:
+                self._progressive_loading = False
+                self._progressive_stage = ''
+        
+        thread = threading.Thread(target=load_progressively, daemon=True)
+        thread.start()
     
     def _get_all_missing(self, include_items: bool = True, limit_per_instance: int = 100) -> Dict[str, Any]:
         """Get all missing items AND upgrades from all instances.
