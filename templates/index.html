@@ -2234,8 +2234,17 @@
             // SABnzbd downloads are managed through Sonarr/Radarr
             let serviceName, actionService;
             if (item.source === 'sabnzbd') {
-                // SABnzbd is just the downloader - actions go through Sonarr/Radarr
-                actionService = item.series_id ? 'Sonarr' : 'Radarr';
+                // SABnzbd is just the downloader - determine service from instance name or IDs
+                // Check instance name for hints (e.g., "Sabnzbd Sonarr", "SAB Radarr")
+                const instanceLower = (item.instance || '').toLowerCase();
+                if (item.series_id || item.episode_id || instanceLower.includes('sonarr')) {
+                    actionService = 'Sonarr';
+                } else if (item.movie_id || instanceLower.includes('radarr')) {
+                    actionService = 'Radarr';
+                } else {
+                    // Default guess based on content - TV shows usually have SxxExx pattern
+                    actionService = /s\d{1,2}e\d{1,2}/i.test(item.title) ? 'Sonarr' : 'Radarr';
+                }
                 serviceName = `SABnzbd → ${actionService}`;
             } else {
                 serviceName = item.source === 'sonarr' ? 'Sonarr' : 'Radarr';
@@ -2248,7 +2257,7 @@
             
             document.getElementById('modal-desc').innerHTML = `
                 <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)">
-                    <strong>Source:</strong> ${serviceName}${item.instance && item.source !== 'sabnzbd' ? ` (${esc(item.instance)})` : ''}
+                    <strong>Source:</strong> ${serviceName}${item.instance ? ` (${esc(item.instance)})` : ''}
                 </div>
             `;
             
@@ -2263,6 +2272,8 @@
                 </div>
             `;
             
+            // Store actionService in item for use by action functions
+            item.actionService = actionService.toLowerCase();
             const itemStr = JSON.stringify(item).replace(/'/g, "\\'");
             
             document.getElementById('modal-actions').innerHTML = `
@@ -2291,8 +2302,19 @@
             updateActivityBar('searching', 'Blocklisting: ' + item.title.substring(0, 30) + '...', 'Removing and searching for alternative...');
             
             try {
+                // Use actionService if set, otherwise detect from source/instance
+                let targetService = item.actionService || item.source;
+                if (item.source === 'sabnzbd') {
+                    const instanceLower = (item.instance || '').toLowerCase();
+                    if (instanceLower.includes('sonarr') || /s\d{1,2}e\d{1,2}/i.test(item.title)) {
+                        targetService = 'sonarr';
+                    } else {
+                        targetService = 'radarr';
+                    }
+                }
+                
                 const data = await api('resolve', 'POST', {
-                    source: item.source === 'sabnzbd' ? (item.series_id ? 'sonarr' : 'radarr') : item.source,
+                    source: targetService,
                     queue_id: item.queue_id,
                     action: 'blocklist_retry'
                 });
@@ -2309,8 +2331,19 @@
             updateActivityBar('searching', 'Removing: ' + item.title.substring(0, 30) + '...', 'Canceling download...');
             
             try {
+                // Use actionService if set, otherwise detect from source/instance
+                let targetService = item.actionService || item.source;
+                if (item.source === 'sabnzbd') {
+                    const instanceLower = (item.instance || '').toLowerCase();
+                    if (instanceLower.includes('sonarr') || /s\d{1,2}e\d{1,2}/i.test(item.title)) {
+                        targetService = 'sonarr';
+                    } else {
+                        targetService = 'radarr';
+                    }
+                }
+                
                 const data = await api('resolve', 'POST', {
-                    source: item.source === 'sabnzbd' ? (item.series_id ? 'sonarr' : 'radarr') : item.source,
+                    source: targetService,
                     queue_id: item.queue_id,
                     action: 'remove'
                 });
@@ -3467,7 +3500,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.75';
+        const CURRENT_VERSION = '1.0.76';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3561,6 +3594,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.75</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.76</div>
 </body>
 </html>
