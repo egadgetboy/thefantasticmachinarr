@@ -377,39 +377,26 @@
             background: var(--bg3);
         }
         
-        /* Collapsible panels */
-        .panel-head.collapsible {
-            cursor: pointer;
-            user-select: none;
-        }
-        
-        .panel-head.collapsible:hover {
-            background: var(--bg);
-        }
-        
-        .panel-head .collapse-icon {
-            margin-left: 8px;
-            padding: 4px 12px;
-            transition: transform 0.2s ease;
-            opacity: 0.6;
-        }
-        
-        .panel.collapsed .panel-head .collapse-icon {
-            transform: rotate(-90deg);
-        }
-        
-        .panel.collapsed .panel-body {
-            display: none;
-        }
-        
-        .panel.collapsed .panel-head {
-            border-bottom: none;
-        }
-        
         .panel-title {
             font-weight: 600;
             font-size: 15px;
             letter-spacing: -0.2px;
+        }
+        
+        /* Expand hint shown when more than 5 items */
+        .expand-hint {
+            text-align: center;
+            padding: 8px;
+            color: var(--text3);
+            font-size: 12px;
+            border-top: 1px solid var(--border);
+            cursor: pointer;
+            transition: all var(--transition);
+        }
+        
+        .expand-hint:hover {
+            background: var(--bg-hover);
+            color: var(--accent);
         }
         
         .panel-body {
@@ -1675,14 +1662,13 @@
         
         <!-- Row 2: Search History -->
         <div class="panel" id="search-panel">
-            <div class="panel-head collapsible" onclick="togglePanel('search-panel', event)">
+            <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
                     <span class="panel-title">🔍 Search History</span>
-                    <span class="collapse-icon">▼</span>
-                    <button class="btn btn-sm btn-pri" onclick="event.stopPropagation(); runSearch()">Search Now</button>
-                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('search')" title="Expand to full view">⛶</button>
+                    <button class="btn btn-sm btn-pri" onclick="runSearch()">Search Now</button>
+                    <button class="expand-btn" onclick="openExpandedPanel('search')" title="Expand to full view">⛶</button>
                 </div>
-                <div style="display:flex;gap:12px;align-items:center" onclick="event.stopPropagation()">
+                <div style="display:flex;gap:12px;align-items:center">
                     <input type="text" id="search-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
                     <select id="search-filter-tier" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterSearchActivity()">
                         <option value="">All Tiers</option>
@@ -1707,14 +1693,13 @@
         
         <!-- Row 3: Downloading Now -->
         <div class="panel" id="downloads-panel">
-            <div class="panel-head collapsible" onclick="togglePanel('downloads-panel', event)">
+            <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
                     <span class="panel-title">⬇️ Downloading Now</span>
-                    <span class="collapse-icon">▼</span>
                     <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
-                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('downloads')" title="Expand to full view">⛶</button>
+                    <button class="expand-btn" onclick="openExpandedPanel('downloads')" title="Expand to full view">⛶</button>
                 </div>
-                <div style="display:flex;gap:12px;align-items:center" onclick="event.stopPropagation()">
+                <div style="display:flex;gap:12px;align-items:center">
                     <input type="text" id="downloads-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterDownloads()">
                     <select id="downloads-sort" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterDownloads()">
                         <option value="progress-desc">Finishing Soon</option>
@@ -1732,7 +1717,7 @@
                 </div>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="downloads-list" style="max-height:280px">
+                <div class="data-table-wrap" id="downloads-list">
                     <div class="empty"><div class="empty-icon">📭</div><p>Nothing downloading</p></div>
                 </div>
             </div>
@@ -1740,16 +1725,15 @@
         
         <!-- Row 4: Recently Grabbed -->
         <div class="panel" id="finds-panel">
-            <div class="panel-head collapsible" onclick="togglePanel('finds-panel', event)">
+            <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="panel-title">✅ Recently Grabbed</span>
-                    <span class="collapse-icon">▼</span>
-                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('finds')" title="Expand to full view">⛶</button>
+                    <button class="expand-btn" onclick="openExpandedPanel('finds')" title="Expand to full view">⛶</button>
                 </div>
                 <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="finds-list" style="max-height:220px">
+                <div class="data-table-wrap" id="finds-list">
                     <div class="empty"><div class="empty-icon">🔍</div><p>No grabs yet - TFM is working on it!</p></div>
                 </div>
             </div>
@@ -1757,19 +1741,15 @@
         
         <!-- Row 5: Download Problems -->
         <div class="panel" id="problems-panel">
-            <div class="panel-head collapsible" onclick="togglePanel('problems-panel', event)">
+            <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="panel-title">⚠️ Download Problems</span>
-                    <span class="collapse-icon">▼</span>
-                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('problems')" title="Expand to full view">⛶</button>
-                </div>
-                    <span class="panel-title">⚠️ Download Problems</span>
-                    <span class="collapse-icon">▼</span>
+                    <button class="expand-btn" onclick="openExpandedPanel('problems')" title="Expand to full view">⛶</button>
                 </div>
                 <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="stuck-list" style="max-height:250px">
+                <div class="data-table-wrap" id="stuck-list">
                     <div class="empty"><div class="empty-icon">✅</div><p>No problems</p></div>
                 </div>
             </div>
@@ -1777,16 +1757,15 @@
         
         <!-- Row 6: Needs Attention -->
         <div class="panel" id="attention-panel">
-            <div class="panel-head collapsible" onclick="togglePanel('attention-panel', event)">
+            <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="panel-title">🖐️ Needs Attention</span>
-                    <span class="collapse-icon">▼</span>
-                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('interventions')" title="Expand to full view">⛶</button>
+                    <button class="expand-btn" onclick="openExpandedPanel('interventions')" title="Expand to full view">⛶</button>
                 </div>
                 <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="intervention-list" style="max-height:250px">
+                <div class="data-table-wrap" id="intervention-list">
                     <div class="empty"><div class="empty-icon">👍</div><p>Nothing needs attention</p></div>
                 </div>
             </div>
@@ -2032,36 +2011,6 @@
             updateThemeButtons();
         }
         
-        // Panel collapse/expand (per-device preference)
-        function togglePanel(panelId, event) {
-            // Don't toggle if clicking on controls
-            if (event && event.target.closest('input, select, button')) return;
-            
-            const panel = document.getElementById(panelId);
-            if (!panel) return;
-            
-            panel.classList.toggle('collapsed');
-            
-            // Save state to localStorage (per-device preference, OK)
-            const collapsed = JSON.parse(localStorage.getItem('tfm-collapsed-panels') || '{}');
-            collapsed[panelId] = panel.classList.contains('collapsed');
-            localStorage.setItem('tfm-collapsed-panels', JSON.stringify(collapsed));
-        }
-        
-        // Restore collapsed panels on load
-        function restoreCollapsedPanels() {
-            const collapsed = JSON.parse(localStorage.getItem('tfm-collapsed-panels') || '{}');
-            for (const [panelId, isCollapsed] of Object.entries(collapsed)) {
-                if (isCollapsed) {
-                    const panel = document.getElementById(panelId);
-                    if (panel) panel.classList.add('collapsed');
-                }
-            }
-        }
-        
-        // Call on page load
-        document.addEventListener('DOMContentLoaded', restoreCollapsedPanels);
-        
         function updateThemeButtons() {
             const theme = document.documentElement.getAttribute('data-theme');
             const darkBtn = document.getElementById('theme-dark-btn');
@@ -2086,8 +2035,8 @@
         document.documentElement.setAttribute('data-theme', savedTheme);
         document.querySelector('.theme-btn').textContent = savedTheme === 'dark' ? '🌙' : '☀️';
         
-        // Pagination state - store up to 500 items, show 10 per page
-        const PAGE_SIZE = 10;
+        // Pagination state - store up to 500 items, show 5 per page in panels
+        const PAGE_SIZE = 5;
         const MAX_ITEMS = 500;
         const paginationState = {
             searches: { items: [], page: 0 },
@@ -2096,43 +2045,28 @@
             interventions: { items: [], page: 0 }
         };
         
+        // Map container IDs to panel types for expand
+        const containerToPanelType = {
+            'search-list': 'search',
+            'finds-list': 'finds',
+            'stuck-list': 'problems',
+            'intervention-list': 'interventions'
+        };
+        
         function renderPagination(containerId, state, renderFn) {
-            const totalPages = Math.ceil(state.items.length / PAGE_SIZE);
-            const start = state.page * PAGE_SIZE;
-            const end = start + PAGE_SIZE;
-            const pageItems = state.items.slice(start, end);
+            const totalItems = state.items.length;
+            const pageItems = state.items.slice(0, PAGE_SIZE);  // Always show first 5
+            const remaining = totalItems - PAGE_SIZE;
             
-            const paginationHtml = totalPages > 1 ? `
-                <div class="pagination">
-                    <button class="btn btn-sm btn-sec" onclick="pageNav('${containerId}', -1)" ${state.page === 0 ? 'disabled' : ''}>← Prev</button>
-                    <span class="page-info">Page ${state.page + 1} of ${totalPages} (${state.items.length} total)</span>
-                    <button class="btn btn-sm btn-sec" onclick="pageNav('${containerId}', 1)" ${state.page >= totalPages - 1 ? 'disabled' : ''}>Next →</button>
+            // Show expand hint if more than 5 items
+            const panelType = containerToPanelType[containerId];
+            const expandHintHtml = remaining > 0 ? `
+                <div class="expand-hint" onclick="openExpandedPanel('${panelType}')">
+                    📋 ${remaining} more item${remaining > 1 ? 's' : ''} — click to expand
                 </div>
             ` : '';
             
-            return { pageItems, paginationHtml };
-        }
-        
-        function pageNav(containerId, direction) {
-            // Map container IDs to state keys
-            const keyMap = {
-                'search-list': 'searches',
-                'finds-list': 'finds',
-                'stuck-list': 'queue',
-                'intervention-list': 'interventions'
-            };
-            const stateKey = keyMap[containerId];
-            const state = paginationState[stateKey];
-            if (!state) return;
-            
-            const totalPages = Math.ceil(state.items.length / PAGE_SIZE);
-            state.page = Math.max(0, Math.min(totalPages - 1, state.page + direction));
-            
-            // Re-render the appropriate list
-            if (stateKey === 'searches') renderSearchesPage();
-            else if (stateKey === 'finds') renderFindsPage();
-            else if (stateKey === 'queue') renderQueuePage();
-            else if (stateKey === 'interventions') renderInterventionsPage();
+            return { pageItems, paginationHtml: expandHintHtml };
         }
         
         // Expanded Panel State
@@ -4119,7 +4053,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.99';
+        const CURRENT_VERSION = '1.0.100';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4274,6 +4208,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.99</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.100</div>
 </body>
 </html>
