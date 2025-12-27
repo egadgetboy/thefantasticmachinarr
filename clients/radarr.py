@@ -25,16 +25,28 @@ class RadarrClient(BaseClient):
         """Get a specific movie."""
         return self.get(f'movie/{movie_id}')
     
-    def get_missing_movies(self) -> List[Dict]:
-        """Get all monitored missing movies."""
+    def get_missing_movies(self, page: int = None, page_size: int = None) -> List[Dict]:
+        """Get monitored missing movies. If page specified, returns single page."""
+        if page is not None:
+            # Single page mode
+            result = self.get('wanted/missing', params={
+                'page': page,
+                'pageSize': page_size or 1000,
+                'sortKey': 'digitalRelease',
+                'sortDirection': 'descending',
+                'monitored': True
+            })
+            return result.get('records', [])
+        
+        # All pages mode (original behavior)
         all_missing = []
-        page = 1
-        page_size = 100
+        current_page = 1
+        fetch_size = 100
         
         while True:
             result = self.get('wanted/missing', params={
-                'page': page,
-                'pageSize': page_size,
+                'page': current_page,
+                'pageSize': fetch_size,
                 'sortKey': 'digitalRelease',
                 'sortDirection': 'descending',
                 'monitored': True
@@ -43,26 +55,38 @@ class RadarrClient(BaseClient):
             records = result.get('records', [])
             all_missing.extend(records)
             
-            if len(records) < page_size:
+            if len(records) < fetch_size:
                 break
-            page += 1
+            current_page += 1
             
             # Safety limit - 500 pages = 50,000 items max
-            if page > 500:
+            if current_page > 500:
                 break
         
         return all_missing
     
-    def get_cutoff_unmet(self) -> List[Dict]:
-        """Get movies that don't meet quality cutoff (upgrades wanted)."""
+    def get_cutoff_unmet(self, page: int = None, page_size: int = None) -> List[Dict]:
+        """Get movies that don't meet quality cutoff. If page specified, returns single page."""
+        if page is not None:
+            # Single page mode
+            result = self.get('wanted/cutoff', params={
+                'page': page,
+                'pageSize': page_size or 1000,
+                'sortKey': 'digitalRelease',
+                'sortDirection': 'descending',
+                'monitored': True
+            })
+            return result.get('records', [])
+        
+        # All pages mode (original behavior)
         all_cutoff = []
-        page = 1
-        page_size = 100
+        current_page = 1
+        fetch_size = 100
         
         while True:
             result = self.get('wanted/cutoff', params={
-                'page': page,
-                'pageSize': page_size,
+                'page': current_page,
+                'pageSize': fetch_size,
                 'sortKey': 'digitalRelease',
                 'sortDirection': 'descending',
                 'monitored': True
@@ -71,12 +95,12 @@ class RadarrClient(BaseClient):
             records = result.get('records', [])
             all_cutoff.extend(records)
             
-            if len(records) < page_size:
+            if len(records) < fetch_size:
                 break
-            page += 1
+            current_page += 1
             
             # Safety limit - 500 pages = 50,000 items max
-            if page > 500:
+            if current_page > 500:
                 break
         
         return all_cutoff

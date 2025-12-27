@@ -2133,7 +2133,25 @@
             }
             
             updateActivityBar(status, message, detail);
+            
+            // Smart polling: if searching, poll data more frequently
+            if (status === 'searching' && !searchPolling) {
+                searchPolling = setInterval(() => {
+                    loadSearches();
+                    loadFinds();
+                    loadQueue();
+                }, 3000);
+            } else if (status !== 'searching' && searchPolling) {
+                clearInterval(searchPolling);
+                searchPolling = null;
+                // One final load to get complete results
+                loadSearches();
+                loadFinds();
+                loadQueue();
+            }
         }
+        
+        let searchPolling = null;
         
         async function loadQueue() {
             const data = await api('queue');
@@ -3585,7 +3603,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.81';
+        const CURRENT_VERSION = '1.0.82';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3679,6 +3697,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.81</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.82</div>
 </body>
 </html>

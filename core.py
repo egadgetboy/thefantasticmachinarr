@@ -480,33 +480,56 @@ class MachinarrCore:
                     except Exception as e:
                         self.log.error(f"Sonarr ({name}) cutoff unmet error: {e}")
                 
-                # Radarr missing movies
+                # Radarr missing movies (paginated)
                 for name, client in self.radarr_clients.items():
                     try:
                         self._progressive_stage = f'Radarr ({name}): missing movies'
                         self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
                         
-                        movies = client.get_missing_movies()
-                        self._progressive_counts['radarr_missing'] += len(movies)
-                        
-                        for movie in movies:
-                            tier = self.tier_manager.classify_movie_date(movie)
-                            self._progressive_tiers[tier]['radarr'] += 1
-                            self._progressive_tiers[tier]['total'] += 1
-                        
-                        self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_missing"]} missing'
+                        page = 1
+                        page_size = 1000
+                        while True:
+                            movies = client.get_missing_movies(page=page, page_size=page_size)
+                            if not movies:
+                                break
+                            
+                            self._progressive_counts['radarr_missing'] += len(movies)
+                            
+                            for movie in movies:
+                                tier = self.tier_manager.classify_movie_date(movie)
+                                self._progressive_tiers[tier]['radarr'] += 1
+                                self._progressive_tiers[tier]['total'] += 1
+                            
+                            self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_missing"]} missing'
+                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                            
+                            if len(movies) < page_size:
+                                break
+                            page += 1
                         
                     except Exception as e:
                         self.log.error(f"Radarr ({name}) missing movies error: {e}")
                 
-                # Radarr upgrades
+                # Radarr upgrades (paginated)
                 for name, client in self.radarr_clients.items():
                     try:
                         self._progressive_stage = f'Radarr ({name}): upgrades'
                         self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
                         
-                        movies = client.get_cutoff_unmet()
-                        self._progressive_counts['radarr_upgrade'] += len(movies)
+                        page = 1
+                        page_size = 1000
+                        while True:
+                            movies = client.get_cutoff_unmet(page=page, page_size=page_size)
+                            if not movies:
+                                break
+                            
+                            self._progressive_counts['radarr_upgrade'] += len(movies)
+                            self._progressive_stage = f'Radarr ({name}): {self._progressive_counts["radarr_upgrade"]} upgrades'
+                            self.set_activity('cataloging', 'Cataloging library', self._progressive_stage)
+                            
+                            if len(movies) < page_size:
+                                break
+                            page += 1
                         
                     except Exception as e:
                         self.log.error(f"Radarr ({name}) cutoff unmet error: {e}")
