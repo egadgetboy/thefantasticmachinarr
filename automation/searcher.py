@@ -114,6 +114,9 @@ class SmartSearcher:
         # Track items flagged for manual intervention (exhausted search attempts)
         self.intervention_items: Dict[str, Dict] = {}  # key: "search_exhausted:source:id"
         
+        # Track long-missing items and their notification history
+        self.long_missing_notified: Dict[str, List[int]] = {}  # key: "source:id" -> list of months notified
+        
         # Load persisted data
         self._load_results()
     
@@ -194,9 +197,6 @@ class SmartSearcher:
                 json.dump(data, f)
         except Exception as e:
             self.log.warning(f"Could not save search results: {e}")
-        
-        # Track long-missing items and their notification history
-        self.long_missing_notified: Dict[str, List[int]] = {}  # key: "source:id" -> list of months notified
     
     def _get_pacing_preset(self) -> str:
         """Determine pacing preset based on daily API limit."""

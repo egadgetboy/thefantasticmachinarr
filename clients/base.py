@@ -27,7 +27,7 @@ class BaseClient(ABC):
         self.base_url = url.rstrip('/')
         self.api_key = api_key
         self.name = name or self.__class__.__name__
-        self.timeout = 30
+        self.timeout = 120  # Increased for large libraries
     
     @property
     @abstractmethod
