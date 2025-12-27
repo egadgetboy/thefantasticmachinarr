@@ -1005,27 +1005,9 @@
         <div class="init-content">
             <div class="init-logo">🎬</div>
             <div class="init-title">The Fantastic Machinarr</div>
-            <div class="init-status" id="init-status">Initializing...</div>
+            <div class="init-status" id="init-status">Starting up...</div>
             <div class="init-progress">
                 <div class="init-progress-bar" id="init-progress"></div>
-            </div>
-            <div class="init-steps">
-                <div class="init-step" id="init-step-config">
-                    <span class="init-step-icon">⏳</span>
-                    <span>Loading configuration</span>
-                </div>
-                <div class="init-step" id="init-step-services">
-                    <span class="init-step-icon">⏳</span>
-                    <span>Connecting to services</span>
-                </div>
-                <div class="init-step" id="init-step-data">
-                    <span class="init-step-icon">⏳</span>
-                    <span>Fetching library data</span>
-                </div>
-                <div class="init-step" id="init-step-ui">
-                    <span class="init-step-icon">⏳</span>
-                    <span>Preparing dashboard</span>
-                </div>
             </div>
             <div class="init-timer" id="init-timer"></div>
         </div>
@@ -2224,86 +2206,8 @@
         // ============ Initialization System ============
         const initState = {
             startTime: Date.now(),
-            steps: {
-                config: false,
-                services: false,
-                data: false,
-                ui: false
-            },
-            errors: [],
-            dismissed: false,
-            totalItems: 0,
-            estimatedMs: 0,
-            dataStartTime: 0
+            dismissed: false
         };
-        
-        function updateInitStep(step, status, detail = '') {
-            if (initState.dismissed) return;
-            
-            const el = document.getElementById(`init-step-${step}`);
-            if (!el) return;
-            
-            const icon = el.querySelector('.init-step-icon');
-            const textSpan = el.querySelector('span:last-child');
-            el.classList.remove('active', 'done');
-            
-            if (status === 'active') {
-                el.classList.add('active');
-                icon.textContent = '🔄';
-                if (detail) textSpan.textContent = detail;
-            } else if (status === 'done') {
-                el.classList.add('done');
-                icon.textContent = '✓';
-                initState.steps[step] = true;
-            } else if (status === 'error') {
-                el.classList.add('done');
-                icon.textContent = '✗';
-                el.style.color = 'var(--error)';
-            }
-            
-            updateInitProgress();
-        }
-        
-        function updateInitProgress() {
-            if (initState.dismissed) return;
-            
-            const completed = Object.values(initState.steps).filter(Boolean).length;
-            const total = Object.keys(initState.steps).length;
-            const percent = Math.round((completed / total) * 100);
-            
-            const progressBar = document.getElementById('init-progress');
-            if (progressBar) {
-                progressBar.style.width = `${percent}%`;
-            }
-            
-            // Update timer
-            const timerEl = document.getElementById('init-timer');
-            if (timerEl) {
-                const elapsed = Date.now() - initState.startTime;
-                
-                // If we have an estimate and we're in the data phase, show countdown
-                if (initState.estimatedMs > 0 && initState.dataStartTime > 0 && !initState.steps.data) {
-                    const dataElapsed = Date.now() - initState.dataStartTime;
-                    const remaining = Math.max(0, initState.estimatedMs - dataElapsed);
-                    const remainingSecs = Math.ceil(remaining / 1000);
-                    
-                    if (remaining > 0) {
-                        timerEl.textContent = `~${remainingSecs}s remaining`;
-                    } else {
-                        timerEl.textContent = `Finishing up...`;
-                    }
-                } else {
-                    const secs = Math.floor(elapsed / 1000);
-                    timerEl.textContent = `${secs}s elapsed`;
-                }
-            }
-        }
-        
-        function setInitStatus(text) {
-            if (initState.dismissed) return;
-            const el = document.getElementById('init-status');
-            if (el) el.textContent = text;
-        }
         
         function hideInitOverlay() {
             if (initState.dismissed) return;
@@ -2316,96 +2220,66 @@
                     overlay.style.display = 'none';
                 }, 500);
             }
-            clearInterval(initTimerInterval);
         }
-        
-        function showInitError(message) {
-            if (initState.dismissed) return;
-            setInitStatus(`Error: ${message}`);
-            const timerEl = document.getElementById('init-timer');
-            if (timerEl) {
-                timerEl.innerHTML = '<span style="color:var(--warn)">Retrying...</span>';
-            }
-        }
-        
-        // Progress timer update
-        const initTimerInterval = setInterval(updateInitProgress, 200);
         
         async function initializeApp() {
+            const statusEl = document.getElementById('init-status');
+            const timerEl = document.getElementById('init-timer');
+            const progressBar = document.getElementById('init-progress');
+            
+            const updateTimer = setInterval(() => {
+                if (initState.dismissed) {
+                    clearInterval(updateTimer);
+                    return;
+                }
+                const elapsed = Math.floor((Date.now() - initState.startTime) / 1000);
+                if (timerEl) timerEl.textContent = `${elapsed}s`;
+            }, 200);
+            
             try {
-                // Step 1: Load configuration
-                updateInitStep('config', 'active', 'Loading configuration...');
-                setInitStatus('Loading configuration...');
+                // Step 1: Quick config check
+                if (statusEl) statusEl.textContent = 'Checking configuration...';
+                if (progressBar) progressBar.style.width = '25%';
                 await loadStatus();
-                updateInitStep('config', 'done');
                 
-                // Step 2: Check services and get quick counts for estimation
-                updateInitStep('services', 'active', 'Connecting to services...');
-                setInitStatus('Connecting to Sonarr & Radarr...');
+                // Step 2: Show UI immediately after config is confirmed
+                if (statusEl) statusEl.textContent = 'Ready!';
+                if (progressBar) progressBar.style.width = '100%';
                 
-                // Get quick counts to estimate load time
-                try {
-                    const counts = await api('counts');
-                    initState.totalItems = counts.total_missing || 0;
-                    // Estimate: ~3ms per item for tier classification + 2s base
-                    initState.estimatedMs = 2000 + (initState.totalItems * 3);
-                    setInitStatus(`Found ${initState.totalItems.toLocaleString()} items to process...`);
-                } catch (e) {
-                    // Fall back to no estimate
-                    initState.estimatedMs = 0;
-                }
-                
-                updateInitStep('services', 'done');
-                
-                // Step 3: Fetch library data (the slow part)
-                updateInitStep('data', 'active', 'Fetching library data...');
-                initState.dataStartTime = Date.now();
-                
-                if (initState.totalItems > 1000) {
-                    setInitStatus(`Processing ${initState.totalItems.toLocaleString()} items...`);
-                } else {
-                    setInitStatus('Loading library data...');
-                }
-                
-                // Load dashboard which does the tier counting
-                await loadDashboard();
-                setInitStatus('Loading queue status...');
-                await loadQueue();
-                await loadInterventions();
-                updateInitStep('data', 'done');
-                
-                // Step 4: Prepare UI
-                updateInitStep('ui', 'active', 'Preparing dashboard...');
-                setInitStatus('Loading recent activity...');
-                await Promise.all([
-                    loadFinds(),
-                    loadSearches(),
-                    loadLogs()
-                ]);
-                updateInitStep('ui', 'done');
-                
-                // All done!
-                setInitStatus('Ready!');
-                clearInterval(initTimerInterval);
-                
-                await new Promise(r => setTimeout(r, 400));
+                clearInterval(updateTimer);
+                await new Promise(r => setTimeout(r, 300));
                 hideInitOverlay();
+                
+                // Step 3: Load all data in background (UI is now visible)
+                // These will populate panels as they complete
+                loadDashboard();
+                loadQueue();
+                loadInterventions();
+                loadFinds();
+                loadSearches();
+                loadLogs();
                 
             } catch (error) {
                 console.error('Initialization error:', error);
-                showInitError(error.message || 'Unknown error');
+                if (statusEl) statusEl.textContent = 'Error - loading anyway...';
+                clearInterval(updateTimer);
                 
-                // Still hide overlay after delay
                 setTimeout(() => {
                     hideInitOverlay();
-                }, 3000);
+                    // Still try to load data
+                    loadDashboard();
+                    loadQueue();
+                    loadFinds();
+                    loadSearches();
+                    loadLogs();
+                }, 1000);
             }
         }
         
         // Start initialization
         initializeApp();
         
-        // Refresh periodically (starts after a delay to not conflict with init)
+        // Refresh periodically
         setTimeout(() => {
             setInterval(loadStatus, 30000);
             setInterval(loadDashboard, 60000);
@@ -2413,8 +2287,8 @@
             setInterval(loadFinds, 60000);
             setInterval(loadSearches, 60000);
             setInterval(loadLogs, 30000);
-        }, 10000);
+        }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.25</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.26</div>
 </body>
 </html>
