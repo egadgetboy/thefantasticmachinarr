@@ -2066,6 +2066,9 @@
             
             panel.style.display = 'block';
             
+            // Sort by progress descending (closest to completion first)
+            allDownloads.sort((a, b) => (b.progress || 0) - (a.progress || 0));
+            
             el.innerHTML = `
                 <table class="data-table">
                     <thead>
@@ -2082,8 +2085,8 @@
                             const progress = Math.round(item.progress || 0);
                             const progressColor = progress > 75 ? 'var(--success)' : progress > 25 ? 'var(--warn)' : 'var(--accent)';
                             const eta = item.timeleft || '-';
-                            const statusClass = item.status === 'downloading' ? 'badge-success' : 
-                                                item.status === 'paused' ? 'badge-warn' : 'badge-sec';
+                            const statusClass = item.status?.toLowerCase() === 'downloading' ? 'badge-success' : 
+                                                item.status?.toLowerCase() === 'paused' ? 'badge-warn' : 'badge-sec';
                             
                             return `
                             <tr>
@@ -3238,7 +3241,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.71';
+        const CURRENT_VERSION = '1.0.72';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3332,6 +3335,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.71</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.72</div>
 </body>
 </html>

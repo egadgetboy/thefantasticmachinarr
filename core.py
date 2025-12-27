@@ -559,18 +559,17 @@ class MachinarrCore:
         sabnzbd_downloads = []
         for name, client in self.sabnzbd_clients.items():
             try:
-                sab_queue = client.get_queue()
-                for item in sab_queue.get('slots', []):
+                sab_queue = client.get_queue()  # Returns list of parsed items
+                for item in sab_queue:
                     sabnzbd_downloads.append({
                         'source': 'sabnzbd',
                         'instance': name,
                         'title': item.get('filename', 'Unknown'),
                         'status': item.get('status', 'Downloading'),
                         'progress': float(item.get('percentage', 0)),
-                        'size': item.get('mb', 0) * 1024 * 1024,
-                        'sizeleft': item.get('mbleft', 0) * 1024 * 1024,
-                        'timeleft': item.get('timeleft'),
-                        'speed': item.get('speed'),
+                        'size': item.get('size', '0'),
+                        'sizeleft': item.get('size_left', '0'),
+                        'timeleft': item.get('timeleft', ''),
                     })
             except Exception as e:
                 self.log.error(f"Failed to get SABnzbd ({name}) queue: {e}")
