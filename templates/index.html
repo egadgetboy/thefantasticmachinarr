@@ -2008,9 +2008,46 @@
                 clearInterval(dashboardPolling);
                 dashboardPolling = null;
             }
+            
+            // Track activity state for adaptive polling
+            window.tfmActivityState = data.loading ? 'cataloging' : (data.activity?.status || 'idle');
         }
         
         let dashboardPolling = null;
+        
+        // Unified adaptive polling system
+        // - During activity (searching/cataloging): fast polling (3-5 sec)
+        // - When idle: slow polling (30-60 sec) to save resources
+        let adaptivePollingInterval = null;
+        let lastActivityState = 'idle';
+        
+        function startAdaptivePolling() {
+            if (adaptivePollingInterval) return;
+            
+            adaptivePollingInterval = setInterval(() => {
+                const state = window.tfmActivityState || 'idle';
+                const isActive = state === 'searching' || state === 'cataloging';
+                
+                // State changed - adjust what we poll
+                if (state !== lastActivityState) {
+                    lastActivityState = state;
+                    if (!isActive) {
+                        // Became idle - do one final refresh of everything
+                        loadSearches();
+                        loadFinds();
+                        loadQueue();
+                    }
+                }
+                
+                // During activity, poll frequently
+                // When idle, this interval still runs but does nothing
+                // (the slower setIntervals handle idle polling)
+                if (isActive) {
+                    loadSearches();
+                    loadFinds();
+                }
+            }, 4000);  // 4 second interval during activity
+        }
         
         function updateStatusIndicator(scoreboard, scheduler) {
             const card = document.getElementById('status-card');
@@ -2133,24 +2170,16 @@
             
             updateActivityBar(status, message, detail);
             
-            // Smart polling: if searching, poll data more frequently
-            if (status === 'searching' && !searchPolling) {
-                searchPolling = setInterval(() => {
-                    loadSearches();
-                    loadFinds();
-                    loadQueue();
-                }, 3000);
-            } else if (status !== 'searching' && searchPolling) {
-                clearInterval(searchPolling);
-                searchPolling = null;
-                // One final load to get complete results
-                loadSearches();
-                loadFinds();
-                loadQueue();
+            // Track activity state for adaptive polling
+            window.tfmActivityState = status;
+            
+            // Start adaptive polling if not already running
+            if (typeof startAdaptivePolling === 'function') {
+                startAdaptivePolling();
             }
         }
         
-        let searchPolling = null;
+        let searchPolling = null;  // Keep for backwards compatibility but unused
         
         async function loadQueue() {
             const data = await api('queue');
@@ -3602,7 +3631,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.87';
+        const CURRENT_VERSION = '1.0.88';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3686,16 +3715,20 @@
         // Start initialization
         initializeApp();
         
-        // Refresh periodically
+        // Base polling intervals (idle state) - conservative for system resources
+        // These run regardless, but are slow enough to not impact performance
         setTimeout(() => {
-            setInterval(loadStatus, 30000);
-            setInterval(loadDashboard, 60000);
-            setInterval(loadQueue, 60000);
-            setInterval(loadFinds, 60000);
-            setInterval(loadSearches, 60000);
-            setInterval(loadLogs, 30000);
+            setInterval(loadStatus, 30000);      // Status every 30s
+            setInterval(loadDashboard, 60000);   // Dashboard every 60s
+            setInterval(loadQueue, 120000);      // Queue every 2 min (when idle)
+            setInterval(loadFinds, 120000);      // Finds every 2 min (when idle)
+            setInterval(loadSearches, 120000);   // Searches every 2 min (when idle)
+            setInterval(loadLogs, 60000);        // Logs every 60s
+            
+            // Start the adaptive polling system
+            startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.87</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.88</div>
 </body>
 </html>

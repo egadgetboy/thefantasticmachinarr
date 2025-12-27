@@ -180,17 +180,31 @@ class SmartSearcher:
     def _save_results(self, force: bool = False):
         """Save search results to disk.
         
-        Uses batched saving to avoid writing after every single search.
-        Saves every 10 changes or when forced.
+        Uses both count-based AND time-based debouncing:
+        - Saves every 10 items OR
+        - Saves if 30+ seconds since last save
+        - Always saves when forced (end of cycle, shutdown)
+        
+        This balances real-time persistence with disk I/O friendliness.
         """
-        # Track pending saves
+        # Track pending saves and last save time
         if not hasattr(self, '_pending_saves'):
             self._pending_saves = 0
+        if not hasattr(self, '_last_save_time'):
+            self._last_save_time = 0
         
         self._pending_saves += 1
+        now = datetime.utcnow().timestamp()
+        time_since_save = now - self._last_save_time
         
-        # Only save every 10 items or when forced (end of cycle, shutdown)
-        if not force and self._pending_saves < 10:
+        # Save if: forced OR 10+ pending OR 30+ seconds elapsed with pending changes
+        should_save = (
+            force or 
+            self._pending_saves >= 10 or 
+            (self._pending_saves > 0 and time_since_save >= 30)
+        )
+        
+        if not should_save:
             return
         
         try:
@@ -209,6 +223,7 @@ class SmartSearcher:
                 json.dump(data, f)
             
             self._pending_saves = 0
+            self._last_save_time = now
         except Exception as e:
             self.log.warning(f"Could not save search results: {e}")
     
