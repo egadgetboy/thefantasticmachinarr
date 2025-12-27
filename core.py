@@ -157,8 +157,14 @@ class MachinarrCore:
         
         self.set_activity('searching', 'Running scheduled search', 'Searching for missing content and upgrades...')
         
+        # Progress callback updates activity bar in real-time
+        def on_progress(current, total, title):
+            short_title = title[:40] + '...' if len(title) > 40 else title
+            self.set_activity('searching', f'Searching ({current}/{total})', short_title)
+        
         result = self.searcher.run_search_cycle(
-            self.sonarr_clients, self.radarr_clients
+            self.sonarr_clients, self.radarr_clients,
+            progress_callback=on_progress
         )
         
         searched = result.get('searched', 0)
@@ -849,8 +855,14 @@ class MachinarrCore:
         if search_type == 'cycle':
             self.set_activity('searching', 'Manual search triggered', 'Searching for missing content and upgrades...')
             
+            # Progress callback updates activity bar in real-time
+            def on_progress(current, total, title):
+                short_title = title[:40] + '...' if len(title) > 40 else title
+                self.set_activity('searching', f'Searching ({current}/{total})', short_title)
+            
             result = self.searcher.run_search_cycle(
-                self.sonarr_clients, self.radarr_clients
+                self.sonarr_clients, self.radarr_clients,
+                progress_callback=on_progress
             )
             
             searched = result.get('searched', 0)

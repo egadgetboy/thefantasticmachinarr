@@ -572,8 +572,15 @@ class SmartSearcher:
         return prioritized
     
     def run_search_cycle(self, sonarr_clients: Dict, radarr_clients: Dict, 
-                         sabnzbd_clients: Dict = None) -> Dict[str, Any]:
-        """Run a search cycle across all instances."""
+                         sabnzbd_clients: Dict = None, progress_callback=None) -> Dict[str, Any]:
+        """Run a search cycle across all instances.
+        
+        Args:
+            sonarr_clients: Dict of Sonarr clients
+            radarr_clients: Dict of Radarr clients  
+            sabnzbd_clients: Dict of SABnzbd clients (optional)
+            progress_callback: Optional callback(current, total, title) for progress updates
+        """
         can_search, reason = self._can_search()
         if not can_search:
             self.log.warning(f"Search cycle skipped: {reason}")
@@ -726,18 +733,22 @@ class SmartSearcher:
         
         self.log.info(f"Starting search cycle: {len(selected)} items selected")
         
-        # Perform searches
+        # Perform searches - STREAMING: save and report after EACH search
         results = []
-        for item in selected:
+        for i, item in enumerate(selected):
+            # Update progress callback if provided
+            if progress_callback:
+                progress_callback(i + 1, len(selected), item.title)
+            
             result = self._search_item(item, sonarr_clients, radarr_clients)
             results.append(result)
             self.search_results.append(result)
-        
-        # Keep history limited
-        self.search_results = self.search_results[-500:]
-        
-        # Persist to disk
-        self._save_results()
+            
+            # STREAMING: Save after each search so UI can see it immediately
+            # Keep history limited
+            if len(self.search_results) > 500:
+                self.search_results = self.search_results[-500:]
+            self._save_results()
         
         return {
             'searched': len(results),
