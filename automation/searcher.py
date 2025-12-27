@@ -113,10 +113,12 @@ class SmartSearcher:
     # Milestone notifications for long-missing items (in months)
     MILESTONE_MONTHS = [1, 3, 6, 12, 18, 24]  # Notify at these milestones
     
-    def __init__(self, config, tier_manager: TierManager, logger, results_path: str = None):
+    def __init__(self, config, tier_manager: TierManager, logger, results_path: str = None,
+                 find_tracker = None):
         self.config = config
         self.tier_manager = tier_manager
         self.log = logger.get_logger('searcher')
+        self.find_tracker = find_tracker  # Optional FindTracker for recording searches
         
         # Use config.data_dir if available, otherwise default to /config
         if results_path:
@@ -966,11 +968,25 @@ class SmartSearcher:
                     series_key = f"{item.instance_name}:{item.series_id}"
                     
                     if series_key not in self.searched_series:
+                        # TAG BEFORE SEARCH for find attribution
+                        if self.find_tracker:
+                            self.find_tracker.tag_for_search(
+                                client=client,
+                                source='sonarr',
+                                instance_name=item.instance_name,
+                                series_id=item.series_id,
+                                movie_id=None,
+                                title=item.title,
+                                tier=item.tier.value,
+                                search_type=item.search_type
+                            )
+                        
                         self.log.info(f"Searching series: {item.title.split(' - ')[0]}")
                         client.search_series(item.series_id)
                         self.searched_series[series_key] = datetime.utcnow()
                         self.api_hits_today += 1
                         self.tier_manager.record_search(item)
+                        
                         return SearchResult(item, True, "Series search triggered",
                                           search_type=item.search_type,
                                           attempt_number=attempt_num,
@@ -979,7 +995,19 @@ class SmartSearcher:
                                           next_search_at=next_search,
                                           lifecycle_state=lifecycle)
                 
-                # Episode search
+                # Episode search - still tag the series for attribution
+                if self.find_tracker and item.series_id:
+                    self.find_tracker.tag_for_search(
+                        client=client,
+                        source='sonarr',
+                        instance_name=item.instance_name,
+                        series_id=item.series_id,
+                        movie_id=None,
+                        title=item.title,
+                        tier=item.tier.value,
+                        search_type=item.search_type
+                    )
+                
                 self.log.info(f"Searching episode: {item.title}")
                 client.search_episode(item.id)
                 self.api_hits_today += 1
@@ -992,6 +1020,19 @@ class SmartSearcher:
                                       attempt_number=attempt_num,
                                       max_attempts=max_attempts,
                                       lifecycle_state='error')
+                
+                # TAG BEFORE SEARCH for find attribution
+                if self.find_tracker:
+                    self.find_tracker.tag_for_search(
+                        client=client,
+                        source='radarr',
+                        instance_name=item.instance_name,
+                        series_id=None,
+                        movie_id=item.id,
+                        title=item.title,
+                        tier=item.tier.value,
+                        search_type=item.search_type
+                    )
                 
                 self.log.info(f"Searching movie: {item.title}")
                 client.search_movie(item.id)
