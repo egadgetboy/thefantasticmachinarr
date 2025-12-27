@@ -733,7 +733,8 @@ class SmartSearcher:
         return prioritized
     
     def run_search_cycle(self, sonarr_clients: Dict, radarr_clients: Dict, 
-                         sabnzbd_clients: Dict = None, progress_callback=None) -> Dict[str, Any]:
+                         sabnzbd_clients: Dict = None, progress_callback=None,
+                         abort_check=None) -> Dict[str, Any]:
         """Run a search cycle across all instances.
         
         Args:
@@ -741,6 +742,7 @@ class SmartSearcher:
             radarr_clients: Dict of Radarr clients  
             sabnzbd_clients: Dict of SABnzbd clients (optional)
             progress_callback: Optional callback(current, total, title) for progress updates
+            abort_check: Optional callback() that returns True if operation should abort
         """
         can_search, reason = self._can_search()
         if not can_search:
@@ -905,7 +907,14 @@ class SmartSearcher:
         
         # Perform searches - STREAMING: save periodically and report progress
         results = []
+        aborted = False
         for i, item in enumerate(selected):
+            # Check for abort request
+            if abort_check and abort_check():
+                self.log.info(f"Search cycle aborted after {i} items")
+                aborted = True
+                break
+            
             # Update progress callback if provided
             if progress_callback:
                 progress_callback(i + 1, len(selected), item.title)
@@ -928,6 +937,7 @@ class SmartSearcher:
             'searched': len(results),
             'successful': sum(1 for r in results if r.success),
             'results': [r.to_dict() for r in results],
+            'aborted': aborted,
         }
     
     def _search_item(self, item: TieredItem, 
