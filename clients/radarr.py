@@ -47,7 +47,8 @@ class RadarrClient(BaseClient):
                 break
             page += 1
             
-            if page > 50:
+            # Safety limit - 500 pages = 50,000 items max
+            if page > 500:
                 break
         
         return all_missing
@@ -74,7 +75,8 @@ class RadarrClient(BaseClient):
                 break
             page += 1
             
-            if page > 50:
+            # Safety limit - 500 pages = 50,000 items max
+            if page > 500:
                 break
         
         return all_cutoff
