@@ -119,6 +119,7 @@ class MachinarrCore:
             'updated': datetime.now().isoformat(),
             'last_search_result': None  # Store last search results
         }
+        self._abort_requested = False  # Flag to stop in-progress operations
         
         # Initialize if configured
         if config.is_configured():
@@ -533,6 +534,9 @@ class MachinarrCore:
         """
         self.log.info("Manual library refresh triggered")
         
+        # Reset abort flag at start
+        self._abort_requested = False
+        
         # Store old counts for comparison
         old_missing = self.library_manager.metadata.total_missing
         
@@ -543,11 +547,18 @@ class MachinarrCore:
         # Trigger progressive load (synchronous for manual refresh)
         self._start_progressive_load()
         
-        # Wait for it to complete (with timeout)
+        # Wait for it to complete (with timeout and abort check)
         import time
         timeout = 60  # 60 seconds max
         start = time.time()
         while self._progressive_loading and (time.time() - start) < timeout:
+            if self._abort_requested:
+                self.log.info("Library refresh aborted by user")
+                return {
+                    'success': False,
+                    'aborted': True,
+                    'message': 'Cancelled by user'
+                }
             time.sleep(0.5)
         
         # Get new counts
@@ -1492,6 +1503,9 @@ class MachinarrCore:
         """Trigger a search."""
         search_type = data.get('type', 'cycle')
         
+        # Reset abort flag at start of new operation
+        self._abort_requested = False
+        
         if search_type == 'cycle':
             self.set_activity('searching', 'Manual search triggered', 'Searching for missing content and upgrades...')
             
@@ -1500,10 +1514,19 @@ class MachinarrCore:
                 short_title = title[:40] + '...' if len(title) > 40 else title
                 self.set_activity('searching', f'Searching ({current}/{total})', short_title)
             
+            # Abort check callback
+            def should_abort():
+                return self._abort_requested
+            
             result = self.searcher.run_search_cycle(
                 self.sonarr_clients, self.radarr_clients,
-                progress_callback=on_progress
+                progress_callback=on_progress,
+                abort_check=should_abort
             )
+            
+            if result.get('aborted'):
+                self.set_activity('idle', 'Search stopped', 'Cancelled by user')
+                return result
             
             searched = result.get('searched', 0)
             successful = result.get('successful', 0)
@@ -2058,3 +2081,28 @@ class MachinarrCore:
         self.log.info(f"Activity refresh: {len(activity['active_commands'])} active commands, {activity['queue_items']} queue items")
         
         return activity
+    
+    def stop_operations(self) -> Dict[str, Any]:
+        """Stop any in-progress library update or search operations.
+        
+        Sets abort flag and updates activity state.
+        """
+        self._abort_requested = True
+        
+        with self._activity_lock:
+            self._activity_state['status'] = 'idle'
+            self._activity_state['message'] = 'Stopped'
+            self._activity_state['detail'] = 'Operations cancelled by user'
+            self._activity_state['updated'] = datetime.now().isoformat()
+        
+        self.log.info("Stop requested - aborting in-progress operations")
+        
+        # Reset abort flag after a short delay so new operations can start
+        def reset_abort():
+            import time
+            time.sleep(2)
+            self._abort_requested = False
+        
+        threading.Thread(target=reset_abort, daemon=True).start()
+        
+        return {'success': True, 'message': 'Stop requested'}
