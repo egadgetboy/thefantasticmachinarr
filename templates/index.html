@@ -3156,50 +3156,64 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.67';
+        const CURRENT_VERSION = '1.0.68';
         
         async function checkVersionAndAutoSearch() {
-            // Check with server if auto-search should run
+            // Check with server if refresh/search should run
             // Server tracks this to prevent multiple devices from triggering
             try {
                 const result = await api('version/check', 'POST', {version: CURRENT_VERSION});
                 
                 if (!result.should_auto_search) {
-                    console.log('Version check: no auto-search needed');
+                    console.log('Version check: no action needed');
                     return;
                 }
                 
+                const isFirstRun = !result.last_version;
                 const reason = result.reason || `Upgraded to ${CURRENT_VERSION}`;
-                console.log('Auto-search triggered:', reason);
+                console.log('Version action triggered:', reason, 'First run:', isFirstRun);
                 
-                // Show countdown in activity bar
-                updateActivityBar('cataloging', reason, 'Auto-search starting in 10 seconds...');
-                
-                let countdown = 10;
-                const countdownInterval = setInterval(() => {
-                    countdown--;
-                    if (countdown > 0) {
-                        updateActivityBar('cataloging', reason, `Auto-search starting in ${countdown} seconds...`);
-                    }
-                }, 1000);
-                
-                // Wait 10 seconds then trigger search
-                setTimeout(async () => {
-                    clearInterval(countdownInterval);
-                    updateActivityBar('searching', 'Auto-search triggered', 'Searching for missing content and upgrades...');
+                if (isFirstRun) {
+                    // First run - trigger actual search after countdown
+                    updateActivityBar('cataloging', 'First run detected', 'Auto-search starting in 10 seconds...');
                     
-                    try {
-                        const data = await api('search', 'POST', {type: 'cycle'});
-                        updateActivityBar('idle', 'Auto-search complete', `Searched ${data.searched || 0} items`);
+                    let countdown = 10;
+                    const countdownInterval = setInterval(() => {
+                        countdown--;
+                        if (countdown > 0) {
+                            updateActivityBar('cataloging', 'First run detected', `Auto-search starting in ${countdown} seconds...`);
+                        }
+                    }, 1000);
+                    
+                    setTimeout(async () => {
+                        clearInterval(countdownInterval);
+                        updateActivityBar('searching', 'First run search', 'Searching for missing content...');
                         
-                        // Refresh all data
-                        loadDashboard();
-                        loadSearches();
-                        loadFinds();
-                    } catch (e) {
-                        updateActivityBar('idle', 'Auto-search failed', e.message);
-                    }
-                }, 10000);
+                        try {
+                            const data = await api('search', 'POST', {type: 'cycle'});
+                            updateActivityBar('idle', 'Initial search complete', `Searched ${data.searched || 0} items`);
+                            loadDashboard();
+                            loadSearches();
+                            loadFinds();
+                        } catch (e) {
+                            updateActivityBar('idle', 'Initial search failed', e.message);
+                        }
+                    }, 10000);
+                } else {
+                    // Upgrade - just refresh data, don't trigger new searches
+                    updateActivityBar('cataloging', reason, 'Refreshing data from Sonarr/Radarr...');
+                    
+                    // Refresh all panels to validate current state
+                    await Promise.all([
+                        loadDashboard(),
+                        loadQueue(),
+                        loadInterventions(),
+                        loadFinds(),
+                        loadSearches()
+                    ]);
+                    
+                    updateActivityBar('idle', 'Upgrade complete', 'Data refreshed - queue issues validated');
+                }
                 
             } catch (e) {
                 console.error('Version check failed:', e);
@@ -3219,6 +3233,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.67</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.68</div>
 </body>
 </html>
