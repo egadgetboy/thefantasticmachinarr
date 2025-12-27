@@ -35,26 +35,26 @@
         }
         
         [data-theme="light"] {
-            --bg: #e8ebf0;
-            --bg2: #f2f4f7;
-            --bg3: #dde1e8;
-            --bg-hover: #d0d5df;
-            --text: #1e2330;
-            --text2: #4a5168;
-            --text3: #6b7280;
-            --accent: #5b5fc7;
-            --accent-hover: #7073d9;
-            --accent-glow: rgba(91, 95, 199, 0.25);
-            --success: #0d9488;
-            --success-bg: rgba(13, 148, 136, 0.15);
-            --warn: #ca8a04;
-            --warn-bg: rgba(202, 138, 4, 0.15);
-            --error: #dc2626;
-            --error-bg: rgba(220, 38, 38, 0.15);
-            --border: #c9cdd6;
-            --border-focus: #5b5fc7;
-            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
-            --glow: 0 0 20px rgba(91, 95, 199, 0.12);
+            --bg: #c8cdd5;
+            --bg2: #d8dce3;
+            --bg3: #bec4ce;
+            --bg-hover: #b5bcc8;
+            --text: #1a1f2e;
+            --text2: #3d4556;
+            --text3: #5a6275;
+            --accent: #4f54b5;
+            --accent-hover: #6266c7;
+            --accent-glow: rgba(79, 84, 181, 0.3);
+            --success: #0d7d73;
+            --success-bg: rgba(13, 125, 115, 0.18);
+            --warn: #b57a04;
+            --warn-bg: rgba(181, 122, 4, 0.18);
+            --error: #c42020;
+            --error-bg: rgba(196, 32, 32, 0.18);
+            --border: #a8b0bc;
+            --border-focus: #4f54b5;
+            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+            --glow: 0 0 20px rgba(79, 84, 181, 0.15);
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -455,6 +455,18 @@
             font-size: 11px; 
             margin-top: 0;
             color: var(--text3);
+        }
+        .tiers.tiers-horizontal .tier-breakdown {
+            font-size: 10px;
+            color: var(--text2);
+            margin-top: 2px;
+            display: flex;
+            gap: 8px;
+            border: none;
+            padding: 0;
+        }
+        .tiers.tiers-horizontal .tier-breakdown span {
+            display: inline;
         }
         
         /* Lifecycle states */
@@ -1119,6 +1131,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Hot</div>
                                 <div class="tier-desc">0-90 days</div>
+                                <div class="tier-breakdown"><span>📺</span><span id="tier-hot-sonarr">-</span> <span>🎬</span><span id="tier-hot-radarr">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1129,6 +1142,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Warm</div>
                                 <div class="tier-desc">90-365 days</div>
+                                <div class="tier-breakdown"><span>📺</span><span id="tier-warm-sonarr">-</span> <span>🎬</span><span id="tier-warm-radarr">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1139,6 +1153,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Cool</div>
                                 <div class="tier-desc">1-3 years</div>
+                                <div class="tier-breakdown"><span>📺</span><span id="tier-cool-sonarr">-</span> <span>🎬</span><span id="tier-cool-radarr">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1149,6 +1164,7 @@
                             <div class="tier-labels">
                                 <div class="tier-name">Cold</div>
                                 <div class="tier-desc">3+ years</div>
+                                <div class="tier-breakdown"><span>📺</span><span id="tier-cold-sonarr">-</span> <span>🎬</span><span id="tier-cold-radarr">-</span></div>
                             </div>
                         </div>
                     </div>
@@ -1516,6 +1532,16 @@
                 document.getElementById('tier-warm').textContent = (tiers.warm?.total ?? 0).toLocaleString();
                 document.getElementById('tier-cool').textContent = (tiers.cool?.total ?? 0).toLocaleString();
                 document.getElementById('tier-cold').textContent = (tiers.cold?.total ?? 0).toLocaleString();
+                
+                // Update per-tier Sonarr/Radarr breakdowns
+                document.getElementById('tier-hot-sonarr').textContent = (tiers.hot?.sonarr ?? 0).toLocaleString();
+                document.getElementById('tier-hot-radarr').textContent = (tiers.hot?.radarr ?? 0).toLocaleString();
+                document.getElementById('tier-warm-sonarr').textContent = (tiers.warm?.sonarr ?? 0).toLocaleString();
+                document.getElementById('tier-warm-radarr').textContent = (tiers.warm?.radarr ?? 0).toLocaleString();
+                document.getElementById('tier-cool-sonarr').textContent = (tiers.cool?.sonarr ?? 0).toLocaleString();
+                document.getElementById('tier-cool-radarr').textContent = (tiers.cool?.radarr ?? 0).toLocaleString();
+                document.getElementById('tier-cold-sonarr').textContent = (tiers.cold?.sonarr ?? 0).toLocaleString();
+                document.getElementById('tier-cold-radarr').textContent = (tiers.cold?.radarr ?? 0).toLocaleString();
                 
                 // Calculate total for header label
                 const total = (tiers.hot?.total ?? 0) + (tiers.warm?.total ?? 0) + 
@@ -2483,6 +2509,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.32</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.33</div>
 </body>
 </html>
