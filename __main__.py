@@ -7,7 +7,9 @@ Run with: python -m fantastic_machinarr
 import argparse
 import sys
 import signal
+import os
 
+from . import __version__
 from .config import Config
 from .logger import Logger
 from .core import MachinarrCore
@@ -32,7 +34,7 @@ def main():
     parser.add_argument("--debug", action="store_true",
                        help="Enable debug mode")
     parser.add_argument("--version", "-v", action="version",
-                       version="The Fantastic Machinarr v1.0.0")
+                       version=f"The Fantastic Machinarr v{__version__}")
     
     args = parser.parse_args()
     
@@ -44,8 +46,12 @@ def main():
     logger = Logger(debug=args.debug)
     log = logger.get_logger("main")
     
+    # Get timezone info for display
+    tz_name = os.environ.get('TZ', 'UTC')
+    
     log.info("=" * 60)
-    log.info("🎬 The Fantastic Machinarr v1.0.0 Starting...")
+    log.info(f"🎬 The Fantastic Machinarr v{__version__} Starting...")
+    log.info(f"⏰ Timezone: {tz_name}")
     log.info("=" * 60)
     
     # Load config
