@@ -3359,10 +3359,13 @@
         }
         
         async function loadSearches() {
+            console.log('[loadSearches] Fetching search history...');
             const data = await api('searches?limit=500');
+            console.log('[loadSearches] Got response:', data.searches?.length || 0, 'items');
             const el = document.getElementById('search-list');
             
             if (!data.searches?.length) {
+                console.log('[loadSearches] No searches found, showing empty state');
                 el.innerHTML = '<div class="empty"><div class="empty-icon">⏳</div><p>No search activity yet</p></div>';
                 return;
             }
@@ -3370,6 +3373,7 @@
             // Store items (newest first) and reset to page 0 on fresh load
             paginationState.searches.items = data.searches.reverse().slice(0, MAX_ITEMS);
             paginationState.searches.page = 0;
+            console.log('[loadSearches] Rendering', paginationState.searches.items.length, 'items');
             renderSearchesPage();
         }
         
@@ -4067,7 +4071,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.100b';
+        const CURRENT_VERSION = '1.0.100c';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4222,6 +4226,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.100b</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.100c</div>
 </body>
 </html>
