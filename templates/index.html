@@ -2244,8 +2244,16 @@
                 const status = await api('status');
                 
                 // Check if services are connected
-                const sonarrOk = status.services?.sonarr?.some(s => s.connected);
-                const radarrOk = status.services?.radarr?.some(s => s.connected);
+                // services is a flat object like {sonarr_main: {connected: true}, radarr_main: {connected: true}}
+                let sonarrOk = false;
+                let radarrOk = false;
+                
+                if (status.services) {
+                    for (const [key, svc] of Object.entries(status.services)) {
+                        if (key.startsWith('sonarr') && svc.connected) sonarrOk = true;
+                        if (key.startsWith('radarr') && svc.connected) radarrOk = true;
+                    }
+                }
                 
                 if (!sonarrOk && !radarrOk) {
                     if (statusEl) statusEl.textContent = 'No services connected - check settings';
@@ -2321,6 +2329,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.27</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.28</div>
 </body>
 </html>
