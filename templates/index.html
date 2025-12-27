@@ -2237,22 +2237,50 @@
             }, 200);
             
             try {
-                // Step 1: Quick config check
+                // Step 1: Load and validate configuration/API
                 if (statusEl) statusEl.textContent = 'Checking configuration...';
-                if (progressBar) progressBar.style.width = '25%';
+                if (progressBar) progressBar.style.width = '20%';
+                
+                const status = await api('status');
+                
+                // Check if services are connected
+                const sonarrOk = status.services?.sonarr?.some(s => s.connected);
+                const radarrOk = status.services?.radarr?.some(s => s.connected);
+                
+                if (!sonarrOk && !radarrOk) {
+                    if (statusEl) statusEl.textContent = 'No services connected - check settings';
+                    if (progressBar) progressBar.style.width = '100%';
+                    progressBar.style.background = 'var(--warn)';
+                    clearInterval(updateTimer);
+                    await new Promise(r => setTimeout(r, 2000));
+                    hideInitOverlay();
+                    // Still load what we can
+                    loadDashboard();
+                    loadQueue();
+                    loadFinds();
+                    loadSearches();
+                    loadLogs();
+                    return;
+                }
+                
+                if (progressBar) progressBar.style.width = '50%';
+                if (statusEl) statusEl.textContent = 'Services connected!';
+                
+                // Step 2: Quick load of status bar data (fast)
+                if (progressBar) progressBar.style.width = '75%';
                 await loadStatus();
                 
-                // Step 2: Show UI immediately after config is confirmed
+                // Step 3: Done with critical checks - show UI
                 if (statusEl) statusEl.textContent = 'Ready!';
                 if (progressBar) progressBar.style.width = '100%';
                 
                 clearInterval(updateTimer);
-                await new Promise(r => setTimeout(r, 300));
+                await new Promise(r => setTimeout(r, 400));
                 hideInitOverlay();
                 
-                // Step 3: Load all data in background (UI is now visible)
+                // Step 4: Load all data in background (UI is now visible)
                 // These will populate panels as they complete
-                loadDashboard();
+                loadDashboard();  // This is the slow one - runs in background
                 loadQueue();
                 loadInterventions();
                 loadFinds();
@@ -2261,18 +2289,22 @@
                 
             } catch (error) {
                 console.error('Initialization error:', error);
-                if (statusEl) statusEl.textContent = 'Error - loading anyway...';
+                if (statusEl) statusEl.textContent = 'Error connecting - check settings';
+                if (progressBar) {
+                    progressBar.style.width = '100%';
+                    progressBar.style.background = 'var(--error)';
+                }
                 clearInterval(updateTimer);
                 
-                setTimeout(() => {
-                    hideInitOverlay();
-                    // Still try to load data
-                    loadDashboard();
-                    loadQueue();
-                    loadFinds();
-                    loadSearches();
-                    loadLogs();
-                }, 1000);
+                await new Promise(r => setTimeout(r, 2000));
+                hideInitOverlay();
+                
+                // Still try to load data
+                loadDashboard();
+                loadQueue();
+                loadFinds();
+                loadSearches();
+                loadLogs();
             }
         }
         
@@ -2289,6 +2321,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.26</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.27</div>
 </body>
 </html>
