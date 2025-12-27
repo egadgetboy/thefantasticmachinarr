@@ -350,11 +350,11 @@ class MachinarrCore:
             except Exception as e:
                 self.log.debug(f"Could not verify Radarr ({name}) finds: {e}")
         
-        # STEP 5: Cleanup old tags (removes tags from series/movies after 60 min)
+        # STEP 5: Cleanup old tracked searches
         try:
-            self.find_tracker.cleanup_tags(self.sonarr_clients, self.radarr_clients, max_age_minutes=60)
+            self.find_tracker.cleanup_old_searches(max_age_hours=2)
         except Exception as e:
-            self.log.debug(f"Could not cleanup TFM tags: {e}")
+            self.log.debug(f"Could not cleanup old searches: {e}")
         
         # Notify for each find
         for find in new_finds:
