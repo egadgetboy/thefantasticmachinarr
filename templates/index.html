@@ -3089,34 +3089,20 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.63';
+        const CURRENT_VERSION = '1.0.64';
         
         async function checkVersionAndAutoSearch() {
-            const lastVersion = localStorage.getItem('tfm-last-version');
-            const hasRunBefore = localStorage.getItem('tfm-first-run-complete');
-            
-            let shouldAutoSearch = false;
-            let reason = '';
-            
-            if (!hasRunBefore) {
-                // First run after setup wizard
-                shouldAutoSearch = true;
-                reason = 'First run - automatically searching for missing content...';
-                localStorage.setItem('tfm-first-run-complete', 'true');
-            } else if (!lastVersion) {
-                // First time with version tracking (upgrading from older version)
-                shouldAutoSearch = true;
-                reason = `Upgraded to ${CURRENT_VERSION} - refreshing data...`;
-            } else if (lastVersion !== CURRENT_VERSION) {
-                // Version upgrade detected
-                shouldAutoSearch = true;
-                reason = `Upgraded from ${lastVersion} to ${CURRENT_VERSION} - refreshing data...`;
-            }
-            
-            // Always save current version
-            localStorage.setItem('tfm-last-version', CURRENT_VERSION);
-            
-            if (shouldAutoSearch) {
+            // Check with server if auto-search should run
+            // Server tracks this to prevent multiple devices from triggering
+            try {
+                const result = await api('version/check', 'POST', {version: CURRENT_VERSION});
+                
+                if (!result.should_auto_search) {
+                    console.log('Version check: no auto-search needed');
+                    return;
+                }
+                
+                const reason = result.reason || `Upgraded to ${CURRENT_VERSION}`;
                 console.log('Auto-search triggered:', reason);
                 
                 // Show countdown in activity bar
@@ -3147,6 +3133,9 @@
                         updateActivityBar('idle', 'Auto-search failed', e.message);
                     }
                 }, 10000);
+                
+            } catch (e) {
+                console.error('Version check failed:', e);
             }
         }
         
@@ -3163,6 +3152,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.63</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.64</div>
 </body>
 </html>

@@ -953,3 +953,58 @@ class MachinarrCore:
     def test_email(self) -> Dict[str, Any]:
         """Test email configuration."""
         return self.notifier.test_connection()
+    
+    def check_version_upgrade(self, current_version: str) -> Dict[str, Any]:
+        """Check if this is a version upgrade and if auto-search should run.
+        
+        Server-side tracking ensures auto-search only triggers once across all devices.
+        """
+        import json
+        from pathlib import Path
+        
+        version_file = Path('/config/version_state.json')
+        
+        try:
+            if version_file.exists():
+                with open(version_file, 'r') as f:
+                    state = json.load(f)
+            else:
+                state = {}
+        except:
+            state = {}
+        
+        last_version = state.get('last_version')
+        auto_search_triggered = state.get('auto_search_triggered_for') == current_version
+        
+        should_auto_search = False
+        reason = ''
+        
+        if auto_search_triggered:
+            # Already triggered for this version
+            pass
+        elif not last_version:
+            # First time tracking
+            should_auto_search = True
+            reason = f'Upgraded to {current_version} - refreshing data...'
+        elif last_version != current_version:
+            # Version upgrade
+            should_auto_search = True
+            reason = f'Upgraded from {last_version} to {current_version} - refreshing data...'
+        
+        # Save state
+        if should_auto_search:
+            state['auto_search_triggered_for'] = current_version
+        state['last_version'] = current_version
+        
+        try:
+            with open(version_file, 'w') as f:
+                json.dump(state, f)
+        except Exception as e:
+            self.log.error(f"Failed to save version state: {e}")
+        
+        return {
+            'should_auto_search': should_auto_search,
+            'reason': reason,
+            'last_version': last_version,
+            'current_version': current_version
+        }

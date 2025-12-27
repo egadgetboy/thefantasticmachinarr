@@ -147,6 +147,13 @@ class WebServer:
             limit = request.args.get('limit', 50, type=int)
             return jsonify(self.core.get_recent_searches(limit))
         
+        # ============ Version Check ============
+        @self.app.route('/api/version/check', methods=['POST'])
+        def api_check_version():
+            data = request.get_json() or {}
+            version = data.get('version', '')
+            return jsonify(self.core.check_version_upgrade(version))
+        
         # ============ Logs ============
         @self.app.route('/api/logs')
         def api_logs():
