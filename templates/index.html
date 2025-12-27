@@ -35,26 +35,26 @@
         }
         
         [data-theme="light"] {
-            --bg: #f8f9fb;
-            --bg2: #ffffff;
-            --bg3: #f0f1f4;
-            --bg-hover: #e8e9ed;
-            --text: #1a1d26;
-            --text2: #5c6478;
-            --text3: #8b92a5;
-            --accent: #4f46e5;
-            --accent-hover: #6366f1;
-            --accent-glow: rgba(79, 70, 229, 0.2);
-            --success: #059669;
-            --success-bg: rgba(5, 150, 105, 0.12);
-            --warn: #d97706;
-            --warn-bg: rgba(217, 119, 6, 0.12);
+            --bg: #e8ebf0;
+            --bg2: #f2f4f7;
+            --bg3: #dde1e8;
+            --bg-hover: #d0d5df;
+            --text: #1e2330;
+            --text2: #4a5168;
+            --text3: #6b7280;
+            --accent: #5b5fc7;
+            --accent-hover: #7073d9;
+            --accent-glow: rgba(91, 95, 199, 0.25);
+            --success: #0d9488;
+            --success-bg: rgba(13, 148, 136, 0.15);
+            --warn: #ca8a04;
+            --warn-bg: rgba(202, 138, 4, 0.15);
             --error: #dc2626;
-            --error-bg: rgba(220, 38, 38, 0.12);
-            --border: #e2e4e9;
-            --border-focus: #4f46e5;
-            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-            --glow: 0 0 20px rgba(79, 70, 229, 0.08);
+            --error-bg: rgba(220, 38, 38, 0.15);
+            --border: #c9cdd6;
+            --border-focus: #5b5fc7;
+            --card-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
+            --glow: 0 0 20px rgba(91, 95, 199, 0.12);
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -2044,11 +2044,36 @@
         }
         
         async function resolveItem(source, queueId) {
-            const data = await api('resolve', 'POST', {source, queue_id: queueId, action: 'blocklist_retry'});
-            if (data.success) {
-                loadQueue();
-            } else {
-                alert('Failed: ' + data.message);
+            const btn = event.target;
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = '...';
+            
+            try {
+                const data = await api('resolve', 'POST', {source, queue_id: queueId, action: 'blocklist_retry'});
+                if (data.success) {
+                    btn.textContent = '✓';
+                    btn.style.background = 'var(--success)';
+                    setTimeout(() => loadQueue(), 1000);
+                } else {
+                    btn.textContent = '✗';
+                    btn.style.background = 'var(--error)';
+                    alert('Failed: ' + (data.message || 'Unknown error'));
+                    setTimeout(() => {
+                        btn.textContent = originalText;
+                        btn.style.background = '';
+                        btn.disabled = false;
+                    }, 2000);
+                }
+            } catch (e) {
+                btn.textContent = '✗';
+                btn.style.background = 'var(--error)';
+                alert('Error: ' + e.message);
+                setTimeout(() => {
+                    btn.textContent = originalText;
+                    btn.style.background = '';
+                    btn.disabled = false;
+                }, 2000);
             }
         }
         
@@ -2371,6 +2396,6 @@
             setInterval(loadLogs, 30000);
         }, 10000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.22</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.23</div>
 </body>
 </html>

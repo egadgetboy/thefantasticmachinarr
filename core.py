@@ -449,6 +449,8 @@ class MachinarrCore:
         queue_id = data.get('queue_id')
         action = data.get('action', 'blocklist_retry')
         
+        self.log.info(f"Resolving {source} queue item {queue_id} with action: {action}")
+        
         if source == 'sonarr':
             for name, client in self.sonarr_clients.items():
                 try:
@@ -460,8 +462,10 @@ class MachinarrCore:
                         continue
                     
                     if success:
+                        self.log.info(f"Successfully resolved {source} item {queue_id} via {name}")
                         return {'success': True, 'message': f'Resolved via {name}'}
-                except:
+                except Exception as e:
+                    self.log.error(f"Failed to resolve via {name}: {e}")
                     continue
         
         elif source == 'radarr':
@@ -475,11 +479,14 @@ class MachinarrCore:
                         continue
                     
                     if success:
+                        self.log.info(f"Successfully resolved {source} item {queue_id} via {name}")
                         return {'success': True, 'message': f'Resolved via {name}'}
-                except:
+                except Exception as e:
+                    self.log.error(f"Failed to resolve via {name}: {e}")
                     continue
         
-        return {'success': False, 'message': 'Could not resolve item'}
+        self.log.warning(f"Could not resolve {source} item {queue_id}")
+        return {'success': False, 'message': 'Could not resolve item - check logs for details'}
     
     def handle_intervention(self, action: str, data: Dict) -> Dict[str, Any]:
         """Handle a manual intervention action."""
