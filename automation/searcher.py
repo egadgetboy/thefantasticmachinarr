@@ -182,6 +182,8 @@ class SmartSearcher:
                         pass
                 
                 # Load search results for UI display
+                results_loaded = 0
+                results_failed = 0
                 for r in data.get('results', [])[-500:]:
                     try:
                         # Reconstruct SearchResult
@@ -209,8 +211,13 @@ class SmartSearcher:
                             lifecycle_state=r.get('lifecycle_state', 'searched'),
                         )
                         self.search_results.append(result)
+                        results_loaded += 1
                     except Exception as e:
-                        pass  # Skip malformed entries
+                        results_failed += 1
+                        self.log.warning(f"Failed to load search result: {e} - data: {r}")
+                
+                if results_failed > 0:
+                    self.log.warning(f"Failed to load {results_failed} search results")
                 
                 series_count = len(self.searched_series)
                 self.log.info(f"Loaded {len(self.search_results)} search results, {self.finds_total} total finds, {series_count} cached series")
