@@ -169,6 +169,11 @@ class WebServer:
         def api_refresh_activity():
             return jsonify(self.core.refresh_activity())
         
+        @self.app.route('/api/stop', methods=['POST'])
+        def api_stop():
+            """Stop any in-progress library update or search."""
+            return jsonify(self.core.stop_operations())
+        
         # ============ Logs ============
         @self.app.route('/api/logs')
         def api_logs():
