@@ -108,8 +108,16 @@ class RadarrClient(BaseClient):
                 'blocklist': str(blocklist).lower(),
                 'skipRedownload': str(skip_redownload).lower()
             })
+            # DELETE returns empty on success
             return True
-        except APIError:
+        except APIError as e:
+            # 404 might mean already deleted - that's okay
+            if e.status_code == 404:
+                return True
+            print(f"delete_queue_item error: {e}")
+            return False
+        except Exception as e:
+            print(f"delete_queue_item unexpected error: {e}")
             return False
     
     # ==================== Releases & Search ====================

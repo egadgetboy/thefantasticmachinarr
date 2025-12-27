@@ -613,19 +613,27 @@ class MachinarrCore:
         
         self.log.info(f"Resolving {source} queue item {queue_id} with action: {action}")
         
+        if not source or not queue_id:
+            self.log.error(f"Missing source or queue_id: source={source}, queue_id={queue_id}")
+            return {'success': False, 'message': 'Missing source or queue_id'}
+        
         if source == 'sonarr':
             for name, client in self.sonarr_clients.items():
                 try:
+                    self.log.info(f"Trying to resolve via Sonarr instance: {name}")
                     if action == 'blocklist_retry':
                         success = client.delete_queue_item(queue_id, blocklist=True)
                     elif action == 'remove':
                         success = client.delete_queue_item(queue_id, blocklist=False)
                     else:
+                        self.log.warning(f"Unknown action: {action}")
                         continue
                     
                     if success:
                         self.log.info(f"Successfully resolved {source} item {queue_id} via {name}")
                         return {'success': True, 'message': f'Resolved via {name}'}
+                    else:
+                        self.log.warning(f"delete_queue_item returned False for {name}")
                 except Exception as e:
                     self.log.error(f"Failed to resolve via {name}: {e}")
                     continue
@@ -633,19 +641,26 @@ class MachinarrCore:
         elif source == 'radarr':
             for name, client in self.radarr_clients.items():
                 try:
+                    self.log.info(f"Trying to resolve via Radarr instance: {name}")
                     if action == 'blocklist_retry':
                         success = client.delete_queue_item(queue_id, blocklist=True)
                     elif action == 'remove':
                         success = client.delete_queue_item(queue_id, blocklist=False)
                     else:
+                        self.log.warning(f"Unknown action: {action}")
                         continue
                     
                     if success:
                         self.log.info(f"Successfully resolved {source} item {queue_id} via {name}")
                         return {'success': True, 'message': f'Resolved via {name}'}
+                    else:
+                        self.log.warning(f"delete_queue_item returned False for {name}")
                 except Exception as e:
                     self.log.error(f"Failed to resolve via {name}: {e}")
                     continue
+        else:
+            self.log.error(f"Unknown source: {source}")
+            return {'success': False, 'message': f'Unknown source: {source}'}
         
         self.log.warning(f"Could not resolve {source} item {queue_id}")
         return {'success': False, 'message': 'Could not resolve item - check logs for details'}
