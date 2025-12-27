@@ -331,3 +331,29 @@ class SonarrClient(BaseClient):
     def get_base_url(self) -> str:
         """Get the base URL for opening in browser."""
         return self.base_url.rstrip('/')
+    
+    def delete_series(self, series_id: int, delete_files: bool = False, add_exclusion: bool = True) -> bool:
+        """Delete a series from Sonarr.
+        
+        Args:
+            series_id: The series ID to delete
+            delete_files: If True, also delete the series files from disk
+            add_exclusion: If True, add to exclusion list to prevent re-adding
+        """
+        try:
+            params = {
+                'deleteFiles': str(delete_files).lower(),
+                'addImportListExclusion': str(add_exclusion).lower()
+            }
+            self._delete(f'/series/{series_id}', params=params)
+            return True
+        except Exception as e:
+            print(f"Failed to delete series {series_id}: {e}")
+            return False
+    
+    def get_episode(self, episode_id: int) -> Optional[Dict]:
+        """Get episode details including series ID."""
+        try:
+            return self._get(f'/episode/{episode_id}')
+        except:
+            return None

@@ -232,9 +232,17 @@ class SmartSearcher:
         # Check quiet hours
         if hasattr(self.config, 'quiet_hours') and self.config.quiet_hours:
             qh = self.config.quiet_hours
-            if qh.get('enabled', False):
-                start_hour = qh.get('start_hour', 2)
-                end_hour = qh.get('end_hour', 6)
+            # Handle both dataclass (attributes) and dict (.get())
+            try:
+                enabled = getattr(qh, 'enabled', False) if hasattr(qh, 'enabled') else qh.get('enabled', False)
+                start_hour = getattr(qh, 'start_hour', 2) if hasattr(qh, 'start_hour') else qh.get('start_hour', 2)
+                end_hour = getattr(qh, 'end_hour', 6) if hasattr(qh, 'end_hour') else qh.get('end_hour', 6)
+            except (AttributeError, TypeError):
+                enabled = False
+                start_hour = 2
+                end_hour = 6
+            
+            if enabled:
                 current_hour = datetime.utcnow().hour
                 
                 # Handle overnight ranges (e.g., 22:00 to 06:00)

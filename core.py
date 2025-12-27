@@ -757,6 +757,46 @@ class MachinarrCore:
             
             return {'success': False, 'message': 'Service not found'}
         
+        elif action == 'delete_from_service':
+            # Delete item from Sonarr/Radarr entirely
+            source = data.get('source')
+            item_id = data.get('id')
+            delete_files = data.get('delete_files', False)
+            
+            success = False
+            message = 'Could not delete item'
+            
+            if source == 'radarr':
+                for name, client in self.radarr_clients.items():
+                    try:
+                        if client.delete_movie(item_id, delete_files=delete_files, add_exclusion=True):
+                            success = True
+                            message = f'Deleted from {name}' + (' (files removed)' if delete_files else ' (files kept)')
+                            self.log.info(f"Deleted Radarr movie {item_id} via {name}")
+                            break
+                    except Exception as e:
+                        self.log.error(f"Failed to delete via {name}: {e}")
+            
+            elif source == 'sonarr':
+                # For Sonarr episodes, we need to get the series ID first
+                for name, client in self.sonarr_clients.items():
+                    try:
+                        episode = client.get_episode(item_id)
+                        if episode and 'seriesId' in episode:
+                            series_id = episode['seriesId']
+                            if client.delete_series(series_id, delete_files=delete_files, add_exclusion=True):
+                                success = True
+                                message = f'Deleted series from {name}' + (' (files removed)' if delete_files else ' (files kept)')
+                                self.log.info(f"Deleted Sonarr series {series_id} via {name}")
+                                break
+                    except Exception as e:
+                        self.log.error(f"Failed to delete via {name}: {e}")
+            
+            if success:
+                self.queue_monitor.dismiss_intervention(source, item_id, data.get('type'))
+            
+            return {'success': success, 'message': message}
+        
         return {'success': False, 'message': 'Unknown action'}
     
     def _grab_release(self, data: Dict) -> Dict[str, Any]:

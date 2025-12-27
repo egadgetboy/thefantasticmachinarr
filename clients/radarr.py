@@ -304,3 +304,22 @@ class RadarrClient(BaseClient):
     def get_base_url(self) -> str:
         """Get the base URL for opening in browser."""
         return self.base_url.rstrip('/')
+    
+    def delete_movie(self, movie_id: int, delete_files: bool = False, add_exclusion: bool = True) -> bool:
+        """Delete a movie from Radarr.
+        
+        Args:
+            movie_id: The movie ID to delete
+            delete_files: If True, also delete the movie files from disk
+            add_exclusion: If True, add to exclusion list to prevent re-adding
+        """
+        try:
+            params = {
+                'deleteFiles': str(delete_files).lower(),
+                'addImportExclusion': str(add_exclusion).lower()
+            }
+            self._delete(f'/movie/{movie_id}', params=params)
+            return True
+        except Exception as e:
+            print(f"Failed to delete movie {movie_id}: {e}")
+            return False

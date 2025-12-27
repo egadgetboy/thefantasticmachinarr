@@ -2400,10 +2400,13 @@
             actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionOpenIn('${item.source}', ${item.id}, '${item.details?.instance_name || ''}')">🔗 Open in ${isMovie ? 'Radarr' : 'Sonarr'}</button>`);
             
             // Stop Searching (unmonitor)
-            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionStopSearching('${item.source}', ${item.id}, '${item.intervention_type}')" title="Unmonitor in ${isMovie ? 'Radarr' : 'Sonarr'}">🚫 Stop Searching</button>`);
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionStopSearching('${item.source}', ${item.id}, '${item.intervention_type}')" title="Unmonitor in ${isMovie ? 'Radarr' : 'Sonarr'} - keeps files">🚫 Stop Searching</button>`);
+            
+            // Delete from service (with confirmation)
+            actions.push(`<button class="btn btn-sm" style="background:var(--error);color:white" onclick="interventionDelete('${item.source}', ${item.id}, '${item.intervention_type}', '${esc(item.title).replace(/'/g, "\\'")}')" title="DELETE from ${isMovie ? 'Radarr' : 'Sonarr'}">🗑️ Delete</button>`);
             
             // Dismiss (just removes from TFM list)
-            actions.push(`<button class="btn btn-sm btn-sec" onclick="dismissIntervention('${item.source}', ${item.id}, '${item.intervention_type}')" title="Remove from TFM list only - does not affect ${isMovie ? 'Radarr' : 'Sonarr'}">✓ Dismiss</button>`);
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="dismissIntervention('${item.source}', ${item.id}, '${item.intervention_type}')" title="Hide from TFM only">👁️ Hide</button>`);
             
             document.getElementById('modal-actions').innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">
@@ -2456,6 +2459,36 @@
             }
             closeModal();
             loadInterventions();
+        }
+        
+        async function interventionDelete(source, id, type, title) {
+            const serviceName = source === 'radarr' ? 'Radarr' : 'Sonarr';
+            const itemType = source === 'radarr' ? 'movie' : 'series';
+            
+            // First confirmation
+            if (!confirm(`⚠️ DELETE "${title}" from ${serviceName}?\n\nThis will:\n- Remove the ${itemType} from ${serviceName}\n- Add to exclusion list (won't be re-added)\n\nFiles will NOT be deleted.`)) {
+                return;
+            }
+            
+            // Second confirmation for safety
+            const deleteFiles = confirm(`Also DELETE the files from disk?\n\nClick OK to delete files\nClick Cancel to keep files`);
+            
+            if (deleteFiles) {
+                // Triple confirm for file deletion
+                if (!confirm(`🚨 FINAL WARNING 🚨\n\nYou are about to PERMANENTLY DELETE:\n"${title}"\n\nAND all associated files from disk.\n\nThis cannot be undone!\n\nAre you absolutely sure?`)) {
+                    return;
+                }
+            }
+            
+            const data = await api('intervention/delete_from_service', 'POST', {source, id, type, delete_files: deleteFiles});
+            if (data.success) {
+                updateActivityBar('idle', 'Deleted', data.message);
+            } else {
+                alert('Failed to delete: ' + (data.message || 'Unknown error'));
+            }
+            closeModal();
+            loadInterventions();
+            loadDashboard(); // Refresh counts
         }
         
         async function dismissIntervention(source, id, type) {
@@ -2782,6 +2815,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.50</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.51</div>
 </body>
 </html>
