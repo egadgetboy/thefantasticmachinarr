@@ -142,6 +142,16 @@ class SmartSearcher:
                         self.api_hits_today = 0
                         self.finds_today = 0
                 
+                # Load searched_series cache (prevents duplicate series searches)
+                cutoff = datetime.utcnow() - timedelta(hours=24)
+                for key, ts_str in data.get('searched_series', {}).items():
+                    try:
+                        ts = datetime.fromisoformat(ts_str)
+                        if ts > cutoff:  # Only keep recent entries
+                            self.searched_series[key] = ts
+                    except:
+                        pass
+                
                 # Load search results for UI display
                 for r in data.get('results', [])[-500:]:
                     try:
@@ -173,7 +183,8 @@ class SmartSearcher:
                     except Exception as e:
                         pass  # Skip malformed entries
                 
-                self.log.info(f"Loaded {len(self.search_results)} search results, {self.finds_total} total finds")
+                series_count = len(self.searched_series)
+                self.log.info(f"Loaded {len(self.search_results)} search results, {self.finds_total} total finds, {series_count} cached series")
         except Exception as e:
             self.log.warning(f"Could not load search results: {e}")
     
@@ -211,12 +222,21 @@ class SmartSearcher:
             path = Path(self.results_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             
+            # Convert searched_series to serializable format (keep only recent, <24h)
+            cutoff = datetime.utcnow() - timedelta(hours=24)
+            recent_series = {
+                k: v.isoformat() 
+                for k, v in self.searched_series.items() 
+                if v > cutoff
+            }
+            
             data = {
                 'finds_today': self.finds_today,
                 'finds_total': self.finds_total,
                 'api_hits_today': self.api_hits_today,
                 'last_reset_date': datetime.utcnow().date().isoformat(),
                 'results': [r.to_dict() for r in self.search_results[-500:]],
+                'searched_series': recent_series,  # Prevents duplicate series searches after restart
             }
             
             with open(path, 'w') as f:

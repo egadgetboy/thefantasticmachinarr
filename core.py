@@ -38,6 +38,14 @@ class MachinarrCore:
         # Find tracking with resolution reasons
         self.recent_finds: List[Dict] = []
         self.max_finds_history = 100
+        self._load_finds()  # Load persisted finds
+        
+        # Auto-tuning metrics (track API response times)
+        self._api_metrics = {
+            'sonarr_avg_ms': 500,  # Running average response time
+            'radarr_avg_ms': 500,
+            'samples': 0,
+        }
         
         # Cache for tier data (expensive to compute)
         self._tier_cache = None
@@ -1455,12 +1463,60 @@ class MachinarrCore:
         if len(self.recent_finds) > self.max_finds_history:
             self.recent_finds = self.recent_finds[-self.max_finds_history:]
         
+        # Persist finds (debounced - only saves every few finds or when forced)
+        self._save_finds()
+        
         # Notify
         self.notifier.notify_find(title, source, 'hot')  # Tier would come from actual data
         self.searcher.finds_today += 1
         self.searcher.finds_total += 1
         
         self.log.info(f"🎉 Found: {title} ({resolution_type})")
+    
+    def _load_finds(self):
+        """Load recent finds from disk."""
+        try:
+            import json
+            finds_path = self.config.data_dir / 'recent_finds.json'
+            if finds_path.exists():
+                with open(finds_path, 'r') as f:
+                    data = json.load(f)
+                self.recent_finds = data.get('finds', [])[-self.max_finds_history:]
+                self.log.info(f"Loaded {len(self.recent_finds)} recent finds from disk")
+        except Exception as e:
+            self.log.warning(f"Could not load recent finds: {e}")
+    
+    def _save_finds(self, force: bool = False):
+        """Save recent finds to disk with debouncing."""
+        if not hasattr(self, '_finds_pending_save'):
+            self._finds_pending_save = 0
+            self._finds_last_save = 0
+        
+        self._finds_pending_save += 1
+        now = datetime.now().timestamp()
+        
+        # Save if forced OR 5+ pending OR 60+ seconds since last save
+        should_save = (
+            force or
+            self._finds_pending_save >= 5 or
+            (self._finds_pending_save > 0 and now - self._finds_last_save >= 60)
+        )
+        
+        if not should_save:
+            return
+        
+        try:
+            import json
+            finds_path = self.config.data_dir / 'recent_finds.json'
+            finds_path.parent.mkdir(parents=True, exist_ok=True)
+            
+            with open(finds_path, 'w') as f:
+                json.dump({'finds': self.recent_finds}, f)
+            
+            self._finds_pending_save = 0
+            self._finds_last_save = now
+        except Exception as e:
+            self.log.warning(f"Could not save recent finds: {e}")
     
     def get_recent_searches(self, limit: int = 50) -> Dict[str, Any]:
         """Get recent search history."""

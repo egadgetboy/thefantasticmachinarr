@@ -54,7 +54,8 @@ class BaseClient(ABC):
     def _request(self, method: str, endpoint: str, 
                  params: Optional[Dict] = None,
                  data: Optional[Dict] = None) -> Any:
-        """Make HTTP request."""
+        """Make HTTP request with response time tracking."""
+        import time
         url = self._build_url(endpoint, params)
         headers = self._get_headers()
         
@@ -64,9 +65,15 @@ class BaseClient(ABC):
         
         req = urllib.request.Request(url, data=body, headers=headers, method=method)
         
+        start_time = time.time()
         try:
             with urllib.request.urlopen(req, timeout=self.timeout) as response:
                 content = response.read().decode('utf-8')
+                
+                # Track response time for auto-tuning
+                elapsed_ms = (time.time() - start_time) * 1000
+                self._update_response_metrics(elapsed_ms)
+                
                 if content:
                     return json.loads(content)
                 return {}
@@ -85,6 +92,21 @@ class BaseClient(ABC):
             raise APIError(f"Connection error: {e.reason}")
         except json.JSONDecodeError as e:
             raise APIError(f"Invalid JSON response: {e}")
+    
+    def _update_response_metrics(self, elapsed_ms: float):
+        """Track response times for auto-tuning (exponential moving average)."""
+        if not hasattr(self, '_avg_response_ms'):
+            self._avg_response_ms = elapsed_ms
+            self._response_samples = 1
+        else:
+            # Exponential moving average (alpha=0.1 for smooth adaptation)
+            alpha = 0.1
+            self._avg_response_ms = alpha * elapsed_ms + (1 - alpha) * self._avg_response_ms
+            self._response_samples += 1
+    
+    def get_avg_response_ms(self) -> float:
+        """Get average response time in milliseconds."""
+        return getattr(self, '_avg_response_ms', 500)
     
     def get(self, endpoint: str, params: Optional[Dict] = None) -> Any:
         """HTTP GET request."""
