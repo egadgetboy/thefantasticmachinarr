@@ -62,6 +62,14 @@ TFM can optionally connect to SABnzbd for enhanced queue monitoring. While Sonar
 
 **Note:** SABnzbd is completely optional. TFM works perfectly with just Sonarr/Radarr, which already communicate with your download clients. The SABnzbd integration is for users who want additional visibility into their download queue.
 
+### 🔢 Multi-Instance Support
+TFM supports multiple instances of Sonarr, Radarr, and SABnzbd. This is perfect for users who run separate instances for different quality levels:
+- **Sonarr** + **Sonarr 4K** (for standard and 4K TV libraries)
+- **Radarr** + **Radarr 4K** (for standard and 4K movie libraries)
+- **SABnzbd** instances for each
+
+All instances are managed from a single TFM dashboard, with tier counts and search activity shown per-instance.
+
 ---
 
 ## 🚀 Installation
