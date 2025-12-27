@@ -3,7 +3,9 @@ Smart Searcher for The Fantastic Machinarr.
 Tier-based searching with API rate limiting and intelligent prioritization.
 """
 
+import json
 import random
+from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 from datetime import datetime, timedelta
 from dataclasses import dataclass, field
@@ -123,8 +125,6 @@ class SmartSearcher:
     def _load_results(self):
         """Load search results from disk."""
         try:
-            import json
-            from pathlib import Path
             path = Path(self.results_path)
             if path.exists():
                 with open(path, 'r') as f:
@@ -177,11 +177,23 @@ class SmartSearcher:
         except Exception as e:
             self.log.warning(f"Could not load search results: {e}")
     
-    def _save_results(self):
-        """Save search results to disk."""
+    def _save_results(self, force: bool = False):
+        """Save search results to disk.
+        
+        Uses batched saving to avoid writing after every single search.
+        Saves every 10 changes or when forced.
+        """
+        # Track pending saves
+        if not hasattr(self, '_pending_saves'):
+            self._pending_saves = 0
+        
+        self._pending_saves += 1
+        
+        # Only save every 10 items or when forced (end of cycle, shutdown)
+        if not force and self._pending_saves < 10:
+            return
+        
         try:
-            import json
-            from pathlib import Path
             path = Path(self.results_path)
             path.parent.mkdir(parents=True, exist_ok=True)
             
@@ -195,6 +207,8 @@ class SmartSearcher:
             
             with open(path, 'w') as f:
                 json.dump(data, f)
+            
+            self._pending_saves = 0
         except Exception as e:
             self.log.warning(f"Could not save search results: {e}")
     
@@ -616,12 +630,19 @@ class SmartSearcher:
         # Gather all missing items AND upgrades
         all_items = []
         
+        # Shared series cache per Sonarr instance (avoids duplicate API calls)
+        sonarr_series_caches = {}
+        
         # Sonarr instances - Missing
         for name, client in sonarr_clients.items():
             try:
                 missing = client.get_missing_episodes()
                 self.log.info(f"Sonarr ({name}): Found {len(missing)} missing episodes")
-                series_cache = {}
+                
+                # Initialize or reuse series cache for this instance
+                if name not in sonarr_series_caches:
+                    sonarr_series_caches[name] = {}
+                series_cache = sonarr_series_caches[name]
                 
                 for ep in missing:
                     series_id = ep.get('seriesId')
@@ -642,12 +663,14 @@ class SmartSearcher:
             except Exception as e:
                 self.log.error(f"Error getting missing from Sonarr ({name}): {e}")
         
-        # Sonarr instances - Upgrades (cutoff unmet)
+        # Sonarr instances - Upgrades (cutoff unmet) - reuse series cache
         for name, client in sonarr_clients.items():
             try:
                 upgrades = client.get_cutoff_unmet()
                 self.log.info(f"Sonarr ({name}): Found {len(upgrades)} episodes needing upgrade")
-                series_cache = {}
+                
+                # Reuse series cache from missing episodes
+                series_cache = sonarr_series_caches.get(name, {})
                 
                 for ep in upgrades:
                     series_id = ep.get('seriesId')
@@ -733,7 +756,7 @@ class SmartSearcher:
         
         self.log.info(f"Starting search cycle: {len(selected)} items selected")
         
-        # Perform searches - STREAMING: save and report after EACH search
+        # Perform searches - STREAMING: save periodically and report progress
         results = []
         for i, item in enumerate(selected):
             # Update progress callback if provided
@@ -744,11 +767,15 @@ class SmartSearcher:
             results.append(result)
             self.search_results.append(result)
             
-            # STREAMING: Save after each search so UI can see it immediately
             # Keep history limited
             if len(self.search_results) > 500:
                 self.search_results = self.search_results[-500:]
+            
+            # Batched save (every 10 items) for efficiency
             self._save_results()
+        
+        # Force final save to ensure all results persisted
+        self._save_results(force=True)
         
         return {
             'searched': len(results),
