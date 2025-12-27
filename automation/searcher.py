@@ -93,10 +93,11 @@ class SmartSearcher:
     # Milestone notifications for long-missing items (in months)
     MILESTONE_MONTHS = [1, 3, 6, 12, 18, 24]  # Notify at these milestones
     
-    def __init__(self, config, tier_manager: TierManager, logger):
+    def __init__(self, config, tier_manager: TierManager, logger, results_path: str = "/config/search_results.json"):
         self.config = config
         self.tier_manager = tier_manager
         self.log = logger.get_logger('searcher')
+        self.results_path = results_path
         
         # Rate limiting
         self.api_hits_today = 0
@@ -112,6 +113,87 @@ class SmartSearcher:
         
         # Track items flagged for manual intervention (exhausted search attempts)
         self.intervention_items: Dict[str, Dict] = {}  # key: "search_exhausted:source:id"
+        
+        # Load persisted data
+        self._load_results()
+    
+    def _load_results(self):
+        """Load search results from disk."""
+        try:
+            import json
+            from pathlib import Path
+            path = Path(self.results_path)
+            if path.exists():
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                
+                self.finds_today = data.get('finds_today', 0)
+                self.finds_total = data.get('finds_total', 0)
+                self.api_hits_today = data.get('api_hits_today', 0)
+                
+                # Check if we need to reset daily counters
+                last_date_str = data.get('last_reset_date')
+                if last_date_str:
+                    last_date = datetime.fromisoformat(last_date_str).date()
+                    if last_date < datetime.utcnow().date():
+                        self.api_hits_today = 0
+                        self.finds_today = 0
+                
+                # Load search results for UI display
+                for r in data.get('results', [])[-500:]:
+                    try:
+                        # Reconstruct SearchResult
+                        item = TieredItem(
+                            id=r.get('id', 0),
+                            title=r.get('title', ''),
+                            source=r.get('source', ''),
+                            instance_name=r.get('instance_name', ''),
+                            tier=Tier(r.get('tier', 'cold')),
+                            air_date=datetime.fromisoformat(r['air_date']) if r.get('air_date') else None,
+                            season_number=r.get('season_number'),
+                            episode_number=r.get('episode_number'),
+                            formatted_code=r.get('formatted_code'),
+                            search_type=r.get('search_type', 'missing'),
+                        )
+                        result = SearchResult(
+                            item=item,
+                            success=r.get('success', True),
+                            message=r.get('message', ''),
+                            timestamp=datetime.fromisoformat(r['timestamp']) if r.get('timestamp') else datetime.utcnow(),
+                            search_type=r.get('search_type', 'missing'),
+                            attempt_number=r.get('attempt_number', 1),
+                            max_attempts=r.get('max_attempts', 1),
+                            cooldown_minutes=r.get('cooldown_minutes', 0),
+                            lifecycle_state=r.get('lifecycle_state', 'searched'),
+                        )
+                        self.search_results.append(result)
+                    except Exception as e:
+                        pass  # Skip malformed entries
+                
+                self.log.info(f"Loaded {len(self.search_results)} search results, {self.finds_total} total finds")
+        except Exception as e:
+            self.log.warning(f"Could not load search results: {e}")
+    
+    def _save_results(self):
+        """Save search results to disk."""
+        try:
+            import json
+            from pathlib import Path
+            path = Path(self.results_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {
+                'finds_today': self.finds_today,
+                'finds_total': self.finds_total,
+                'api_hits_today': self.api_hits_today,
+                'last_reset_date': datetime.utcnow().date().isoformat(),
+                'results': [r.to_dict() for r in self.search_results[-500:]],
+            }
+            
+            with open(path, 'w') as f:
+                json.dump(data, f)
+        except Exception as e:
+            self.log.warning(f"Could not save search results: {e}")
         
         # Track long-missing items and their notification history
         self.long_missing_notified: Dict[str, List[int]] = {}  # key: "source:id" -> list of months notified
@@ -567,6 +649,9 @@ class SmartSearcher:
         
         # Keep history limited
         self.search_results = self.search_results[-500:]
+        
+        # Persist to disk
+        self._save_results()
         
         return {
             'searched': len(results),

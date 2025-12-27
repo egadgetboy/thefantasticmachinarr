@@ -95,9 +95,62 @@ class TieredItem:
 class TierManager:
     """Manages tier classification and tracking."""
     
-    def __init__(self, config):
+    def __init__(self, config, history_path: str = "/config/search_history.json"):
         self.config = config
+        self.history_path = history_path
         self.search_history: Dict[str, TieredItem] = {}  # key: "source:id"
+        self._load_history()
+    
+    def _load_history(self):
+        """Load search history from disk."""
+        try:
+            import json
+            from pathlib import Path
+            path = Path(self.history_path)
+            if path.exists():
+                with open(path, 'r') as f:
+                    data = json.load(f)
+                for key, item_data in data.items():
+                    # Reconstruct minimal TieredItem for history tracking
+                    self.search_history[key] = TieredItem(
+                        id=item_data.get('id', 0),
+                        title=item_data.get('title', ''),
+                        source=item_data.get('source', ''),
+                        instance_name=item_data.get('instance_name', ''),
+                        tier=Tier(item_data.get('tier', 'cold')),
+                        air_date=datetime.fromisoformat(item_data['air_date']) if item_data.get('air_date') else None,
+                        last_searched=datetime.fromisoformat(item_data['last_searched']) if item_data.get('last_searched') else None,
+                        search_count=item_data.get('search_count', 0),
+                    )
+                print(f"Loaded {len(self.search_history)} items from search history")
+        except Exception as e:
+            print(f"Could not load search history: {e}")
+    
+    def _save_history(self):
+        """Save search history to disk."""
+        try:
+            import json
+            from pathlib import Path
+            path = Path(self.history_path)
+            path.parent.mkdir(parents=True, exist_ok=True)
+            
+            data = {}
+            for key, item in self.search_history.items():
+                data[key] = {
+                    'id': item.id,
+                    'title': item.title,
+                    'source': item.source,
+                    'instance_name': item.instance_name,
+                    'tier': item.tier.value,
+                    'air_date': item.air_date.isoformat() if item.air_date else None,
+                    'last_searched': item.last_searched.isoformat() if item.last_searched else None,
+                    'search_count': item.search_count,
+                }
+            
+            with open(path, 'w') as f:
+                json.dump(data, f)
+        except Exception as e:
+            print(f"Could not save search history: {e}")
     
     def classify(self, air_date: Optional[datetime]) -> Tier:
         """Classify an item into a tier based on air date."""
@@ -241,6 +294,7 @@ class TierManager:
         item.last_searched = datetime.utcnow()
         item.search_count += 1
         self.search_history[key] = item
+        self._save_history()  # Persist to disk
     
     def get_tier_stats(self, items: List[TieredItem]) -> Dict[str, Any]:
         """Get statistics by tier."""
