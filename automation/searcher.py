@@ -571,12 +571,40 @@ class SmartSearcher:
         
         return prioritized
     
-    def run_search_cycle(self, sonarr_clients: Dict, radarr_clients: Dict) -> Dict[str, Any]:
+    def run_search_cycle(self, sonarr_clients: Dict, radarr_clients: Dict, 
+                         sabnzbd_clients: Dict = None) -> Dict[str, Any]:
         """Run a search cycle across all instances."""
         can_search, reason = self._can_search()
         if not can_search:
             self.log.warning(f"Search cycle skipped: {reason}")
             return {'skipped': True, 'reason': reason}
+        
+        # First, get items already downloading to avoid duplicate searches
+        downloading_ids = set()
+        for name, client in sonarr_clients.items():
+            try:
+                queue = client.get_queue()
+                for item in queue:
+                    if item.get('status', '').lower() in ('downloading', 'queued', 'paused'):
+                        if item.get('seriesId'):
+                            downloading_ids.add(f"sonarr:{name}:series:{item.get('seriesId')}")
+                        if item.get('episodeId'):
+                            downloading_ids.add(f"sonarr:{name}:ep:{item.get('episodeId')}")
+            except Exception as e:
+                self.log.debug(f"Could not check Sonarr ({name}) queue: {e}")
+        
+        for name, client in radarr_clients.items():
+            try:
+                queue = client.get_queue()
+                for item in queue:
+                    if item.get('status', '').lower() in ('downloading', 'queued', 'paused'):
+                        if item.get('movieId'):
+                            downloading_ids.add(f"radarr:{name}:movie:{item.get('movieId')}")
+            except Exception as e:
+                self.log.debug(f"Could not check Radarr ({name}) queue: {e}")
+        
+        if downloading_ids:
+            self.log.info(f"Found {len(downloading_ids)} items already downloading - will skip these")
         
         # Gather all missing items AND upgrades
         all_items = []
@@ -663,6 +691,38 @@ class SmartSearcher:
         if not selected:
             self.log.info("No items selected for search this cycle")
             return {'searched': 0, 'results': []}
+        
+        # Filter out items already downloading
+        filtered = []
+        skipped_downloading = 0
+        for item in selected:
+            item_key = None
+            if item.source == 'sonarr':
+                if item.series_id:
+                    item_key = f"sonarr:{item.instance_name}:series:{item.series_id}"
+                if item.id:
+                    ep_key = f"sonarr:{item.instance_name}:ep:{item.id}"
+                    if ep_key in downloading_ids:
+                        skipped_downloading += 1
+                        continue
+                if item_key and item_key in downloading_ids:
+                    skipped_downloading += 1
+                    continue
+            elif item.source == 'radarr':
+                item_key = f"radarr:{item.instance_name}:movie:{item.id}"
+                if item_key in downloading_ids:
+                    skipped_downloading += 1
+                    continue
+            filtered.append(item)
+        
+        if skipped_downloading:
+            self.log.info(f"Skipped {skipped_downloading} items already downloading")
+        
+        selected = filtered
+        
+        if not selected:
+            self.log.info("All selected items are already downloading")
+            return {'searched': 0, 'skipped_downloading': skipped_downloading, 'results': []}
         
         self.log.info(f"Starting search cycle: {len(selected)} items selected")
         

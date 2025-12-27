@@ -498,13 +498,91 @@ class MachinarrCore:
         }
     
     def get_queue_status(self) -> Dict[str, Any]:
-        """Get current queue status."""
+        """Get current queue status including active downloads."""
         stuck = self.queue_monitor.get_stuck_items()
+        
+        # Get active downloads from Sonarr/Radarr queues
+        active_downloads = []
+        downloading_ids = set()  # Track what's already downloading
+        
+        for name, client in self.sonarr_clients.items():
+            try:
+                queue = client.get_queue()
+                for item in queue:
+                    status = item.get('status', '').lower()
+                    if status in ('downloading', 'queued', 'paused'):
+                        download_info = {
+                            'source': 'sonarr',
+                            'instance': name,
+                            'title': item.get('title', 'Unknown'),
+                            'status': status,
+                            'progress': item.get('sizeleft', 0) / max(item.get('size', 1), 1) * 100,
+                            'size': item.get('size', 0),
+                            'sizeleft': item.get('sizeleft', 0),
+                            'timeleft': item.get('timeleft'),
+                            'series_id': item.get('seriesId'),
+                            'episode_id': item.get('episodeId'),
+                        }
+                        active_downloads.append(download_info)
+                        # Track by series/episode to avoid duplicate searches
+                        if item.get('seriesId'):
+                            downloading_ids.add(f"sonarr:{item.get('seriesId')}")
+                        if item.get('episodeId'):
+                            downloading_ids.add(f"sonarr:ep:{item.get('episodeId')}")
+            except Exception as e:
+                self.log.error(f"Failed to get Sonarr ({name}) queue: {e}")
+        
+        for name, client in self.radarr_clients.items():
+            try:
+                queue = client.get_queue()
+                for item in queue:
+                    status = item.get('status', '').lower()
+                    if status in ('downloading', 'queued', 'paused'):
+                        download_info = {
+                            'source': 'radarr',
+                            'instance': name,
+                            'title': item.get('title', 'Unknown'),
+                            'status': status,
+                            'progress': (1 - item.get('sizeleft', 0) / max(item.get('size', 1), 1)) * 100,
+                            'size': item.get('size', 0),
+                            'sizeleft': item.get('sizeleft', 0),
+                            'timeleft': item.get('timeleft'),
+                            'movie_id': item.get('movieId'),
+                        }
+                        active_downloads.append(download_info)
+                        if item.get('movieId'):
+                            downloading_ids.add(f"radarr:{item.get('movieId')}")
+            except Exception as e:
+                self.log.error(f"Failed to get Radarr ({name}) queue: {e}")
+        
+        # Get SABnzbd downloads if configured
+        sabnzbd_downloads = []
+        for name, client in self.sabnzbd_clients.items():
+            try:
+                sab_queue = client.get_queue()
+                for item in sab_queue.get('slots', []):
+                    sabnzbd_downloads.append({
+                        'source': 'sabnzbd',
+                        'instance': name,
+                        'title': item.get('filename', 'Unknown'),
+                        'status': item.get('status', 'Downloading'),
+                        'progress': float(item.get('percentage', 0)),
+                        'size': item.get('mb', 0) * 1024 * 1024,
+                        'sizeleft': item.get('mbleft', 0) * 1024 * 1024,
+                        'timeleft': item.get('timeleft'),
+                        'speed': item.get('speed'),
+                    })
+            except Exception as e:
+                self.log.error(f"Failed to get SABnzbd ({name}) queue: {e}")
         
         return {
             'stuck_items': [s.to_dict() for s in stuck],
             'total_stuck': len(stuck),
             'auto_resolvable': sum(1 for s in stuck if s.can_auto_resolve),
+            'active_downloads': active_downloads,
+            'sabnzbd_downloads': sabnzbd_downloads,
+            'downloading_ids': list(downloading_ids),
+            'total_downloading': len(active_downloads) + len(sabnzbd_downloads),
         }
     
     def get_interventions(self) -> Dict[str, Any]:

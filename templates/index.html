@@ -1507,7 +1507,20 @@
             </div>
         </div>
         
-        <!-- Row 4: Queue Issues (full width table) -->
+        <!-- Row 4: Active Downloads (full width table) -->
+        <div class="panel" id="downloads-panel">
+            <div class="panel-head">
+                <span class="panel-title">📥 Active Downloads</span>
+                <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="downloads-list" style="max-height:220px">
+                    <div class="empty"><div class="empty-icon">📭</div><p>No active downloads</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Row 5: Queue Issues (full width table) -->
         <div class="panel">
             <div class="panel-head">
                 <span class="panel-title">⚠️ Queue Issues</span>
@@ -2017,18 +2030,87 @@
         
         async function loadQueue() {
             const data = await api('queue');
+            
+            // Update stuck items
             const el = document.getElementById('stuck-list');
             document.getElementById('stuck-count').textContent = `${data.total_stuck || 0} items`;
             
             if (!data.stuck_items?.length) {
                 el.innerHTML = '<div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>';
                 paginationState.queue.items = [];
+            } else {
+                paginationState.queue.items = data.stuck_items.slice(0, MAX_ITEMS);
+                paginationState.queue.page = 0;
+                renderQueuePage();
+            }
+            
+            // Update active downloads panel
+            renderActiveDownloads(data);
+        }
+        
+        function renderActiveDownloads(data) {
+            const el = document.getElementById('downloads-list');
+            const panel = document.getElementById('downloads-panel');
+            const allDownloads = [
+                ...(data.active_downloads || []),
+                ...(data.sabnzbd_downloads || [])
+            ];
+            
+            document.getElementById('downloads-count').textContent = `${allDownloads.length} items`;
+            
+            // Hide panel if no downloads
+            if (!allDownloads.length) {
+                panel.style.display = 'none';
                 return;
             }
             
-            paginationState.queue.items = data.stuck_items.slice(0, MAX_ITEMS);
-            paginationState.queue.page = 0;
-            renderQueuePage();
+            panel.style.display = 'block';
+            
+            el.innerHTML = `
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th class="col-source">Source</th>
+                            <th class="col-title">Title</th>
+                            <th class="col-progress">Progress</th>
+                            <th class="col-status">Status</th>
+                            <th class="col-time">ETA</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${allDownloads.map(item => {
+                            const progress = Math.round(item.progress || 0);
+                            const progressColor = progress > 75 ? 'var(--success)' : progress > 25 ? 'var(--warn)' : 'var(--accent)';
+                            const eta = item.timeleft || '-';
+                            const statusClass = item.status === 'downloading' ? 'badge-success' : 
+                                                item.status === 'paused' ? 'badge-warn' : 'badge-sec';
+                            
+                            return `
+                            <tr>
+                                <td class="col-source">
+                                    <span class="badge badge-${item.source}">${item.source}</span>
+                                    ${item.instance ? `<small style="color:var(--text3);margin-left:4px">${item.instance}</small>` : ''}
+                                </td>
+                                <td class="col-title">
+                                    <div class="title-main">${esc(item.title)}</div>
+                                </td>
+                                <td class="col-progress">
+                                    <div style="display:flex;align-items:center;gap:8px">
+                                        <div style="flex:1;height:6px;background:var(--bg);border-radius:3px;overflow:hidden">
+                                            <div style="width:${progress}%;height:100%;background:${progressColor};transition:width 0.3s"></div>
+                                        </div>
+                                        <span style="font-size:11px;color:var(--text2)">${progress}%</span>
+                                    </div>
+                                </td>
+                                <td class="col-status">
+                                    <span class="badge ${statusClass}">${item.status}</span>
+                                </td>
+                                <td class="col-time">${eta}</td>
+                            </tr>
+                        `}).join('')}
+                    </tbody>
+                </table>
+            `;
         }
         
         function renderQueuePage() {
@@ -3156,7 +3238,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.69';
+        const CURRENT_VERSION = '1.0.70';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3250,6 +3332,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.69</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.70</div>
 </body>
 </html>
