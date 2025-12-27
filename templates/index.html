@@ -1664,9 +1664,9 @@
         <div class="panel" id="search-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
+                    <button class="expand-btn" onclick="openExpandedPanel('search')" title="Expand to full view">⛶</button>
                     <span class="panel-title">🔍 Search History</span>
                     <button class="btn btn-sm btn-pri" onclick="runSearch()">Search Now</button>
-                    <button class="expand-btn" onclick="openExpandedPanel('search')" title="Expand to full view">⛶</button>
                 </div>
                 <div style="display:flex;gap:12px;align-items:center">
                     <input type="text" id="search-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
@@ -1695,9 +1695,9 @@
         <div class="panel" id="downloads-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
+                    <button class="expand-btn" onclick="openExpandedPanel('downloads')" title="Expand to full view">⛶</button>
                     <span class="panel-title">⬇️ Downloading Now</span>
                     <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
-                    <button class="expand-btn" onclick="openExpandedPanel('downloads')" title="Expand to full view">⛶</button>
                 </div>
                 <div style="display:flex;gap:12px;align-items:center">
                     <input type="text" id="downloads-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterDownloads()">
@@ -1727,8 +1727,8 @@
         <div class="panel" id="finds-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
-                    <span class="panel-title">✅ Recently Grabbed</span>
                     <button class="expand-btn" onclick="openExpandedPanel('finds')" title="Expand to full view">⛶</button>
+                    <span class="panel-title">✅ Recently Grabbed</span>
                 </div>
                 <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -1743,8 +1743,8 @@
         <div class="panel" id="problems-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
-                    <span class="panel-title">⚠️ Download Problems</span>
                     <button class="expand-btn" onclick="openExpandedPanel('problems')" title="Expand to full view">⛶</button>
+                    <span class="panel-title">⚠️ Download Problems</span>
                 </div>
                 <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -1759,8 +1759,8 @@
         <div class="panel" id="attention-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
-                    <span class="panel-title">🖐️ Needs Attention</span>
                     <button class="expand-btn" onclick="openExpandedPanel('interventions')" title="Expand to full view">⛶</button>
+                    <span class="panel-title">🖐️ Needs Attention</span>
                 </div>
                 <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -4067,7 +4067,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.101';
+        const CURRENT_VERSION = '1.0.102';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4222,6 +4222,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.101</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.102</div>
 </body>
 </html>

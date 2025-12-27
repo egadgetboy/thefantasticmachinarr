@@ -77,7 +77,7 @@ class MachinarrCore:
         # Cache for tier data (expensive to compute)
         self._tier_cache = None
         self._tier_cache_time = None
-        self._tier_cache_ttl = 60  # seconds
+        self._tier_cache_ttl = 1800  # 30 minutes - avoid full catalog rebuilds
         
         # Progressive loading state
         self._progressive_loading = False
@@ -511,11 +511,12 @@ class MachinarrCore:
             cache_age = (datetime.now() - cache_time).total_seconds()
             
             # Accept cache if:
-            # - Less than 5 minutes old (fresh), OR
-            # - Less than 1 hour old AND has significant data (partial progress worth keeping)
+            # - Less than 30 minutes old (fresh), OR
+            # - Less than 6 hours old AND has significant data (partial progress worth keeping)
+            # Large libraries (100k+ items) take a long time to catalog, so we're generous
             has_data = sum(data.get('counts', {}).values()) > 0
-            is_fresh = cache_age < 300
-            is_recent_with_data = cache_age < 3600 and has_data
+            is_fresh = cache_age < 1800  # 30 minutes
+            is_recent_with_data = cache_age < 21600 and has_data  # 6 hours
             
             if not (is_fresh or is_recent_with_data):
                 self.log.info(f"Catalog cache too old ({cache_age:.0f}s), will refresh")
