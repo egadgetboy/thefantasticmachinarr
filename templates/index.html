@@ -1663,6 +1663,12 @@
                 // Update status indicator
                 updateStatusIndicator(data.scoreboard, data.scheduler);
             }
+            
+            // Apply global activity state from server
+            if (data.activity) {
+                applyActivityState(data.activity);
+            }
+            
             if (data.tiers) {
                 // Update tier totals
                 const tiers = data.tiers;
@@ -1785,6 +1791,12 @@
             
             text.textContent = mainText || 'Idle';
             detailEl.textContent = detail || '';
+        }
+        
+        function applyActivityState(activity) {
+            // Apply global activity state from server
+            if (!activity) return;
+            updateActivityBar(activity.status, activity.message, activity.detail);
         }
         
         async function loadQueue() {
@@ -2225,6 +2237,7 @@
             btn.disabled = true;
             btn.textContent = 'Searching...';
             
+            // Server will set activity state, but show immediate feedback
             updateActivityBar('searching', 'Manual search triggered', 'Searching for missing content and upgrades...');
             
             const data = await api('search', 'POST', {type: 'cycle'});
@@ -2232,15 +2245,11 @@
             btn.disabled = false;
             btn.textContent = 'Search Now';
             
-            if (data.searched > 0) {
-                updateActivityBar('finding', `Searched ${data.searched} items`, `${data.successful || 0} searches triggered successfully`);
-            } else {
-                updateActivityBar('idle', 'Search complete', 'No items needed searching');
-            }
-            
-            alert(`Searched ${data.searched || 0} items`);
+            // Reload dashboard to get server's activity state
             loadDashboard();
             loadSearches();
+            
+            alert(`Searched ${data.searched || 0} items`);
         }
         
         async function resolveItem(source, queueId) {
@@ -2537,6 +2546,11 @@
                     updateStatusIndicator(data.scoreboard, data.scheduler);
                 }
                 
+                // Apply global activity state from server
+                if (data.activity) {
+                    applyActivityState(data.activity);
+                }
+                
                 // Check if tier data is already cached (ready = true means no long init needed)
                 const dataReady = data.ready === true;
                 const cacheAge = data.cache_age || null;
@@ -2609,6 +2623,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.43</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.44</div>
 </body>
 </html>

@@ -6,6 +6,7 @@ Coordinates all components and provides API methods.
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 import os
+import threading
 
 from .config import Config, ServiceInstance
 from .logger import Logger
@@ -43,6 +44,16 @@ class MachinarrCore:
         self._tier_cache_time = None
         self._tier_cache_ttl = 60  # seconds
         
+        # Global activity state (shared across all browser sessions)
+        self._activity_lock = threading.Lock()
+        self._activity_state = {
+            'status': 'idle',  # idle, searching, finding, sleeping
+            'message': 'Ready',
+            'detail': '',
+            'updated': datetime.now().isoformat(),
+            'last_search_result': None  # Store last search results
+        }
+        
         # Initialize if configured
         if config.is_configured():
             self.reinit_clients()
@@ -70,6 +81,22 @@ class MachinarrCore:
                 inst.url, inst.api_key, inst.name
             )
             self.log.info(f"Initialized SABnzbd: {inst.name}")
+    
+    def set_activity(self, status: str, message: str, detail: str = '', search_result: Dict = None):
+        """Set global activity state (thread-safe)."""
+        with self._activity_lock:
+            self._activity_state = {
+                'status': status,
+                'message': message,
+                'detail': detail,
+                'updated': datetime.now().isoformat(),
+                'last_search_result': search_result or self._activity_state.get('last_search_result')
+            }
+    
+    def get_activity(self) -> Dict[str, Any]:
+        """Get global activity state (thread-safe)."""
+        with self._activity_lock:
+            return self._activity_state.copy()
     
     def start_scheduler(self):
         """Start background tasks."""
@@ -102,10 +129,22 @@ class MachinarrCore:
         """Periodic search task."""
         if not self.config.search.enabled:
             return
+        
+        self.set_activity('searching', 'Running scheduled search', 'Searching for missing content and upgrades...')
+        
         result = self.searcher.run_search_cycle(
             self.sonarr_clients, self.radarr_clients
         )
-        self.log.info(f"Search cycle: {result.get('searched', 0)} items searched")
+        
+        searched = result.get('searched', 0)
+        successful = result.get('successful', 0)
+        
+        if searched > 0:
+            self.set_activity('idle', f'Searched {searched} items', f'{successful} searches triggered', search_result=result)
+        else:
+            self.set_activity('idle', 'Search complete', 'No items needed searching', search_result=result)
+        
+        self.log.info(f"Search cycle: {searched} items searched")
     
     def _task_queue_monitor(self):
         """Monitor queues for stuck items."""
@@ -258,6 +297,7 @@ class MachinarrCore:
             'intervention_count': len(self.queue_monitor.get_pending_interventions()),
             'ready': has_cached_data,  # True if tier data is cached
             'cache_age': cache_age,  # Seconds since last tier data fetch
+            'activity': self.get_activity(),  # Global activity state
         }
     
     def get_dashboard_data(self) -> Dict[str, Any]:
@@ -527,9 +567,22 @@ class MachinarrCore:
         search_type = data.get('type', 'cycle')
         
         if search_type == 'cycle':
-            return self.searcher.run_search_cycle(
+            self.set_activity('searching', 'Manual search triggered', 'Searching for missing content and upgrades...')
+            
+            result = self.searcher.run_search_cycle(
                 self.sonarr_clients, self.radarr_clients
             )
+            
+            searched = result.get('searched', 0)
+            successful = result.get('successful', 0)
+            
+            if searched > 0:
+                self.set_activity('idle', f'Searched {searched} items', f'{successful} searches triggered', search_result=result)
+            else:
+                self.set_activity('idle', 'Search complete', 'No items needed searching', search_result=result)
+            
+            return result
+            
         elif search_type == 'single':
             return self.searcher.search_single(
                 data.get('source'),
