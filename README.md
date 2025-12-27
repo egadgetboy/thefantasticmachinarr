@@ -323,14 +323,28 @@ docker-compose up -d
 
 ## 📱 Dashboard
 
-The web dashboard provides:
+The web dashboard shows your media automation workflow from start to finish:
 
 - **Scoreboard**: Finds today/total, API calls, next search countdown
-- **Missing Content by Tier**: Visual breakdown of your library gaps
-- **Search Activity**: Recent searches with status
-- **Recent Finds**: Successfully grabbed content
-- **Queue Issues**: Stuck downloads with auto-resolve
-- **Manual Interventions**: Items needing your attention
+- **📊 Library Status**: Missing content organized by tier (Hot/Warm/Cool/Cold)
+- **🔍 Search History**: What TFM has searched for, with tier and cooldown info
+- **⬇️ Downloading Now**: Active downloads from Sonarr/Radarr/SABnzbd with progress bars
+- **✅ Recently Grabbed**: Successfully found and grabbed content
+- **⚠️ Download Problems**: Stuck or failed downloads with resolution options
+- **🖐️ Needs Attention**: Items requiring manual intervention
+
+The panels follow the logical flow of content acquisition:
+```
+Library Status (what's missing)
+    ↓ TFM searches
+Search History (what we looked for)
+    ↓ Sonarr/Radarr grabs
+Downloading Now (what's in progress)
+    ↓ completes
+Recently Grabbed (success!)
+    ↓ or fails
+Download Problems → Needs Attention
+```
 
 ---
 

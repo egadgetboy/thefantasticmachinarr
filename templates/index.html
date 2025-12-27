@@ -1464,15 +1464,15 @@
             </div>
         </div>
         
-        <!-- Row 2: Search Activity (full width table with filters) -->
+        <!-- Row 2: Search History -->
         <div class="panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
-                    <span class="panel-title">🔄 Search Activity</span>
+                    <span class="panel-title">🔍 Search History</span>
                     <button class="btn btn-sm btn-pri" onclick="runSearch()">Search Now</button>
                 </div>
                 <div style="display:flex;gap:12px;align-items:center">
-                    <input type="text" id="search-filter-text" placeholder="Search by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
+                    <input type="text" id="search-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
                     <select id="search-filter-tier" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterSearchActivity()">
                         <option value="">All Tiers</option>
                         <option value="hot">🔥 Hot</option>
@@ -1489,64 +1489,64 @@
             </div>
             <div class="panel-body flush">
                 <div class="data-table-wrap" id="search-list" style="max-height:280px">
-                    <div class="empty"><div class="empty-icon">⏳</div><p>No search activity yet</p></div>
+                    <div class="empty"><div class="empty-icon">⏳</div><p>No searches yet</p></div>
                 </div>
             </div>
         </div>
         
-        <!-- Row 3: Recent Finds (full width table) -->
-        <div class="panel">
-            <div class="panel-head">
-                <span class="panel-title">🎉 Recent Finds</span>
-                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
-            </div>
-            <div class="panel-body flush">
-                <div class="data-table-wrap" id="finds-list" style="max-height:220px">
-                    <div class="empty"><div class="empty-icon">🔍</div><p>No finds yet - TFM is working on it!</p></div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Row 4: Active Downloads (full width table) -->
+        <!-- Row 3: Downloading Now -->
         <div class="panel" id="downloads-panel">
             <div class="panel-head">
-                <span class="panel-title">📥 Active Downloads</span>
+                <span class="panel-title">⬇️ Downloading Now</span>
                 <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
                 <div class="data-table-wrap" id="downloads-list" style="max-height:220px">
-                    <div class="empty"><div class="empty-icon">📭</div><p>No active downloads</p></div>
+                    <div class="empty"><div class="empty-icon">📭</div><p>Nothing downloading</p></div>
                 </div>
             </div>
         </div>
         
-        <!-- Row 5: Queue Issues (full width table) -->
+        <!-- Row 4: Recently Grabbed -->
         <div class="panel">
             <div class="panel-head">
-                <span class="panel-title">⚠️ Queue Issues</span>
+                <span class="panel-title">✅ Recently Grabbed</span>
+                <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
+            </div>
+            <div class="panel-body flush">
+                <div class="data-table-wrap" id="finds-list" style="max-height:220px">
+                    <div class="empty"><div class="empty-icon">🔍</div><p>No grabs yet - TFM is working on it!</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Row 5: Download Problems -->
+        <div class="panel">
+            <div class="panel-head">
+                <span class="panel-title">⚠️ Download Problems</span>
                 <span id="stuck-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
                 <div class="data-table-wrap" id="stuck-list" style="max-height:250px">
-                    <div class="empty"><div class="empty-icon">✅</div><p>No stuck items</p></div>
+                    <div class="empty"><div class="empty-icon">✅</div><p>No problems</p></div>
                 </div>
             </div>
         </div>
         
-        <!-- Row 5: Manual Intervention (full width table) -->
+        <!-- Row 6: Needs Attention -->
         <div class="panel">
             <div class="panel-head">
-                <span class="panel-title">🖐️ Manual Intervention</span>
+                <span class="panel-title">🖐️ Needs Attention</span>
                 <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
             <div class="panel-body flush">
                 <div class="data-table-wrap" id="intervention-list" style="max-height:250px">
-                    <div class="empty"><div class="empty-icon">👍</div><p>No intervention needed</p></div>
+                    <div class="empty"><div class="empty-icon">👍</div><p>Nothing needs attention</p></div>
                 </div>
             </div>
         </div>
         
-        <!-- Row 6: Debug Logs -->
+        <!-- Row 7: Debug Logs -->
         <div class="panel full-width">
             <div class="panel-head">
                 <span class="panel-title">📋 Debug Logs</span>
@@ -3238,7 +3238,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.70';
+        const CURRENT_VERSION = '1.0.71';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3332,6 +3332,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.70</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.71</div>
 </body>
 </html>
