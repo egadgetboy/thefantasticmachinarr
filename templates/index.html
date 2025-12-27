@@ -412,6 +412,19 @@
         }
         .tier-breakdown span { display: flex; align-items: center; gap: 4px; }
         
+        /* Compact tiers */
+        .tiers.tiers-compact {
+            gap: 10px;
+        }
+        .tiers.tiers-compact .tier {
+            padding: 10px 12px;
+            border-radius: 10px;
+        }
+        .tiers.tiers-compact .tier-emoji { font-size: 20px; }
+        .tiers.tiers-compact .tier-count { font-size: 22px; margin: 3px 0; }
+        .tiers.tiers-compact .tier-name { font-size: 10px; }
+        .tiers.tiers-compact .tier-desc { font-size: 9px; margin-top: 2px; }
+        
         /* Lifecycle states */
         .lifecycle-state {
             display: inline-flex;
@@ -1032,11 +1045,12 @@
         <div class="score-card hot">
             <div class="score-val" id="finds-today">0</div>
             <div class="score-label">Finds Today</div>
+            <div class="score-breakdown" id="finds-today-breakdown"></div>
         </div>
         <div class="score-card">
             <div class="score-val" id="finds-total">0</div>
             <div class="score-label">Total Finds</div>
-            <div class="score-breakdown" id="finds-breakdown"></div>
+            <div class="score-breakdown" id="finds-total-breakdown"></div>
         </div>
         <div class="score-card api">
             <div class="score-val"><span id="api-used">0</span><span style="color:var(--text3);font-size:16px"> / <span id="api-limit">500</span></span></div>
@@ -1056,59 +1070,37 @@
     </div>
     
     <main>
-        <!-- Row 1: Missing Content by Tier (no title) -->
+        <!-- Row 1: Missing Content by Tier -->
         <div class="panel">
-            <div class="panel-body" style="padding: 16px;">
-                <div class="tiers">
-                    <div class="tier" style="background: linear-gradient(135deg, var(--bg3), var(--bg2)); border-color: var(--accent);">
-                        <div class="tier-emoji">📊</div>
-                        <div class="tier-count" id="tier-total-count">-</div>
-                        <div class="tier-name">Total</div>
-                        <div class="tier-desc">Missing</div>
-                        <div class="tier-breakdown">
-                            <span>📺 <span id="tier-total-sonarr">0</span></span>
-                            <span>🎬 <span id="tier-total-radarr">0</span></span>
-                        </div>
-                    </div>
+            <div class="panel-head" style="padding: 10px 16px;">
+                <span class="panel-title">🎯 Missing Content by Tier</span>
+                <span id="tier-total-label" style="color:var(--text2);font-size:12px"></span>
+            </div>
+            <div class="panel-body" style="padding: 10px 16px;">
+                <div class="tiers tiers-compact">
                     <div class="tier">
                         <div class="tier-emoji">🔥</div>
                         <div class="tier-count" id="tier-hot">-</div>
                         <div class="tier-name">Hot</div>
                         <div class="tier-desc">0-90 days</div>
-                        <div class="tier-breakdown">
-                            <span>📺 <span id="tier-hot-sonarr">0</span></span>
-                            <span>🎬 <span id="tier-hot-radarr">0</span></span>
-                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">☀️</div>
                         <div class="tier-count" id="tier-warm">-</div>
                         <div class="tier-name">Warm</div>
                         <div class="tier-desc">90-365 days</div>
-                        <div class="tier-breakdown">
-                            <span>📺 <span id="tier-warm-sonarr">0</span></span>
-                            <span>🎬 <span id="tier-warm-radarr">0</span></span>
-                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">❄️</div>
                         <div class="tier-count" id="tier-cool">-</div>
                         <div class="tier-name">Cool</div>
                         <div class="tier-desc">1-3 years</div>
-                        <div class="tier-breakdown">
-                            <span>📺 <span id="tier-cool-sonarr">0</span></span>
-                            <span>🎬 <span id="tier-cool-radarr">0</span></span>
-                        </div>
                     </div>
                     <div class="tier">
                         <div class="tier-emoji">🧊</div>
                         <div class="tier-count" id="tier-cold">-</div>
                         <div class="tier-name">Cold</div>
                         <div class="tier-desc">3+ years</div>
-                        <div class="tier-breakdown">
-                            <span>📺 <span id="tier-cold-sonarr">0</span></span>
-                            <span>🎬 <span id="tier-cold-radarr">0</span></span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -1452,13 +1444,16 @@
                 document.getElementById('api-used').textContent = data.scoreboard.api_hits_today;
                 document.getElementById('api-limit').textContent = data.scoreboard.api_limit;
                 
-                // Finds breakdown
-                const breakdown = document.getElementById('finds-breakdown');
-                if (breakdown && data.scoreboard.finds_by_source) {
-                    const parts = [];
-                    if (data.scoreboard.finds_by_source.sonarr) parts.push(`📺 ${data.scoreboard.finds_by_source.sonarr}`);
-                    if (data.scoreboard.finds_by_source.radarr) parts.push(`🎬 ${data.scoreboard.finds_by_source.radarr}`);
-                    breakdown.textContent = parts.join(' • ') || '';
+                // Finds breakdown for both cards
+                if (data.scoreboard.finds_by_source) {
+                    const sonarr = data.scoreboard.finds_by_source.sonarr || 0;
+                    const radarr = data.scoreboard.finds_by_source.radarr || 0;
+                    const breakdownText = `📺 ${sonarr} • 🎬 ${radarr}`;
+                    
+                    const todayBreakdown = document.getElementById('finds-today-breakdown');
+                    const totalBreakdown = document.getElementById('finds-total-breakdown');
+                    if (todayBreakdown) todayBreakdown.textContent = breakdownText;
+                    if (totalBreakdown) totalBreakdown.textContent = breakdownText;
                 }
                 
                 // Update status indicator
@@ -1467,22 +1462,12 @@
             if (data.tiers) {
                 // Update tier totals
                 const tiers = data.tiers;
-                document.getElementById('tier-hot').textContent = tiers.hot?.total ?? 0;
-                document.getElementById('tier-warm').textContent = tiers.warm?.total ?? 0;
-                document.getElementById('tier-cool').textContent = tiers.cool?.total ?? 0;
-                document.getElementById('tier-cold').textContent = tiers.cold?.total ?? 0;
+                document.getElementById('tier-hot').textContent = (tiers.hot?.total ?? 0).toLocaleString();
+                document.getElementById('tier-warm').textContent = (tiers.warm?.total ?? 0).toLocaleString();
+                document.getElementById('tier-cool').textContent = (tiers.cool?.total ?? 0).toLocaleString();
+                document.getElementById('tier-cold').textContent = (tiers.cold?.total ?? 0).toLocaleString();
                 
-                // Update tier breakdowns by source
-                document.getElementById('tier-hot-sonarr').textContent = tiers.hot?.sonarr ?? 0;
-                document.getElementById('tier-hot-radarr').textContent = tiers.hot?.radarr ?? 0;
-                document.getElementById('tier-warm-sonarr').textContent = tiers.warm?.sonarr ?? 0;
-                document.getElementById('tier-warm-radarr').textContent = tiers.warm?.radarr ?? 0;
-                document.getElementById('tier-cool-sonarr').textContent = tiers.cool?.sonarr ?? 0;
-                document.getElementById('tier-cool-radarr').textContent = tiers.cool?.radarr ?? 0;
-                document.getElementById('tier-cold-sonarr').textContent = tiers.cold?.sonarr ?? 0;
-                document.getElementById('tier-cold-radarr').textContent = tiers.cold?.radarr ?? 0;
-                
-                // Calculate and update Total counter
+                // Calculate total for header label
                 const total = (tiers.hot?.total ?? 0) + (tiers.warm?.total ?? 0) + 
                              (tiers.cool?.total ?? 0) + (tiers.cold?.total ?? 0);
                 const totalSonarr = (tiers.hot?.sonarr ?? 0) + (tiers.warm?.sonarr ?? 0) + 
@@ -1490,9 +1475,10 @@
                 const totalRadarr = (tiers.hot?.radarr ?? 0) + (tiers.warm?.radarr ?? 0) + 
                                    (tiers.cool?.radarr ?? 0) + (tiers.cold?.radarr ?? 0);
                 
-                document.getElementById('tier-total-count').textContent = total.toLocaleString();
-                document.getElementById('tier-total-sonarr').textContent = totalSonarr.toLocaleString();
-                document.getElementById('tier-total-radarr').textContent = totalRadarr.toLocaleString();
+                const tierLabel = document.getElementById('tier-total-label');
+                if (tierLabel) {
+                    tierLabel.textContent = `${total.toLocaleString()} total (📺 ${totalSonarr.toLocaleString()} • 🎬 ${totalRadarr.toLocaleString()})`;
+                }
             }
         }
         
@@ -2396,6 +2382,6 @@
             setInterval(loadLogs, 30000);
         }, 10000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.23</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.24</div>
 </body>
 </html>
