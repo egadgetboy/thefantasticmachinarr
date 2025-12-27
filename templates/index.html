@@ -2225,8 +2225,18 @@
         
         function showDownloadActions(item) {
             const modal = document.getElementById('modal');
-            const serviceName = item.source === 'sonarr' ? 'Sonarr' : 
-                               item.source === 'radarr' ? 'Radarr' : 'SABnzbd';
+            
+            // Determine the actual service for actions
+            // SABnzbd downloads are managed through Sonarr/Radarr
+            let serviceName, actionService;
+            if (item.source === 'sabnzbd') {
+                // SABnzbd is just the downloader - actions go through Sonarr/Radarr
+                actionService = item.series_id ? 'Sonarr' : 'Radarr';
+                serviceName = `SABnzbd → ${actionService}`;
+            } else {
+                serviceName = item.source === 'sonarr' ? 'Sonarr' : 'Radarr';
+                actionService = serviceName;
+            }
             
             document.getElementById('modal-title').innerHTML = `
                 <span style="margin-right:8px">⬇️</span>${esc(item.title)}
@@ -2234,7 +2244,7 @@
             
             document.getElementById('modal-desc').innerHTML = `
                 <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)">
-                    <strong>Source:</strong> ${serviceName}${item.instance ? ` (${esc(item.instance)})` : ''}
+                    <strong>Source:</strong> ${serviceName}${item.instance && item.source !== 'sabnzbd' ? ` (${esc(item.instance)})` : ''}
                 </div>
             `;
             
@@ -2244,7 +2254,7 @@
                     <ul style="margin:0;padding-left:20px;color:var(--text2);font-size:13px;line-height:1.8">
                         <li>Remove from queue (cancel download)</li>
                         <li>Blocklist and search for another release</li>
-                        <li>Open in ${serviceName} for more options</li>
+                        <li>Open in ${actionService} for more options</li>
                     </ul>
                 </div>
             `;
@@ -2257,7 +2267,7 @@
                         <span>🔄</span><span>Blocklist & Retry</span>
                     </button>
                     <button class="btn btn-sm btn-sec modal-action-btn" onclick="downloadOpenIn(${itemStr})">
-                        <span>🔗</span><span>Open in ${serviceName}</span>
+                        <span>🔗</span><span>Open in ${actionService}</span>
                     </button>
                     <button class="btn btn-sm btn-sec modal-action-btn" onclick="downloadRemove(${itemStr})">
                         <span>🗑️</span><span>Remove Only</span>
@@ -3453,7 +3463,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.73';
+        const CURRENT_VERSION = '1.0.74';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3547,6 +3557,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.73</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.74</div>
 </body>
 </html>
