@@ -61,16 +61,32 @@ class AutoResolutionConfig:
 
 @dataclass
 class SearchConfig:
-    """Search configuration."""
+    """
+    Search configuration - USER TUNABLE settings.
+    
+    These settings control how aggressively TFM searches for content.
+    Adjust based on your indexer limits and how fast you want results.
+    
+    KEY SETTING: daily_api_limit
+        This is the MAIN tuning knob. Higher = faster, Lower = gentler.
+        - 500: Steady pace, good for limited indexers
+        - 2000: Balanced, good default
+        - 5000: Aggressive, for fast indexers
+        - 10000+: Maximum speed, unlimited indexers
+    
+    TFM automatically adjusts search frequency based on this limit.
+    Hot items (new content) always get priority over Cold items.
+    """
     enabled: bool = True
-    daily_api_limit: int = 500  # Max API hits per day across all indexers
-    searches_per_cycle: int = 10  # How many items to search per cycle
-    cycle_interval_minutes: int = 60  # How often to run search cycle
+    daily_api_limit: int = 500  # Max API hits per day - THE MAIN TUNING KNOB
+    searches_per_cycle: int = 10  # Items to search per cycle
+    cycle_interval_minutes: int = 60  # Minutes between search cycles
     # Tier distribution per cycle (percentages, should sum to 100)
-    hot_percent: int = 40
-    warm_percent: int = 30
-    cool_percent: int = 20
-    cold_percent: int = 10
+    # Higher % = more searches for that tier
+    hot_percent: int = 40   # New content (0-90 days)
+    warm_percent: int = 30  # Recent content (90-365 days)
+    cool_percent: int = 20  # Older content (1-3 years)
+    cold_percent: int = 10  # Very old content (3+ years)
     # Prioritization
     prefer_series_over_episode: bool = True
     prefer_episode_over_season_pack: bool = True

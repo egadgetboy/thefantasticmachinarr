@@ -274,7 +274,22 @@ class SmartSearcher:
             self.log.warning(f"Could not save search results: {e}")
     
     def _get_pacing_preset(self) -> str:
-        """Determine pacing preset based on daily API limit."""
+        """
+        Determine pacing preset based on user's daily_api_limit setting.
+        
+        USER TUNING: The daily_api_limit in config controls how aggressive
+        TFM is. Higher limits = faster searching, lower limits = gentler.
+        
+        | User's daily_api_limit | Preset   | Behavior              |
+        |------------------------|----------|------------------------|
+        | ≤500                   | steady   | Patient, thorough     |
+        | ≤2000                  | fast     | Balanced              |
+        | ≤5000                  | faster   | Aggressive            |
+        | >5000                  | blazing  | Maximum speed         |
+        
+        The preset affects cooldowns between searches for each tier.
+        Hot items always get searched more often than Cold items.
+        """
         limit = self.config.search.daily_api_limit
         if limit <= 500:
             return 'steady'
