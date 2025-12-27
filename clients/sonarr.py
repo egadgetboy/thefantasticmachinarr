@@ -4,7 +4,7 @@ Handles series, episodes, queue, releases, and commands.
 """
 
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from .base import BaseClient, APIError
 
 
@@ -222,6 +222,78 @@ class SonarrClient(BaseClient):
             'includeEpisode': True
         })
     
+    def get_history_since(self, since_date: datetime, event_types: List[str] = None) -> List[Dict]:
+        """Get history events since a specific date.
+        
+        Args:
+            since_date: Get events after this datetime
+            event_types: Filter by event type ('grabbed', 'downloadFolderImported', etc.)
+                        If None, returns all types
+        
+        Returns:
+            List of history records matching criteria
+        """
+        all_records = []
+        page = 1
+        page_size = 100
+        
+        while True:
+            result = self.get('history', params={
+                'page': page,
+                'pageSize': page_size,
+                'sortKey': 'date',
+                'sortDirection': 'descending',
+                'includeSeries': True,
+                'includeEpisode': True
+            })
+            
+            records = result.get('records', [])
+            if not records:
+                break
+            
+            for record in records:
+                # Parse the date
+                date_str = record.get('date', '')
+                if date_str:
+                    try:
+                        record_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        if record_date.tzinfo:
+                            record_date = record_date.replace(tzinfo=None)
+                        
+                        # Stop if we've gone past our date range
+                        if record_date < since_date:
+                            return all_records
+                        
+                        # Filter by event type if specified
+                        event_type = record.get('eventType', '')
+                        if event_types is None or event_type in event_types:
+                            all_records.append(record)
+                    except:
+                        pass
+            
+            page += 1
+            # Safety limit
+            if page > 50:
+                break
+        
+        return all_records
+    
+    def get_recent_grabs(self, minutes: int = 30) -> List[Dict]:
+        """Get items grabbed in the last N minutes.
+        
+        These are items where Sonarr sent them to the download client.
+        """
+        since = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.get_history_since(since, event_types=['grabbed'])
+    
+    def get_recent_imports(self, minutes: int = 60) -> List[Dict]:
+        """Get items imported in the last N minutes.
+        
+        These are items successfully added to the library.
+        """
+        since = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.get_history_since(since, event_types=['downloadFolderImported'])
+    
     # ==================== System ====================
     
     def get_system_status(self) -> Dict:
@@ -235,6 +307,62 @@ class SonarrClient(BaseClient):
     def get_disk_space(self) -> List[Dict]:
         """Get disk space info."""
         return self.get('diskspace')
+    
+    # ==================== Tags ====================
+    
+    def get_tags(self) -> List[Dict]:
+        """Get all tags."""
+        return self.get('tag')
+    
+    def create_tag(self, label: str) -> Dict:
+        """Create a new tag."""
+        return self.post('tag', data={'label': label})
+    
+    def get_or_create_tag(self, label: str) -> int:
+        """Get tag ID by label, creating it if it doesn't exist."""
+        tags = self.get_tags()
+        for tag in tags:
+            if tag.get('label', '').lower() == label.lower():
+                return tag['id']
+        # Create new tag
+        new_tag = self.create_tag(label)
+        return new_tag['id']
+    
+    def add_tag_to_series(self, series_id: int, tag_id: int) -> bool:
+        """Add a tag to a series."""
+        try:
+            series = self.get_series_by_id(series_id)
+            tags = series.get('tags', [])
+            if tag_id not in tags:
+                tags.append(tag_id)
+                series['tags'] = tags
+                self.put(f'series/{series_id}', data=series)
+            return True
+        except Exception as e:
+            print(f"Failed to add tag to series {series_id}: {e}")
+            return False
+    
+    def remove_tag_from_series(self, series_id: int, tag_id: int) -> bool:
+        """Remove a tag from a series."""
+        try:
+            series = self.get_series_by_id(series_id)
+            tags = series.get('tags', [])
+            if tag_id in tags:
+                tags.remove(tag_id)
+                series['tags'] = tags
+                self.put(f'series/{series_id}', data=series)
+            return True
+        except Exception as e:
+            print(f"Failed to remove tag from series {series_id}: {e}")
+            return False
+    
+    def series_has_tag(self, series_id: int, tag_id: int) -> bool:
+        """Check if a series has a specific tag."""
+        try:
+            series = self.get_series_by_id(series_id)
+            return tag_id in series.get('tags', [])
+        except:
+            return False
     
     # ==================== Commands ====================
     
