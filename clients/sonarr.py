@@ -311,3 +311,23 @@ class SonarrClient(BaseClient):
                 status['issues'].append(issue_type)
         
         return status
+    
+    def unmonitor_episode(self, episode_id: int) -> bool:
+        """Unmonitor a specific episode."""
+        try:
+            # Get episode first
+            episode = self._get(f'/episode/{episode_id}')
+            if not episode:
+                return False
+            
+            # Update monitored status
+            episode['monitored'] = False
+            self._put(f'/episode/{episode_id}', episode)
+            return True
+        except Exception as e:
+            print(f"Failed to unmonitor episode {episode_id}: {e}")
+            return False
+    
+    def get_base_url(self) -> str:
+        """Get the base URL for opening in browser."""
+        return self.base_url.rstrip('/')

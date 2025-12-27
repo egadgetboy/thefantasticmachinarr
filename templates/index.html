@@ -2387,21 +2387,23 @@
             `;
             
             // Build action buttons
+            const itemData = JSON.stringify(item).replace(/'/g, "\\'");
             const actions = [];
             
             // Search Now action
-            actions.push(`<button class="btn btn-sm btn-pri" onclick="interventionSearchNow('${item.source}', ${item.id}, '${esc(item.title)}')">🔍 Search Now</button>`);
+            actions.push(`<button class="btn btn-sm btn-pri" onclick="interventionSearchNow('${item.source}', ${item.id}, '${esc(item.title).replace(/'/g, "\\'")}')">🔍 Search Now</button>`);
             
             // Delay action (reset cooldown)
-            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionDelay('${item.source}', ${item.id}, 7)">📅 Delay 7 Days</button>`);
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionDelay('${item.source}', ${item.id}, 7, '${item.intervention_type}')">📅 Delay 7 Days</button>`);
             
             // Open in Sonarr/Radarr
-            if (item.details?.instance_name) {
-                actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionOpenIn('${item.source}', ${item.id}, '${item.details.instance_name}')">🔗 Open in ${isMovie ? 'Radarr' : 'Sonarr'}</button>`);
-            }
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionOpenIn('${item.source}', ${item.id}, '${item.details?.instance_name || ''}')">🔗 Open in ${isMovie ? 'Radarr' : 'Sonarr'}</button>`);
             
-            // Dismiss
-            actions.push(`<button class="btn btn-sm btn-sec" onclick="dismissIntervention('${item.source}', ${item.id}, '${item.intervention_type}')">✓ Dismiss</button>`);
+            // Stop Searching (unmonitor)
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="interventionStopSearching('${item.source}', ${item.id}, '${item.intervention_type}')" title="Unmonitor in ${isMovie ? 'Radarr' : 'Sonarr'}">🚫 Stop Searching</button>`);
+            
+            // Dismiss (just removes from TFM list)
+            actions.push(`<button class="btn btn-sm btn-sec" onclick="dismissIntervention('${item.source}', ${item.id}, '${item.intervention_type}')" title="Remove from TFM list only - does not affect ${isMovie ? 'Radarr' : 'Sonarr'}">✓ Dismiss</button>`);
             
             document.getElementById('modal-actions').innerHTML = `
                 <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:flex-end">
@@ -2424,16 +2426,36 @@
             loadInterventions();
         }
         
-        async function interventionDelay(source, id, days) {
-            await api('intervention/delay', 'POST', {source, id, days});
-            updateActivityBar('idle', 'Delayed ' + days + ' days', 'Item will be searched again later');
+        async function interventionDelay(source, id, days, type) {
+            const data = await api('intervention/delay', 'POST', {source, id, days, type});
+            if (data.success) {
+                updateActivityBar('idle', 'Delayed ' + days + ' days', 'Item will be searched again later');
+            }
             closeModal();
             loadInterventions();
         }
         
         async function interventionOpenIn(source, id, instanceName) {
-            // This would need the base URL from config - for now just dismiss
-            alert('Open in ' + (source === 'radarr' ? 'Radarr' : 'Sonarr') + ' - Feature coming soon');
+            const data = await api('intervention/get_service_url', 'POST', {source, id, instance_name: instanceName});
+            if (data.success && data.url) {
+                window.open(data.url, '_blank');
+            } else {
+                alert('Could not get service URL: ' + (data.message || 'Unknown error'));
+            }
+        }
+        
+        async function interventionStopSearching(source, id, type) {
+            if (!confirm('This will UNMONITOR the item in ' + (source === 'radarr' ? 'Radarr' : 'Sonarr') + '. Continue?')) {
+                return;
+            }
+            const data = await api('intervention/stop_searching', 'POST', {source, id, type});
+            if (data.success) {
+                updateActivityBar('idle', 'Stopped searching', data.message || 'Item unmonitored');
+            } else {
+                alert('Failed: ' + (data.message || 'Unknown error'));
+            }
+            closeModal();
+            loadInterventions();
         }
         
         async function dismissIntervention(source, id, type) {
@@ -2760,6 +2782,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.49</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.50</div>
 </body>
 </html>

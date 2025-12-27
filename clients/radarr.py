@@ -284,3 +284,23 @@ class RadarrClient(BaseClient):
             })
         
         return parsed
+    
+    def unmonitor_movie(self, movie_id: int) -> bool:
+        """Unmonitor a specific movie."""
+        try:
+            # Get movie first
+            movie = self._get(f'/movie/{movie_id}')
+            if not movie:
+                return False
+            
+            # Update monitored status
+            movie['monitored'] = False
+            self._put(f'/movie/{movie_id}', movie)
+            return True
+        except Exception as e:
+            print(f"Failed to unmonitor movie {movie_id}: {e}")
+            return False
+    
+    def get_base_url(self) -> str:
+        """Get the base URL for opening in browser."""
+        return self.base_url.rstrip('/')

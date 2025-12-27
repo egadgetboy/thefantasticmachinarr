@@ -680,16 +680,82 @@ class MachinarrCore:
             return {'success': True, 'message': f'Delayed {days} days'}
         
         elif action == 'ignore_future':
-            # TODO: Add to ignore list
-            return {'success': True, 'message': 'Added to ignore list'}
+            # Add to ignore list (skip in future searches)
+            source = data.get('source')
+            item_id = data.get('id')
+            
+            key = f"{source}:{item_id}"
+            if key in self.tier_manager.search_history:
+                # Mark as ignored by setting search_count very high
+                self.tier_manager.search_history[key].search_count = 9999
+                self.tier_manager._save_history()
+                self.log.info(f"Ignoring {source} item {item_id} in future searches")
+            
+            # Dismiss the intervention
+            self.queue_monitor.dismiss_intervention(source, item_id, data.get('type'))
+            return {'success': True, 'message': 'Item will be ignored in future searches'}
         
         elif action == 'stop_searching':
-            # TODO: Unmonitor item
-            return {'success': True, 'message': 'Stopped searching for item'}
+            # Unmonitor item in Sonarr/Radarr
+            source = data.get('source')
+            item_id = data.get('id')
+            
+            success = False
+            message = 'Could not unmonitor item'
+            
+            if source == 'sonarr':
+                for name, client in self.sonarr_clients.items():
+                    try:
+                        if client.unmonitor_episode(item_id):
+                            success = True
+                            message = f'Unmonitored in {name}'
+                            self.log.info(f"Unmonitored Sonarr episode {item_id} via {name}")
+                            break
+                    except Exception as e:
+                        self.log.error(f"Failed to unmonitor via {name}: {e}")
+            
+            elif source == 'radarr':
+                for name, client in self.radarr_clients.items():
+                    try:
+                        if client.unmonitor_movie(item_id):
+                            success = True
+                            message = f'Unmonitored in {name}'
+                            self.log.info(f"Unmonitored Radarr movie {item_id} via {name}")
+                            break
+                    except Exception as e:
+                        self.log.error(f"Failed to unmonitor via {name}: {e}")
+            
+            if success:
+                self.queue_monitor.dismiss_intervention(source, item_id, data.get('type'))
+            
+            return {'success': success, 'message': message}
         
         elif action == 'grab_anyway':
             # Grab a rejected release
             return self._grab_release(data)
+        
+        elif action == 'get_service_url':
+            # Get URL to open item in Sonarr/Radarr
+            source = data.get('source')
+            item_id = data.get('id')
+            instance_name = data.get('instance_name')
+            
+            if source == 'sonarr':
+                for name, client in self.sonarr_clients.items():
+                    if instance_name and name != instance_name:
+                        continue
+                    base_url = client.get_base_url()
+                    # For episodes, we'd need series_id - for now just return base
+                    return {'success': True, 'url': f'{base_url}/activity/queue'}
+            
+            elif source == 'radarr':
+                for name, client in self.radarr_clients.items():
+                    if instance_name and name != instance_name:
+                        continue
+                    base_url = client.get_base_url()
+                    return {'success': True, 'url': f'{base_url}/movie/{item_id}'}
+            
+            return {'success': False, 'message': 'Service not found'}
         
         return {'success': False, 'message': 'Unknown action'}
     
