@@ -20,7 +20,7 @@ Sonarr and Radarr are great at *grabbing* content when it appears, but they're n
 ## ✨ Key Features
 
 ### 🔥 Tier-Based Prioritization
-Content is automatically classified by age into four tiers:
+Content is automatically classified by age into four tiers (fully customizable):
 
 | Tier | Age | Priority | Philosophy |
 |------|-----|----------|------------|
@@ -29,8 +29,10 @@ Content is automatically classified by age into four tiers:
 | ❄️ **Cool** | 1-3 years | Medium | Older content - search weekly |
 | 🧊 **Cold** | 3+ years | Low | Rare content - search monthly, never give up |
 
+*Tier thresholds and search intervals are fully customizable in Settings.*
+
 ### ⚡ Pacing Presets
-Choose how aggressive TFM should be based on your indexer limits:
+Choose how aggressive TFM should be based on your indexer limits (or create your own):
 
 | Preset | API Calls/Day | Best For |
 |--------|---------------|----------|
@@ -38,6 +40,8 @@ Choose how aggressive TFM should be based on your indexer limits:
 | 🐇 **Fast** | ~2,000 | Most users |
 | 🚀 **Faster** | ~5,000 | Premium indexers |
 | ⚡ **Blazing** | 10,000+ | Unlimited indexers |
+
+*Presets are starting points—all values can be fine-tuned in Settings.*
 
 ### 🔄 Smart Cooldowns
 TFM remembers what it's searched and doesn't waste API calls on recently searched items.
