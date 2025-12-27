@@ -1147,6 +1147,126 @@
         
         .modal-actions .btn { flex: 1; }
         
+        /* Expanded Panel Modal */
+        .modal.expanded-panel .modal-content {
+            max-width: 95vw;
+            width: 95vw;
+            max-height: 90vh;
+            height: 90vh;
+            display: flex;
+            flex-direction: column;
+            padding: 0;
+        }
+        
+        .expanded-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 24px;
+            border-bottom: 1px solid var(--border);
+            background: var(--bg3);
+        }
+        
+        .expanded-header h3 {
+            margin: 0;
+            font-size: 18px;
+        }
+        
+        .expanded-header .header-controls {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+        
+        .expanded-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 0;
+        }
+        
+        .expanded-body .data-table-wrap {
+            max-height: none !important;
+        }
+        
+        .expanded-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 24px;
+            border-top: 1px solid var(--border);
+            background: var(--bg3);
+        }
+        
+        /* Pagination */
+        .pagination {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .pagination button {
+            padding: 6px 12px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text);
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all var(--transition);
+        }
+        
+        .pagination button:hover:not(:disabled) {
+            background: var(--bg-hover);
+            border-color: var(--accent);
+        }
+        
+        .pagination button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination .page-info {
+            color: var(--text2);
+            font-size: 13px;
+            min-width: 120px;
+            text-align: center;
+        }
+        
+        .page-size-select {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text2);
+            font-size: 13px;
+        }
+        
+        .page-size-select select {
+            padding: 6px 10px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: var(--bg);
+            color: var(--text);
+            font-size: 13px;
+        }
+        
+        /* Expand button in panel headers */
+        .expand-btn {
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text2);
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all var(--transition);
+        }
+        
+        .expand-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+            border-color: var(--accent);
+        }
+        
         .modal-actions-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1560,6 +1680,7 @@
                     <span class="panel-title">🔍 Search History</span>
                     <span class="collapse-icon">▼</span>
                     <button class="btn btn-sm btn-pri" onclick="event.stopPropagation(); runSearch()">Search Now</button>
+                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('search')" title="Expand to full view">⛶</button>
                 </div>
                 <div style="display:flex;gap:12px;align-items:center" onclick="event.stopPropagation()">
                     <input type="text" id="search-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterSearchActivity()">
@@ -1591,6 +1712,7 @@
                     <span class="panel-title">⬇️ Downloading Now</span>
                     <span class="collapse-icon">▼</span>
                     <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
+                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('downloads')" title="Expand to full view">⛶</button>
                 </div>
                 <div style="display:flex;gap:12px;align-items:center" onclick="event.stopPropagation()">
                     <input type="text" id="downloads-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterDownloads()">
@@ -1622,6 +1744,7 @@
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="panel-title">✅ Recently Grabbed</span>
                     <span class="collapse-icon">▼</span>
+                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('finds')" title="Expand to full view">⛶</button>
                 </div>
                 <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -1636,6 +1759,10 @@
         <div class="panel" id="problems-panel">
             <div class="panel-head collapsible" onclick="togglePanel('problems-panel', event)">
                 <div style="display:flex;align-items:center;gap:8px">
+                    <span class="panel-title">⚠️ Download Problems</span>
+                    <span class="collapse-icon">▼</span>
+                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('problems')" title="Expand to full view">⛶</button>
+                </div>
                     <span class="panel-title">⚠️ Download Problems</span>
                     <span class="collapse-icon">▼</span>
                 </div>
@@ -1654,6 +1781,7 @@
                 <div style="display:flex;align-items:center;gap:8px">
                     <span class="panel-title">🖐️ Needs Attention</span>
                     <span class="collapse-icon">▼</span>
+                    <button class="expand-btn" onclick="event.stopPropagation(); openExpandedPanel('interventions')" title="Expand to full view">⛶</button>
                 </div>
                 <span id="intervention-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -1681,6 +1809,41 @@
             </div>
         </div>
     </main>
+    
+    <!-- Expanded Panel Modal -->
+    <div class="modal expanded-panel" id="expanded-modal">
+        <div class="modal-content">
+            <div class="expanded-header">
+                <h3 id="expanded-title">Panel Title</h3>
+                <div class="header-controls">
+                    <div id="expanded-filters"></div>
+                    <button class="btn btn-sec" onclick="closeExpandedPanel()">✕ Close</button>
+                </div>
+            </div>
+            <div class="expanded-body">
+                <div class="data-table-wrap" id="expanded-content"></div>
+            </div>
+            <div class="expanded-footer">
+                <div class="page-size-select">
+                    <label>Items per page:</label>
+                    <select id="expanded-page-size" onchange="changeExpandedPageSize()">
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                    </select>
+                </div>
+                <div class="pagination">
+                    <button onclick="expandedPageFirst()" title="First page">⏮</button>
+                    <button onclick="expandedPagePrev()" title="Previous page">◀</button>
+                    <span class="page-info" id="expanded-page-info">Page 1 of 1</span>
+                    <button onclick="expandedPageNext()" title="Next page">▶</button>
+                    <button onclick="expandedPageLast()" title="Last page">⏭</button>
+                </div>
+                <div id="expanded-total-info" style="color:var(--text2);font-size:13px"></div>
+            </div>
+        </div>
+    </div>
     
     <!-- Intervention Modal -->
     <div class="modal" id="modal">
@@ -1970,6 +2133,272 @@
             else if (stateKey === 'finds') renderFindsPage();
             else if (stateKey === 'queue') renderQueuePage();
             else if (stateKey === 'interventions') renderInterventionsPage();
+        }
+        
+        // Expanded Panel State
+        const expandedState = {
+            panelType: null,
+            items: [],
+            page: 0,
+            pageSize: parseInt(localStorage.getItem('tfm-expanded-page-size') || '20'),
+            filterText: '',
+            filterTier: '',
+            filterSource: ''
+        };
+        
+        function openExpandedPanel(panelType) {
+            expandedState.panelType = panelType;
+            expandedState.page = 0;
+            
+            // Copy items from pagination state
+            const stateMap = {
+                'search': 'searches',
+                'finds': 'finds',
+                'downloads': 'downloads',
+                'problems': 'queue',
+                'interventions': 'interventions'
+            };
+            
+            const stateKey = stateMap[panelType];
+            if (stateKey && paginationState[stateKey]) {
+                expandedState.items = [...paginationState[stateKey].items];
+            } else if (panelType === 'downloads') {
+                // Downloads aren't in pagination state, get from DOM data
+                expandedState.items = window.lastDownloadsData || [];
+            }
+            
+            // Set title
+            const titles = {
+                'search': '🔍 Search History',
+                'finds': '✅ Recently Grabbed',
+                'downloads': '⬇️ Downloading Now',
+                'problems': '⚠️ Download Problems',
+                'interventions': '🖐️ Needs Attention'
+            };
+            document.getElementById('expanded-title').textContent = titles[panelType] || 'Panel';
+            
+            // Set page size from saved preference
+            document.getElementById('expanded-page-size').value = expandedState.pageSize;
+            
+            // Build filters based on panel type
+            buildExpandedFilters(panelType);
+            
+            // Render content
+            renderExpandedContent();
+            
+            // Show modal
+            document.getElementById('expanded-modal').classList.add('show');
+        }
+        
+        function closeExpandedPanel() {
+            document.getElementById('expanded-modal').classList.remove('show');
+            expandedState.panelType = null;
+        }
+        
+        function buildExpandedFilters(panelType) {
+            const filtersDiv = document.getElementById('expanded-filters');
+            let html = '';
+            
+            if (panelType === 'search' || panelType === 'finds') {
+                html = `
+                    <input type="text" placeholder="Filter by title..." 
+                           style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px"
+                           onkeyup="expandedState.filterText=this.value; expandedState.page=0; renderExpandedContent()">
+                    <select style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px"
+                            onchange="expandedState.filterTier=this.value; expandedState.page=0; renderExpandedContent()">
+                        <option value="">All Tiers</option>
+                        <option value="hot">🔥 Hot</option>
+                        <option value="warm">☀️ Warm</option>
+                        <option value="cool">❄️ Cool</option>
+                        <option value="cold">🧊 Cold</option>
+                    </select>
+                    <select style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px"
+                            onchange="expandedState.filterSource=this.value; expandedState.page=0; renderExpandedContent()">
+                        <option value="">All Sources</option>
+                        <option value="sonarr">📺 Sonarr</option>
+                        <option value="radarr">🎬 Radarr</option>
+                    </select>
+                `;
+            } else if (panelType === 'downloads') {
+                html = `
+                    <input type="text" placeholder="Filter by title..." 
+                           style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px"
+                           onkeyup="expandedState.filterText=this.value; expandedState.page=0; renderExpandedContent()">
+                `;
+            } else if (panelType === 'problems' || panelType === 'interventions') {
+                html = `
+                    <input type="text" placeholder="Filter by title..." 
+                           style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px"
+                           onkeyup="expandedState.filterText=this.value; expandedState.page=0; renderExpandedContent()">
+                `;
+            }
+            
+            filtersDiv.innerHTML = html;
+        }
+        
+        function getFilteredExpandedItems() {
+            let items = expandedState.items;
+            const filter = expandedState.filterText.toLowerCase();
+            const tier = expandedState.filterTier;
+            const source = expandedState.filterSource;
+            
+            if (filter) {
+                items = items.filter(item => {
+                    const title = (item.title || item.name || '').toLowerCase();
+                    return title.includes(filter);
+                });
+            }
+            
+            if (tier) {
+                items = items.filter(item => item.tier === tier);
+            }
+            
+            if (source) {
+                items = items.filter(item => item.source === source);
+            }
+            
+            return items;
+        }
+        
+        function renderExpandedContent() {
+            const items = getFilteredExpandedItems();
+            const totalPages = Math.max(1, Math.ceil(items.length / expandedState.pageSize));
+            const start = expandedState.page * expandedState.pageSize;
+            const end = start + expandedState.pageSize;
+            const pageItems = items.slice(start, end);
+            
+            // Render items based on panel type
+            let html = '';
+            
+            if (pageItems.length === 0) {
+                html = '<div class="empty"><div class="empty-icon">📭</div><p>No items to display</p></div>';
+            } else if (expandedState.panelType === 'search') {
+                html = '<table class="data-table"><thead><tr><th>Title</th><th>Tier</th><th>Source</th><th>Status</th><th>Searched</th></tr></thead><tbody>';
+                pageItems.forEach(item => {
+                    const tierEmoji = {'hot':'🔥','warm':'☀️','cool':'❄️','cold':'🧊'}[item.tier] || '';
+                    const sourceIcon = item.source === 'sonarr' ? '📺' : '🎬';
+                    const statusIcon = item.found ? '✅' : (item.searched ? '⏳' : '🔍');
+                    const time = item.searched_at ? new Date(item.searched_at).toLocaleString() : '-';
+                    html += `<tr>
+                        <td>${item.title || 'Unknown'}</td>
+                        <td>${tierEmoji} ${item.tier || '-'}</td>
+                        <td>${sourceIcon} ${item.source || '-'}</td>
+                        <td>${statusIcon}</td>
+                        <td>${time}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else if (expandedState.panelType === 'finds') {
+                html = '<table class="data-table"><thead><tr><th>Title</th><th>Tier</th><th>Source</th><th>Method</th><th>Found</th></tr></thead><tbody>';
+                pageItems.forEach(item => {
+                    const tierEmoji = {'hot':'🔥','warm':'☀️','cool':'❄️','cold':'🧊'}[item.tier] || '';
+                    const sourceIcon = item.source === 'sonarr' ? '📺' : '🎬';
+                    const time = item.found_at ? new Date(item.found_at).toLocaleString() : '-';
+                    html += `<tr>
+                        <td>${item.title || 'Unknown'}</td>
+                        <td>${tierEmoji} ${item.tier || '-'}</td>
+                        <td>${sourceIcon} ${item.source || '-'}</td>
+                        <td>${item.method || '-'}</td>
+                        <td>${time}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else if (expandedState.panelType === 'downloads') {
+                html = '<table class="data-table"><thead><tr><th>Title</th><th>Source</th><th>Progress</th><th>ETA</th><th>Size</th></tr></thead><tbody>';
+                pageItems.forEach(item => {
+                    const sourceIcon = item.source === 'sonarr' ? '📺' : (item.source === 'radarr' ? '🎬' : '📥');
+                    const progress = item.progress || 0;
+                    html += `<tr>
+                        <td>${item.title || item.name || 'Unknown'}</td>
+                        <td>${sourceIcon} ${item.source || '-'}</td>
+                        <td><div class="progress-bar" style="width:100px;height:16px;background:var(--bg3);border-radius:4px;overflow:hidden"><div style="width:${progress}%;height:100%;background:var(--success)"></div></div> ${progress.toFixed(0)}%</td>
+                        <td>${item.timeleft || item.eta || '-'}</td>
+                        <td>${item.size || '-'}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else if (expandedState.panelType === 'problems') {
+                html = '<table class="data-table"><thead><tr><th>Title</th><th>Source</th><th>Issue</th><th>Status</th><th>Detected</th></tr></thead><tbody>';
+                pageItems.forEach(item => {
+                    const sourceIcon = item.source === 'sonarr' ? '📺' : '🎬';
+                    const time = item.first_detected ? new Date(item.first_detected).toLocaleString() : '-';
+                    html += `<tr>
+                        <td>${item.title || 'Unknown'}</td>
+                        <td>${sourceIcon} ${item.source || '-'}</td>
+                        <td>${(item.issues || []).join(', ') || '-'}</td>
+                        <td>${item.can_auto_resolve ? '🔄 Auto' : '🖐️ Manual'}</td>
+                        <td>${time}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            } else if (expandedState.panelType === 'interventions') {
+                html = '<table class="data-table"><thead><tr><th>Title</th><th>Source</th><th>Reason</th><th>Type</th><th>Created</th></tr></thead><tbody>';
+                pageItems.forEach(item => {
+                    const sourceIcon = item.source === 'sonarr' ? '📺' : '🎬';
+                    const time = item.created_at ? new Date(item.created_at).toLocaleString() : '-';
+                    html += `<tr class="clickable" onclick="showInterventionFromExpanded('${item.source}', ${item.id}, '${item.type || ''}')">
+                        <td>${item.title || 'Unknown'}</td>
+                        <td>${sourceIcon} ${item.source || '-'}</td>
+                        <td>${item.reason || '-'}</td>
+                        <td>${item.type || '-'}</td>
+                        <td>${time}</td>
+                    </tr>`;
+                });
+                html += '</tbody></table>';
+            }
+            
+            document.getElementById('expanded-content').innerHTML = html;
+            
+            // Update pagination info
+            document.getElementById('expanded-page-info').textContent = `Page ${expandedState.page + 1} of ${totalPages}`;
+            document.getElementById('expanded-total-info').textContent = `${items.length} items total`;
+            
+            // Update button states
+            const buttons = document.querySelectorAll('#expanded-modal .pagination button');
+            buttons[0].disabled = expandedState.page === 0;
+            buttons[1].disabled = expandedState.page === 0;
+            buttons[2].disabled = expandedState.page >= totalPages - 1;
+            buttons[3].disabled = expandedState.page >= totalPages - 1;
+        }
+        
+        function changeExpandedPageSize() {
+            const newSize = parseInt(document.getElementById('expanded-page-size').value);
+            expandedState.pageSize = newSize;
+            expandedState.page = 0;
+            localStorage.setItem('tfm-expanded-page-size', newSize.toString());
+            renderExpandedContent();
+        }
+        
+        function expandedPageFirst() {
+            expandedState.page = 0;
+            renderExpandedContent();
+        }
+        
+        function expandedPagePrev() {
+            expandedState.page = Math.max(0, expandedState.page - 1);
+            renderExpandedContent();
+        }
+        
+        function expandedPageNext() {
+            const items = getFilteredExpandedItems();
+            const totalPages = Math.ceil(items.length / expandedState.pageSize);
+            expandedState.page = Math.min(totalPages - 1, expandedState.page + 1);
+            renderExpandedContent();
+        }
+        
+        function expandedPageLast() {
+            const items = getFilteredExpandedItems();
+            const totalPages = Math.ceil(items.length / expandedState.pageSize);
+            expandedState.page = totalPages - 1;
+            renderExpandedContent();
+        }
+        
+        function showInterventionFromExpanded(source, id, type) {
+            closeExpandedPanel();
+            // Trigger the intervention modal
+            if (typeof showIntervention === 'function') {
+                showIntervention(source, id, type);
+            }
         }
     
         async function api(endpoint, method = 'GET', data = null) {
@@ -2269,6 +2698,9 @@
                 ...(data.active_downloads || []),
                 ...(data.sabnzbd_downloads || [])
             ];
+            
+            // Make available for expanded panel
+            window.lastDownloadsData = downloadsData;
             
             // Always show panel (even if empty, so filters are visible)
             panel.style.display = 'block';
@@ -3687,7 +4119,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.98';
+        const CURRENT_VERSION = '1.0.99';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -3842,6 +4274,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.98</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.99</div>
 </body>
 </html>
