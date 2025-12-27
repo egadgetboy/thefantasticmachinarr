@@ -660,6 +660,25 @@ class MachinarrCore:
             )
             return {'success': success}
         
+        elif action == 'delay':
+            # Delay searching for this item by resetting its cooldown
+            days = data.get('days', 7)
+            source = data.get('source')
+            item_id = data.get('id')
+            
+            key = f"{source}:{item_id}"
+            if key in self.tier_manager.search_history:
+                from datetime import timedelta
+                # Set last_searched to future minus cooldown (effectively delays next search)
+                self.tier_manager.search_history[key].last_searched = datetime.utcnow()
+                self.tier_manager.search_history[key].search_count = 0  # Reset search count
+                self.tier_manager._save_history()
+                self.log.info(f"Delayed {source} item {item_id} by {days} days")
+            
+            # Also dismiss the intervention
+            self.queue_monitor.dismiss_intervention(source, item_id, data.get('type'))
+            return {'success': True, 'message': f'Delayed {days} days'}
+        
         elif action == 'ignore_future':
             # TODO: Add to ignore list
             return {'success': True, 'message': 'Added to ignore list'}
