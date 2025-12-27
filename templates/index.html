@@ -35,8 +35,31 @@
         }
         
         [data-theme="light"] {
-            --bg: #c0c0c0;
-            --bg2: #dfdfdf;
+            --bg: #f5f0e8;
+            --bg2: #ebe5d9;
+            --bg3: #ddd6c8;
+            --bg-hover: #d0c9bb;
+            --text: #2c2416;
+            --text2: #4a4030;
+            --text3: #6b604a;
+            --accent: #7c5c3c;
+            --accent-hover: #8c6c4c;
+            --accent-glow: rgba(124, 92, 60, 0.3);
+            --success: #4a7c52;
+            --success-bg: rgba(74, 124, 82, 0.2);
+            --warn: #9a7820;
+            --warn-bg: rgba(154, 120, 32, 0.2);
+            --error: #9c4040;
+            --error-bg: rgba(156, 64, 64, 0.2);
+            --border: #c5bba8;
+            --border-focus: #7c5c3c;
+            --card-shadow: 0 4px 24px rgba(44, 36, 22, 0.1);
+            --glow: 0 0 20px rgba(124, 92, 60, 0.15);
+        }
+        
+        [data-theme="win98"] {
+            --bg: #008080;
+            --bg2: #c0c0c0;
             --bg3: #808080;
             --bg-hover: #b0b0b0;
             --text: #000000;
@@ -57,61 +80,84 @@
             --glow: none;
         }
         
-        /* Windows 98 specific styling for light mode */
-        [data-theme="light"] .panel,
-        [data-theme="light"] .score-card,
-        [data-theme="light"] .modal-content {
+        /* Windows 98 specific styling */
+        [data-theme="win98"] .panel,
+        [data-theme="win98"] .score-card,
+        [data-theme="win98"] .modal-content {
             border-radius: 0;
             border: none;
             box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
         }
         
-        [data-theme="light"] .panel-head {
+        [data-theme="win98"] .panel-head {
             background: linear-gradient(90deg, #000080, #1084d0);
             color: #ffffff;
             font-weight: bold;
         }
         
-        [data-theme="light"] .panel-title {
+        [data-theme="win98"] .panel-title {
             color: #ffffff;
         }
         
-        [data-theme="light"] .btn {
+        [data-theme="win98"] .btn {
             border-radius: 0;
             box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
         }
         
-        [data-theme="light"] .btn:active {
+        [data-theme="win98"] .btn:active {
             box-shadow: inset 1px 1px #0a0a0a, inset -1px -1px #ffffff, inset 2px 2px #808080, inset -2px -2px #dfdfdf;
         }
         
-        [data-theme="light"] .btn-pri {
+        [data-theme="win98"] .btn-pri {
             background: #c0c0c0;
             color: #000000;
         }
         
-        [data-theme="light"] .btn-sec {
+        [data-theme="win98"] .btn-sec {
             background: #c0c0c0;
             color: #000000;
             border: none;
         }
         
-        [data-theme="light"] header {
+        [data-theme="win98"] header {
             background: #c0c0c0;
             box-shadow: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff;
         }
         
-        [data-theme="light"] .activity-bar {
+        [data-theme="win98"] .activity-bar {
             border-radius: 0;
             box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff;
             background: #c0c0c0;
         }
         
-        [data-theme="light"] input,
-        [data-theme="light"] select {
+        [data-theme="win98"] input,
+        [data-theme="win98"] select {
             border-radius: 0;
             box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff, inset 2px 2px #0a0a0a, inset -2px -2px #dfdfdf;
             background: #ffffff;
+        }
+        
+        [data-theme="win98"] body {
+            font-family: 'MS Sans Serif', 'Segoe UI', Tahoma, sans-serif;
+        }
+        
+        [data-theme="win98"] .logo span {
+            font-family: 'MS Sans Serif', Tahoma, sans-serif;
+        }
+        
+        [data-theme="win98"] .data-table {
+            border: 2px solid;
+            border-color: #808080 #ffffff #ffffff #808080;
+        }
+        
+        [data-theme="win98"] .data-table th {
+            background: #c0c0c0;
+            border-bottom: 2px solid;
+            border-color: #ffffff #808080 #808080 #ffffff;
+        }
+        
+        [data-theme="win98"] .badge {
+            border-radius: 0;
         }
         
         * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -1598,16 +1644,22 @@
     </div>
     
     <script>
-        // Theme management
+        // Theme management - 3 themes: dark, light, win98
         function toggleTheme() {
             const current = document.documentElement.getAttribute('data-theme');
-            setTheme(current === 'dark' ? 'light' : 'dark');
+            let next;
+            if (current === 'dark') next = 'light';
+            else if (current === 'light') next = 'win98';
+            else next = 'dark';
+            setTheme(next);
         }
         
         function setTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('tfm-theme', theme);
-            document.querySelector('.theme-btn').textContent = theme === 'dark' ? '🌙' : '☀️';
+            // Update button icon
+            const icons = { dark: '🌙', light: '☀️', win98: '🪟' };
+            document.querySelector('.theme-btn').textContent = icons[theme] || '🌙';
             updateThemeButtons();
         }
         
@@ -1615,11 +1667,18 @@
             const theme = document.documentElement.getAttribute('data-theme');
             const darkBtn = document.getElementById('theme-dark-btn');
             const lightBtn = document.getElementById('theme-light-btn');
-            if (darkBtn && lightBtn) {
+            const win98Btn = document.getElementById('theme-win98-btn');
+            if (darkBtn) {
                 darkBtn.style.background = theme === 'dark' ? 'var(--accent)' : '';
                 darkBtn.style.color = theme === 'dark' ? '#fff' : '';
+            }
+            if (lightBtn) {
                 lightBtn.style.background = theme === 'light' ? 'var(--accent)' : '';
                 lightBtn.style.color = theme === 'light' ? '#fff' : '';
+            }
+            if (win98Btn) {
+                win98Btn.style.background = theme === 'win98' ? 'var(--accent)' : '';
+                win98Btn.style.color = theme === 'win98' ? '#fff' : '';
             }
         }
         
@@ -2875,6 +2934,64 @@
                 loadFinds();
                 loadSearches();
                 loadLogs();
+                
+                // Check for new install or version upgrade - auto-search after 10 seconds
+                checkVersionAndAutoSearch();
+            }
+        }
+        
+        const CURRENT_VERSION = '1.0.55';
+        
+        async function checkVersionAndAutoSearch() {
+            const lastVersion = localStorage.getItem('tfm-last-version');
+            const hasRunBefore = localStorage.getItem('tfm-first-run-complete');
+            
+            let shouldAutoSearch = false;
+            let reason = '';
+            
+            if (!hasRunBefore) {
+                // First run after setup wizard
+                shouldAutoSearch = true;
+                reason = 'First run - automatically searching for missing content...';
+                localStorage.setItem('tfm-first-run-complete', 'true');
+            } else if (lastVersion && lastVersion !== CURRENT_VERSION) {
+                // Version upgrade detected
+                shouldAutoSearch = true;
+                reason = `Upgraded from ${lastVersion} to ${CURRENT_VERSION} - refreshing data...`;
+            }
+            
+            // Always save current version
+            localStorage.setItem('tfm-last-version', CURRENT_VERSION);
+            
+            if (shouldAutoSearch) {
+                // Show countdown in activity bar
+                updateActivityBar('cataloging', reason, 'Auto-search starting in 10 seconds...');
+                
+                let countdown = 10;
+                const countdownInterval = setInterval(() => {
+                    countdown--;
+                    if (countdown > 0) {
+                        updateActivityBar('cataloging', reason, `Auto-search starting in ${countdown} seconds...`);
+                    }
+                }, 1000);
+                
+                // Wait 10 seconds then trigger search
+                setTimeout(async () => {
+                    clearInterval(countdownInterval);
+                    updateActivityBar('searching', 'Auto-search triggered', 'Searching for missing content and upgrades...');
+                    
+                    try {
+                        const data = await api('search', 'POST', {type: 'cycle'});
+                        updateActivityBar('idle', 'Auto-search complete', `Found ${data.searched || 0} items to search`);
+                        
+                        // Refresh all data
+                        loadDashboard();
+                        loadSearches();
+                        loadFinds();
+                    } catch (e) {
+                        updateActivityBar('idle', 'Auto-search failed', e.message);
+                    }
+                }, 10000);
             }
         }
         
