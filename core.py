@@ -52,8 +52,14 @@ class MachinarrCore:
         self.logger = logger
         self.log = logger.get_logger('core')
         
+        # Get app version
+        from . import __version__
+        
         # Library manager - handles sizing and catalog persistence
-        self.library_manager = LibraryManager(config.data_dir, logger)
+        self.library_manager = LibraryManager(config.data_dir, logger, app_version=__version__)
+        
+        # Register callback for library changes to update UI
+        self.library_manager.register_change_callback(self._on_library_change)
         
         # API Clients - support multiple instances of each service
         # Example: {'Main': SonarrClient(...), '4K': SonarrClient(...)}
@@ -113,6 +119,32 @@ class MachinarrCore:
         # Initialize if configured
         if config.is_configured():
             self.reinit_clients()
+            
+            # Check if we need a full scan (fresh install, upgrade, or scheduled)
+            if self.library_manager.needs_full_scan():
+                reason = "upgrade" if self.library_manager.version_upgraded else (
+                    "fresh install" if self.library_manager.is_fresh_install else "scheduled"
+                )
+                self.log.info(f"Full library scan needed ({reason})")
+    
+    def _on_library_change(self, change_info: Dict[str, Any]):
+        """Callback when library manager detects changes.
+        
+        Invalidates tier cache so Content Needing Action updates.
+        """
+        change_type = change_info.get('type', 'unknown')
+        changes = change_info.get('changes', {})
+        
+        self.log.info(f"Library change detected: {change_type}, delta={changes.get('total_delta', 0)}")
+        
+        # Invalidate tier cache to force UI refresh
+        self._tier_cache = None
+        self._tier_cache_time = None
+        
+        # Update activity state
+        with self._activity_lock:
+            self._activity_state['detail'] = f"Library updated ({change_type})"
+            self._activity_state['updated'] = datetime.now().isoformat()
     
     def reinit_clients(self):
         """Initialize or reinitialize API clients."""
@@ -361,6 +393,13 @@ class MachinarrCore:
             },
             'needs_rescan': self.library_manager.needs_full_scan(),
             'catalog_age': self.library_manager.get_catalog_age(),
+            'status': {
+                'is_fresh_install': self.library_manager.is_fresh_install,
+                'version_upgraded': self.library_manager.version_upgraded,
+                'needs_migration': self.library_manager.needs_migration,
+                'app_version': self.library_manager.app_version,
+                'schema_version': self.library_manager.metadata.schema_version,
+            },
         }
     
     def get_scoreboard_quick(self) -> Dict[str, Any]:

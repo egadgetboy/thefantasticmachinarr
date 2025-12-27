@@ -6,15 +6,19 @@ Handles:
 - Adaptive performance tuning based on library size
 - Catalog persistence and incremental updates
 - Change detection polling
+- Version migration detection
 """
 
 import json
 import threading
 from pathlib import Path
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from typing import Dict, Any, List, Optional, Tuple, Callable
+from dataclasses import dataclass, asdict, field
 from enum import Enum
+
+# Current schema version - increment when metadata format changes
+LIBRARY_SCHEMA_VERSION = 1
 
 
 class LibrarySize(Enum):
@@ -29,6 +33,10 @@ class LibrarySize(Enum):
 @dataclass
 class LibraryMetadata:
     """Persisted library metadata."""
+    # Schema version for migration detection
+    schema_version: int = LIBRARY_SCHEMA_VERSION
+    app_version: str = ""  # TFM version that last wrote this
+    
     # Counts
     sonarr_series: int = 0
     sonarr_episodes: int = 0
@@ -110,52 +118,110 @@ class LibraryManager:
         },
     }
     
-    def __init__(self, data_dir: Path, logger):
+    def __init__(self, data_dir: Path, logger, app_version: str = ""):
         self.data_dir = data_dir
         self.log = logger.get_logger('library')
         self.metadata_path = data_dir / 'library_metadata.json'
         self.catalog_path = data_dir / 'catalog.json'
+        self.app_version = app_version
         
         self._lock = threading.RLock()
         self.metadata = LibraryMetadata()
         self.catalog: Dict[str, Any] = {}
         
-        # Load existing metadata
+        # Callbacks for when library changes are detected
+        self._change_callbacks: List[Callable[[Dict[str, Any]], None]] = []
+        
+        # Flags for migration/upgrade detection
+        self.needs_migration = False
+        self.is_fresh_install = False
+        self.version_upgraded = False
+        
+        # Load existing metadata (sets migration flags)
         self._load_metadata()
     
+    def register_change_callback(self, callback: Callable[[Dict[str, Any]], None]):
+        """Register a callback to be called when library changes are detected.
+        
+        Callback receives a dict with:
+            - 'type': 'full_rescan' | 'incremental' | 'significant_change'
+            - 'old_counts': previous counts
+            - 'new_counts': new counts
+            - 'changes': what changed
+        """
+        self._change_callbacks.append(callback)
+    
+    def _notify_change(self, change_info: Dict[str, Any]):
+        """Notify all registered callbacks of a library change."""
+        for callback in self._change_callbacks:
+            try:
+                callback(change_info)
+            except Exception as e:
+                self.log.warning(f"Change callback error: {e}")
+    
     def _load_metadata(self):
-        """Load library metadata from disk."""
+        """Load library metadata from disk and detect migrations."""
         try:
-            if self.metadata_path.exists():
-                with open(self.metadata_path, 'r') as f:
-                    data = json.load(f)
-                
-                self.metadata = LibraryMetadata(
-                    sonarr_series=data.get('sonarr_series', 0),
-                    sonarr_episodes=data.get('sonarr_episodes', 0),
-                    sonarr_missing=data.get('sonarr_missing', 0),
-                    radarr_movies=data.get('radarr_movies', 0),
-                    radarr_missing=data.get('radarr_missing', 0),
-                    total_items=data.get('total_items', 0),
-                    total_missing=data.get('total_missing', 0),
-                    size_class=data.get('size_class', 'small'),
-                    first_scan=data.get('first_scan'),
-                    last_full_scan=data.get('last_full_scan'),
-                    last_incremental_check=data.get('last_incremental_check'),
-                    cache_ttl_seconds=data.get('cache_ttl_seconds', 1800),
-                    disk_cache_max_age_seconds=data.get('disk_cache_max_age_seconds', 21600),
-                    incremental_poll_seconds=data.get('incremental_poll_seconds', 300),
-                    batch_size=data.get('batch_size', 100),
-                )
-                
-                self.log.info(f"Loaded library metadata: {self.metadata.total_items:,} items, size={self.metadata.size_class}")
+            if not self.metadata_path.exists():
+                # No metadata file = fresh install
+                self.is_fresh_install = True
+                self.needs_migration = True  # Need full scan
+                self.log.info("Fresh install detected - will perform full library scan")
+                return
+            
+            with open(self.metadata_path, 'r') as f:
+                data = json.load(f)
+            
+            # Check schema version for migration
+            saved_schema = data.get('schema_version', 0)
+            if saved_schema < LIBRARY_SCHEMA_VERSION:
+                self.needs_migration = True
+                self.log.info(f"Schema migration needed: v{saved_schema} → v{LIBRARY_SCHEMA_VERSION}")
+            
+            # Check app version for upgrade detection
+            saved_app_version = data.get('app_version', '')
+            if self.app_version and saved_app_version != self.app_version:
+                self.version_upgraded = True
+                self.log.info(f"App version changed: {saved_app_version or 'unknown'} → {self.app_version}")
+                # Force rescan on version upgrade to pick up any new features
+                if saved_app_version and saved_app_version < "1.0.103":
+                    self.needs_migration = True
+                    self.log.info("Upgrade from pre-1.0.103 - forcing full library scan")
+            
+            self.metadata = LibraryMetadata(
+                schema_version=data.get('schema_version', 0),
+                app_version=data.get('app_version', ''),
+                sonarr_series=data.get('sonarr_series', 0),
+                sonarr_episodes=data.get('sonarr_episodes', 0),
+                sonarr_missing=data.get('sonarr_missing', 0),
+                radarr_movies=data.get('radarr_movies', 0),
+                radarr_missing=data.get('radarr_missing', 0),
+                total_items=data.get('total_items', 0),
+                total_missing=data.get('total_missing', 0),
+                size_class=data.get('size_class', 'small'),
+                first_scan=data.get('first_scan'),
+                last_full_scan=data.get('last_full_scan'),
+                last_incremental_check=data.get('last_incremental_check'),
+                cache_ttl_seconds=data.get('cache_ttl_seconds', 1800),
+                disk_cache_max_age_seconds=data.get('disk_cache_max_age_seconds', 21600),
+                incremental_poll_seconds=data.get('incremental_poll_seconds', 300),
+                batch_size=data.get('batch_size', 100),
+            )
+            
+            self.log.info(f"Loaded library metadata: {self.metadata.total_items:,} items, size={self.metadata.size_class}")
         except Exception as e:
             self.log.warning(f"Could not load library metadata: {e}")
+            self.is_fresh_install = True
+            self.needs_migration = True
     
     def _save_metadata(self):
         """Save library metadata to disk."""
         try:
             with self._lock:
+                # Update version info before saving
+                self.metadata.schema_version = LIBRARY_SCHEMA_VERSION
+                self.metadata.app_version = self.app_version
+                
                 self.data_dir.mkdir(parents=True, exist_ok=True)
                 with open(self.metadata_path, 'w') as f:
                     json.dump(asdict(self.metadata), f, indent=2)
@@ -182,8 +248,16 @@ class LibraryManager:
         Update library counts and auto-tune performance settings.
         
         Called after counting items from Sonarr/Radarr.
+        Notifies registered callbacks of changes.
         """
         with self._lock:
+            # Store old values for change detection
+            old_counts = {
+                'sonarr_missing': self.metadata.sonarr_missing,
+                'radarr_missing': self.metadata.radarr_missing,
+                'total_missing': self.metadata.total_missing,
+            }
+            
             self.metadata.sonarr_series = sonarr_series
             self.metadata.sonarr_episodes = sonarr_episodes
             self.metadata.sonarr_missing = sonarr_missing
@@ -206,6 +280,8 @@ class LibraryManager:
             
             if is_full_scan:
                 self.metadata.last_full_scan = now
+                # Clear migration flag after successful full scan
+                self.needs_migration = False
             else:
                 self.metadata.last_incremental_check = now
             
@@ -226,9 +302,36 @@ class LibraryManager:
                 f"{self.metadata.total_missing:,} missing, "
                 f"cache_ttl={profile['cache_ttl']}s"
             )
+            
+            # Calculate changes and notify callbacks
+            new_counts = {
+                'sonarr_missing': sonarr_missing,
+                'radarr_missing': radarr_missing,
+                'total_missing': self.metadata.total_missing,
+            }
+            
+            changes = {
+                'sonarr_delta': sonarr_missing - old_counts['sonarr_missing'],
+                'radarr_delta': radarr_missing - old_counts['radarr_missing'],
+                'total_delta': self.metadata.total_missing - old_counts['total_missing'],
+                'size_changed': old_size != size.value,
+            }
+            
+            # Only notify if there are actual changes
+            if any([changes['sonarr_delta'], changes['radarr_delta'], changes['size_changed']]):
+                self._notify_change({
+                    'type': 'full_rescan' if is_full_scan else 'incremental',
+                    'old_counts': old_counts,
+                    'new_counts': new_counts,
+                    'changes': changes,
+                })
     
     def needs_full_scan(self) -> bool:
         """Check if a full library scan is needed."""
+        # Migration/upgrade always needs full scan
+        if self.needs_migration:
+            return True
+        
         if self.metadata.first_scan is None:
             return True  # Never scanned
         
