@@ -2451,11 +2451,20 @@
             const serviceName = source === 'radarr' ? 'Radarr' : 'Sonarr';
             const itemType = source === 'radarr' ? 'movie' : 'series';
             
-            const instructions = `To stop searching for this item:\n\n` +
-                `1. Click OK to open the ${itemType} in ${serviceName}\n` +
-                `2. Find the "Monitored" toggle (usually near the top)\n` +
-                `3. Click it to turn monitoring OFF\n\n` +
-                `This gives you full control and you can easily re-enable monitoring later if needed.`;
+            let instructions;
+            if (source === 'radarr') {
+                instructions = `To stop searching for this movie:\n\n` +
+                    `1. Click OK to open the movie in Radarr\n` +
+                    `2. Find the "Monitored" toggle (usually near the top)\n` +
+                    `3. Click it to turn monitoring OFF\n\n` +
+                    `This gives you full control and you can easily re-enable monitoring later if needed.`;
+            } else {
+                instructions = `To stop searching for this episode/series:\n\n` +
+                    `1. Click OK to open the series in Sonarr\n` +
+                    `2. To unmonitor the SERIES: Toggle "Monitored" near the top\n` +
+                    `3. To unmonitor specific EPISODES: Click the episode and toggle its monitor status\n\n` +
+                    `This gives you full control and you can easily re-enable monitoring later if needed.`;
+            }
             
             if (!confirm(instructions)) {
                 return;
@@ -2825,6 +2834,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.53</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.54</div>
 </body>
 </html>
