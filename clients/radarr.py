@@ -4,7 +4,7 @@ Handles movies, queue, releases, and commands.
 """
 
 from typing import Dict, Any, List, Optional
-from datetime import datetime
+from datetime import datetime, timedelta
 from .base import BaseClient, APIError
 
 
@@ -193,6 +193,77 @@ class RadarrClient(BaseClient):
             'includeMovie': True
         })
     
+    def get_history_since(self, since_date: datetime, event_types: List[str] = None) -> List[Dict]:
+        """Get history events since a specific date.
+        
+        Args:
+            since_date: Get events after this datetime
+            event_types: Filter by event type ('grabbed', 'downloadFolderImported', etc.)
+                        If None, returns all types
+        
+        Returns:
+            List of history records matching criteria
+        """
+        all_records = []
+        page = 1
+        page_size = 100
+        
+        while True:
+            result = self.get('history', params={
+                'page': page,
+                'pageSize': page_size,
+                'sortKey': 'date',
+                'sortDirection': 'descending',
+                'includeMovie': True
+            })
+            
+            records = result.get('records', [])
+            if not records:
+                break
+            
+            for record in records:
+                # Parse the date
+                date_str = record.get('date', '')
+                if date_str:
+                    try:
+                        record_date = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+                        if record_date.tzinfo:
+                            record_date = record_date.replace(tzinfo=None)
+                        
+                        # Stop if we've gone past our date range
+                        if record_date < since_date:
+                            return all_records
+                        
+                        # Filter by event type if specified
+                        event_type = record.get('eventType', '')
+                        if event_types is None or event_type in event_types:
+                            all_records.append(record)
+                    except:
+                        pass
+            
+            page += 1
+            # Safety limit
+            if page > 50:
+                break
+        
+        return all_records
+    
+    def get_recent_grabs(self, minutes: int = 30) -> List[Dict]:
+        """Get movies grabbed in the last N minutes.
+        
+        These are movies where Radarr sent them to the download client.
+        """
+        since = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.get_history_since(since, event_types=['grabbed'])
+    
+    def get_recent_imports(self, minutes: int = 60) -> List[Dict]:
+        """Get movies imported in the last N minutes.
+        
+        These are movies successfully added to the library.
+        """
+        since = datetime.utcnow() - timedelta(minutes=minutes)
+        return self.get_history_since(since, event_types=['downloadFolderImported'])
+    
     # ==================== System ====================
     
     def get_system_status(self) -> Dict:
@@ -206,6 +277,62 @@ class RadarrClient(BaseClient):
     def get_disk_space(self) -> List[Dict]:
         """Get disk space info."""
         return self.get('diskspace')
+    
+    # ==================== Tags ====================
+    
+    def get_tags(self) -> List[Dict]:
+        """Get all tags."""
+        return self.get('tag')
+    
+    def create_tag(self, label: str) -> Dict:
+        """Create a new tag."""
+        return self.post('tag', data={'label': label})
+    
+    def get_or_create_tag(self, label: str) -> int:
+        """Get tag ID by label, creating it if it doesn't exist."""
+        tags = self.get_tags()
+        for tag in tags:
+            if tag.get('label', '').lower() == label.lower():
+                return tag['id']
+        # Create new tag
+        new_tag = self.create_tag(label)
+        return new_tag['id']
+    
+    def add_tag_to_movie(self, movie_id: int, tag_id: int) -> bool:
+        """Add a tag to a movie."""
+        try:
+            movie = self.get_movie(movie_id)
+            tags = movie.get('tags', [])
+            if tag_id not in tags:
+                tags.append(tag_id)
+                movie['tags'] = tags
+                self.put(f'movie/{movie_id}', data=movie)
+            return True
+        except Exception as e:
+            print(f"Failed to add tag to movie {movie_id}: {e}")
+            return False
+    
+    def remove_tag_from_movie(self, movie_id: int, tag_id: int) -> bool:
+        """Remove a tag from a movie."""
+        try:
+            movie = self.get_movie(movie_id)
+            tags = movie.get('tags', [])
+            if tag_id in tags:
+                tags.remove(tag_id)
+                movie['tags'] = tags
+                self.put(f'movie/{movie_id}', data=movie)
+            return True
+        except Exception as e:
+            print(f"Failed to remove tag from movie {movie_id}: {e}")
+            return False
+    
+    def movie_has_tag(self, movie_id: int, tag_id: int) -> bool:
+        """Check if a movie has a specific tag."""
+        try:
+            movie = self.get_movie(movie_id)
+            return tag_id in movie.get('tags', [])
+        except:
+            return False
     
     # ==================== Commands ====================
     
