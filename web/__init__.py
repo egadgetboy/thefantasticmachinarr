@@ -1,4 +1,6 @@
-"""Web interface for The Fantastic Machinarr."""
+"""
+Web module - Flask server and API endpoints.
+"""
 
 from .server import WebServer
 

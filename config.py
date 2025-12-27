@@ -131,6 +131,7 @@ class Config:
     
     def __init__(self, config_path: str = "/config/config.json"):
         self.config_path = Path(config_path)
+        self.data_dir = self.config_path.parent  # Store data files next to config
         self._lock = threading.RLock()
         
         # Service instances (support multiple)
