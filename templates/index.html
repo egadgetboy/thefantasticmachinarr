@@ -2476,6 +2476,12 @@
                 await new Promise(r => setTimeout(r, 400));
                 hideInitOverlay();
                 
+                // Trigger first search automatically after a short delay
+                setTimeout(() => {
+                    console.log('Triggering initial search cycle...');
+                    runSearch();
+                }, 2000);
+                
             } catch (error) {
                 console.error('Initialization error:', error);
                 if (statusEl) statusEl.textContent = 'Error - ' + (error.message || 'check settings');
@@ -2509,6 +2515,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.33</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.34</div>
 </body>
 </html>
