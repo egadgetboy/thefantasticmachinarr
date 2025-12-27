@@ -89,6 +89,11 @@ class WebServer:
             return jsonify(self.core.test_service(service, data))
         
         # ============ Dashboard Data ============
+        @self.app.route('/api/counts')
+        def api_counts():
+            """Quick endpoint to get just item counts (for init estimation)."""
+            return jsonify(self.core.get_quick_counts())
+        
         @self.app.route('/api/dashboard')
         def api_dashboard():
             return jsonify(self.core.get_dashboard_data())

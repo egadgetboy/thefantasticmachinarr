@@ -2232,8 +2232,9 @@
             },
             errors: [],
             dismissed: false,
-            itemsProcessed: 0,
-            totalItems: 0
+            totalItems: 0,
+            estimatedMs: 0,
+            dataStartTime: 0
         };
         
         function updateInitStep(step, status, detail = '') {
@@ -2275,12 +2276,26 @@
                 progressBar.style.width = `${percent}%`;
             }
             
-            // Update timer with elapsed time
-            const elapsed = Date.now() - initState.startTime;
+            // Update timer
             const timerEl = document.getElementById('init-timer');
             if (timerEl) {
-                const secs = Math.floor(elapsed / 1000);
-                timerEl.textContent = `${secs}s elapsed`;
+                const elapsed = Date.now() - initState.startTime;
+                
+                // If we have an estimate and we're in the data phase, show countdown
+                if (initState.estimatedMs > 0 && initState.dataStartTime > 0 && !initState.steps.data) {
+                    const dataElapsed = Date.now() - initState.dataStartTime;
+                    const remaining = Math.max(0, initState.estimatedMs - dataElapsed);
+                    const remainingSecs = Math.ceil(remaining / 1000);
+                    
+                    if (remaining > 0) {
+                        timerEl.textContent = `~${remainingSecs}s remaining`;
+                    } else {
+                        timerEl.textContent = `Finishing up...`;
+                    }
+                } else {
+                    const secs = Math.floor(elapsed / 1000);
+                    timerEl.textContent = `${secs}s elapsed`;
+                }
             }
         }
         
@@ -2324,15 +2339,33 @@
                 await loadStatus();
                 updateInitStep('config', 'done');
                 
-                // Step 2: Check services
+                // Step 2: Check services and get quick counts for estimation
                 updateInitStep('services', 'active', 'Connecting to services...');
                 setInitStatus('Connecting to Sonarr & Radarr...');
-                await new Promise(r => setTimeout(r, 300));
+                
+                // Get quick counts to estimate load time
+                try {
+                    const counts = await api('counts');
+                    initState.totalItems = counts.total_missing || 0;
+                    // Estimate: ~3ms per item for tier classification + 2s base
+                    initState.estimatedMs = 2000 + (initState.totalItems * 3);
+                    setInitStatus(`Found ${initState.totalItems.toLocaleString()} items to process...`);
+                } catch (e) {
+                    // Fall back to no estimate
+                    initState.estimatedMs = 0;
+                }
+                
                 updateInitStep('services', 'done');
                 
                 // Step 3: Fetch library data (the slow part)
                 updateInitStep('data', 'active', 'Fetching library data...');
-                setInitStatus('Counting missing content (this may take a moment)...');
+                initState.dataStartTime = Date.now();
+                
+                if (initState.totalItems > 1000) {
+                    setInitStatus(`Processing ${initState.totalItems.toLocaleString()} items...`);
+                } else {
+                    setInitStatus('Loading library data...');
+                }
                 
                 // Load dashboard which does the tier counting
                 await loadDashboard();
@@ -2382,6 +2415,6 @@
             setInterval(loadLogs, 30000);
         }, 10000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.24</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.25</div>
 </body>
 </html>

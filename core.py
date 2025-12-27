@@ -174,6 +174,47 @@ class MachinarrCore:
             'queue_monitor': self.queue_monitor.get_stats(),
         }
     
+    def get_quick_counts(self) -> Dict[str, Any]:
+        """Get just the item counts quickly (no tier classification)."""
+        counts = {
+            'sonarr_missing': 0,
+            'sonarr_upgrade': 0,
+            'radarr_missing': 0,
+            'radarr_upgrade': 0,
+        }
+        
+        # Just count items - no classification
+        for name, client in self.sonarr_clients.items():
+            try:
+                missing = client.get_missing_episodes()
+                counts['sonarr_missing'] += len(missing)
+            except:
+                pass
+            try:
+                upgrades = client.get_cutoff_unmet()
+                counts['sonarr_upgrade'] += len(upgrades)
+            except:
+                pass
+        
+        for name, client in self.radarr_clients.items():
+            try:
+                missing = client.get_missing_movies()
+                counts['radarr_missing'] += len(missing)
+            except:
+                pass
+            try:
+                upgrades = client.get_cutoff_unmet()
+                counts['radarr_upgrade'] += len(upgrades)
+            except:
+                pass
+        
+        total = counts['sonarr_missing'] + counts['radarr_missing']
+        return {
+            'counts': counts,
+            'total_missing': total,
+            'total_upgrades': counts['sonarr_upgrade'] + counts['radarr_upgrade'],
+        }
+    
     def get_dashboard_data(self) -> Dict[str, Any]:
         """Get data for dashboard display."""
         # Scoreboard with finds breakdown
