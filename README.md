@@ -54,6 +54,14 @@ Pause searching during specific hours to reduce load during maintenance windows.
 ### 🔧 Queue Management
 Automatically detects and handles stuck downloads with auto-resolution capabilities.
 
+### 📥 SABnzbd Integration (Optional)
+TFM can optionally connect to SABnzbd for enhanced queue monitoring. While Sonarr and Radarr handle most download management, SABnzbd integration allows TFM to:
+- Monitor download progress directly
+- Detect stuck or stalled downloads faster
+- Provide more detailed queue status information
+
+**Note:** SABnzbd is completely optional. TFM works perfectly with just Sonarr/Radarr, which already communicate with your download clients. The SABnzbd integration is for users who want additional visibility into their download queue.
+
 ---
 
 ## 🚀 Installation
@@ -62,6 +70,7 @@ Automatically detects and handles stuck downloads with auto-resolution capabilit
 - Docker installed on your system
 - Sonarr v3+ and/or Radarr v3+ running and accessible
 - API keys for your Sonarr/Radarr instances
+- (Optional) SABnzbd for enhanced queue monitoring
 
 ---
 
@@ -262,6 +271,7 @@ docker-compose up -d
 1. Open the web UI at `http://your-server:8080`
 2. The Setup Wizard will guide you through:
    - Adding Sonarr/Radarr instances (URL + API key)
+   - Adding SABnzbd (optional, for enhanced queue monitoring)
    - Choosing a pacing preset
    - Configuring tier thresholds (optional)
    - Setting up quiet hours (optional)
