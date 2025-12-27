@@ -11,7 +11,7 @@ import threading
 from .config import Config, ServiceInstance
 from .logger import Logger
 from .clients import SonarrClient, RadarrClient, SABnzbdClient
-from .automation import TierManager, QueueMonitor, SmartSearcher, Scheduler, Tier
+from .automation import TierManager, QueueMonitor, SmartSearcher, Scheduler, Tier, FindTracker
 from .notifier import EmailNotifier
 from .library import LibraryManager
 
@@ -33,6 +33,7 @@ class MachinarrCore:
         ├── radarr_clients     - Dict of Radarr API clients
         ├── sabnzbd_clients    - Dict of SABnzbd API clients (optional)
         ├── tier_manager       - Classifies content by age (Hot/Warm/Cool/Cold)
+        ├── find_tracker       - Tracks successful finds from TFM searching
         ├── queue_monitor      - Detects stuck downloads
         ├── searcher           - Smart search logic with rate limiting
         ├── scheduler          - Cron-like task scheduling
@@ -43,8 +44,9 @@ class MachinarrCore:
         2. Catalog loaded from disk or built progressively
         3. Tier manager classifies items by age
         4. Searcher prioritizes HOT items, respects API limits
-        5. Queue monitor watches for stuck downloads
-        6. Web UI polls for updates via API endpoints
+        5. FindTracker monitors history for successful grabs
+        6. Queue monitor watches for stuck downloads
+        7. Web UI polls for updates via API endpoints
     """
     
     def __init__(self, config: Config, logger: Logger):
@@ -69,12 +71,14 @@ class MachinarrCore:
         
         # Core components
         self.tier_manager = TierManager(config)      # Classifies content by age
+        self.find_tracker = FindTracker(config, logger, config.data_dir)  # Track successful finds
         self.queue_monitor = QueueMonitor(config, logger)  # Watches for stuck items
-        self.searcher = SmartSearcher(config, self.tier_manager, logger)  # Search logic
+        self.searcher = SmartSearcher(config, self.tier_manager, logger, 
+                                      find_tracker=self.find_tracker)  # Search logic with find tracking
         self.scheduler = Scheduler(config, logger)   # Task scheduling
         self.notifier = EmailNotifier(config, logger)
         
-        # Find tracking with resolution reasons
+        # Legacy find tracking (deprecated - use find_tracker instead)
         self.recent_finds: List[Dict] = []
         self.max_finds_history = 100
         self._load_finds()  # Load persisted finds
@@ -291,13 +295,13 @@ class MachinarrCore:
         self.scheduler.start()
     
     def _task_search_cycle(self):
-        """Periodic search task."""
+        """Periodic search task with tag-based find detection."""
         if not self.config.search.enabled:
             return
         
         self.set_activity('searching', 'Running scheduled search', 'Searching for missing content and upgrades...')
         
-        # Progress callback updates activity bar in real-time
+        # STEP 1: Run searches (searcher tags series/movies before searching)
         def on_progress(current, total, title):
             short_title = title[:40] + '...' if len(title) > 40 else title
             self.set_activity('searching', f'Searching ({current}/{total})', short_title)
@@ -310,25 +314,67 @@ class MachinarrCore:
         searched = result.get('searched', 0)
         successful = result.get('successful', 0)
         
+        # STEP 2: Wait briefly for Sonarr/Radarr to process search commands
+        import time
+        time.sleep(5)  # Give arr services time to grab
+        
+        # STEP 3: Check queues for items with TFM tags (DEFINITIVE FIND DETECTION)
+        new_finds = []
+        for name, client in self.sonarr_clients.items():
+            try:
+                queue = client.get_queue()
+                finds = self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
+                new_finds.extend(finds)
+            except Exception as e:
+                self.log.debug(f"Could not check Sonarr ({name}) queue for finds: {e}")
+        
+        for name, client in self.radarr_clients.items():
+            try:
+                queue = client.get_queue()
+                finds = self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
+                new_finds.extend(finds)
+            except Exception as e:
+                self.log.debug(f"Could not check Radarr ({name}) queue for finds: {e}")
+        
+        # STEP 4: Cleanup old tags (removes tags from series/movies after 60 min)
+        try:
+            self.find_tracker.cleanup_tags(self.sonarr_clients, self.radarr_clients, max_age_minutes=60)
+        except Exception as e:
+            self.log.debug(f"Could not cleanup TFM tags: {e}")
+        
+        # Notify for each find
+        for find in new_finds:
+            self.notifier.notify_find(find.title, find.source, find.tier)
+        
+        # Update activity with find count
+        finds_msg = f", {len(new_finds)} finds!" if new_finds else ""
         if searched > 0:
-            self.set_activity('idle', f'Searched {searched} items', f'{successful} searches triggered', search_result=result)
+            self.set_activity('idle', f'Searched {searched} items', f'{successful} searches triggered{finds_msg}', search_result=result)
         else:
-            self.set_activity('idle', 'Search complete', 'No items needed searching', search_result=result)
+            self.set_activity('idle', 'Search complete', f'No items needed searching{finds_msg}', search_result=result)
         
         self.log.info(f"Search cycle: {searched} items searched")
     
     def _task_queue_monitor(self):
-        """Monitor queues for stuck items."""
+        """Monitor queues for stuck items and detect finds in real-time."""
         # Check Sonarr queues
         for name, client in self.sonarr_clients.items():
             try:
                 queue = client.get_queue()
+                
+                # Check for stuck items
                 for item in queue:
                     stuck = self.queue_monitor.analyze_queue_item(
                         item, 'sonarr', name, client
                     )
                     if stuck and self.queue_monitor.should_auto_resolve(stuck):
                         self.queue_monitor.resolve_stuck_item(stuck, client)
+                
+                # Check for finds (items from TFM-tagged series)
+                new_finds = self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
+                for find in new_finds:
+                    self.notifier.notify_find(find.title, find.source, find.tier)
+                    
             except Exception as e:
                 self.log.error(f"Queue monitor error ({name}): {e}")
         
@@ -336,12 +382,20 @@ class MachinarrCore:
         for name, client in self.radarr_clients.items():
             try:
                 queue = client.get_queue()
+                
+                # Check for stuck items
                 for item in queue:
                     stuck = self.queue_monitor.analyze_queue_item(
                         item, 'radarr', name, client
                     )
                     if stuck and self.queue_monitor.should_auto_resolve(stuck):
                         self.queue_monitor.resolve_stuck_item(stuck, client)
+                
+                # Check for finds (items from TFM-tagged movies)
+                new_finds = self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
+                for find in new_finds:
+                    self.notifier.notify_find(find.title, find.source, find.tier)
+                    
             except Exception as e:
                 self.log.error(f"Queue monitor error ({name}): {e}")
     
@@ -536,13 +590,19 @@ class MachinarrCore:
         if self._tier_cache_time:
             cache_age = (datetime.now() - self._tier_cache_time).total_seconds()
         
+        # Get find stats from FindTracker (primary) or fall back to searcher
+        find_stats = self.find_tracker.get_stats()
+        finds_today = find_stats['finds_today']
+        finds_total = find_stats['finds_total']
+        
         return {
             'scoreboard': {
-                'finds_today': self.searcher.finds_today,
-                'finds_total': self.searcher.finds_total,
+                'finds_today': finds_today,
+                'finds_total': finds_total,
                 'api_hits_today': self.searcher.api_hits_today,
                 'api_limit': self.config.search.daily_api_limit,
                 'finds_by_source': finds_by_source,
+                'finds_by_tier': find_stats.get('finds_by_tier', {}),
             },
             'scheduler': scheduler_info,
             'stuck_count': len(self.queue_monitor.get_stuck_items()),
@@ -591,12 +651,19 @@ class MachinarrCore:
                     self._start_progressive_load()
                 missing_data = self._get_progressive_state()
         
+        # Get find stats from FindTracker
+        find_stats = self.find_tracker.get_stats()
+        finds_today = find_stats['finds_today']
+        finds_total = find_stats['finds_total']
+        
         scoreboard = {
-            'finds_today': self.searcher.finds_today,
-            'finds_total': self.searcher.finds_total,
+            'finds_today': finds_today,
+            'finds_total': finds_total,
             'api_hits_today': self.searcher.api_hits_today,
             'api_limit': self.config.search.daily_api_limit,
-            'finds_by_source': finds_by_source,
+            'finds_by_source': find_stats.get('finds_by_tier', {}),  # Now by tier, more useful
+            'finds_by_type': find_stats.get('finds_by_type', {}),
+            'avg_search_to_find_minutes': find_stats.get('avg_search_to_find_minutes', 0),
             'missing_episodes': missing_data['counts']['sonarr_missing'],
             'missing_movies': missing_data['counts']['radarr_missing'],
             'upgrade_episodes': missing_data['counts']['sonarr_upgrade'],
@@ -1742,37 +1809,34 @@ class MachinarrCore:
         return {'paths': paths, 'warnings': warnings}
     
     def get_recent_finds(self, limit: int = 50) -> Dict[str, Any]:
-        """Get recent successful finds."""
-        return {'finds': self.recent_finds[-limit:]}
+        """Get recent successful finds from FindTracker."""
+        return {
+            'finds': self.find_tracker.get_recent_finds(limit),
+            'stats': self.find_tracker.get_stats(),
+        }
     
     def record_find(self, title: str, source: str, instance: str, 
-                    resolution_type: str, resolution_detail: str = ""):
-        """Record a successful find with how it was resolved."""
-        from datetime import datetime
+                    resolution_type: str, resolution_detail: str = "",
+                    item_id: int = 0, series_id: int = None, tier: str = 'unknown'):
+        """Record a successful find with how it was resolved.
         
-        find = {
-            'title': title,
-            'source': source,
-            'instance': instance,
-            'resolution_type': resolution_type,  # 'auto', 'manual', 'rss', 'search'
-            'resolution_detail': resolution_detail,
-            'timestamp': datetime.utcnow().isoformat(),
-        }
+        This is the manual recording method - typically used for auto-resolution finds.
+        For search-based finds, the FindTracker automatically detects them via history.
+        """
+        # Use the FindTracker for consistent tracking
+        self.find_tracker.record_manual_find(
+            title=title,
+            source=source,
+            instance_name=instance,
+            item_id=item_id,
+            series_id=series_id,
+            tier=tier,
+            resolution_type=resolution_type,
+            resolution_detail=resolution_detail,
+        )
         
-        self.recent_finds.append(find)
-        
-        # Trim history
-        if len(self.recent_finds) > self.max_finds_history:
-            self.recent_finds = self.recent_finds[-self.max_finds_history:]
-        
-        # Persist finds (debounced - only saves every few finds or when forced)
-        self._save_finds()
-        
-        # Notify
-        self.notifier.notify_find(title, source, 'hot')  # Tier would come from actual data
-        self.searcher.finds_today += 1
-        self.searcher.finds_total += 1
-        
+        # Also notify
+        self.notifier.notify_find(title, source, tier)
         self.log.info(f"🎉 Found: {title} ({resolution_type})")
     
     def _load_finds(self):
