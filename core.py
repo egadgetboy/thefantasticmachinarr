@@ -38,6 +38,11 @@ class MachinarrCore:
         self.recent_finds: List[Dict] = []
         self.max_finds_history = 100
         
+        # Cache for tier data (expensive to compute)
+        self._tier_cache = None
+        self._tier_cache_time = None
+        self._tier_cache_ttl = 60  # seconds
+        
         # Initialize if configured
         if config.is_configured():
             self.reinit_clients()
@@ -251,8 +256,19 @@ class MachinarrCore:
             if source in finds_by_source:
                 finds_by_source[source] += 1
         
-        # Get missing/upgrade data with TRUE counts
-        missing_data = self._get_all_missing(include_items=False)
+        # Check cache for tier data
+        now = datetime.now()
+        if (self._tier_cache is not None and self._tier_cache_time is not None
+            and (now - self._tier_cache_time).total_seconds() < self._tier_cache_ttl):
+            missing_data = self._tier_cache
+            self.log.debug("Using cached tier data")
+        else:
+            # Get missing/upgrade data with TRUE counts (expensive)
+            self.log.info("Fetching fresh tier data from Sonarr/Radarr...")
+            missing_data = self._get_all_missing(include_items=False)
+            self._tier_cache = missing_data
+            self._tier_cache_time = now
+            self.log.info("Tier data cached")
         
         scoreboard = {
             'finds_today': self.searcher.finds_today,
