@@ -511,14 +511,17 @@ class MachinarrCore:
                 for item in queue:
                     status = item.get('status', '').lower()
                     if status in ('downloading', 'queued', 'paused'):
+                        size = item.get('size', 1) or 1
+                        sizeleft = item.get('sizeleft', 0) or 0
                         download_info = {
                             'source': 'sonarr',
                             'instance': name,
+                            'queue_id': item.get('id'),
                             'title': item.get('title', 'Unknown'),
                             'status': status,
-                            'progress': item.get('sizeleft', 0) / max(item.get('size', 1), 1) * 100,
+                            'progress': (1 - sizeleft / size) * 100,
                             'size': item.get('size', 0),
-                            'sizeleft': item.get('sizeleft', 0),
+                            'sizeleft': sizeleft,
                             'timeleft': item.get('timeleft'),
                             'series_id': item.get('seriesId'),
                             'episode_id': item.get('episodeId'),
@@ -538,14 +541,17 @@ class MachinarrCore:
                 for item in queue:
                     status = item.get('status', '').lower()
                     if status in ('downloading', 'queued', 'paused'):
+                        size = item.get('size', 1) or 1
+                        sizeleft = item.get('sizeleft', 0) or 0
                         download_info = {
                             'source': 'radarr',
                             'instance': name,
+                            'queue_id': item.get('id'),
                             'title': item.get('title', 'Unknown'),
                             'status': status,
-                            'progress': (1 - item.get('sizeleft', 0) / max(item.get('size', 1), 1)) * 100,
+                            'progress': (1 - sizeleft / size) * 100,
                             'size': item.get('size', 0),
-                            'sizeleft': item.get('sizeleft', 0),
+                            'sizeleft': sizeleft,
                             'timeleft': item.get('timeleft'),
                             'movie_id': item.get('movieId'),
                         }
@@ -564,6 +570,7 @@ class MachinarrCore:
                     sabnzbd_downloads.append({
                         'source': 'sabnzbd',
                         'instance': name,
+                        'id': item.get('id', ''),
                         'title': item.get('filename', 'Unknown'),
                         'status': item.get('status', 'Downloading'),
                         'progress': float(item.get('percentage', 0)),

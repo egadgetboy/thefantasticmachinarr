@@ -1497,11 +1497,29 @@
         <!-- Row 3: Downloading Now -->
         <div class="panel" id="downloads-panel">
             <div class="panel-head">
-                <span class="panel-title">⬇️ Downloading Now</span>
-                <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
+                <div style="display:flex;align-items:center;gap:12px">
+                    <span class="panel-title">⬇️ Downloading Now</span>
+                    <span id="downloads-count" style="color:var(--text2);font-size:13px">0 items</span>
+                </div>
+                <div style="display:flex;gap:12px;align-items:center">
+                    <input type="text" id="downloads-filter-text" placeholder="Filter by title..." style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px;width:150px" onkeyup="filterDownloads()">
+                    <select id="downloads-sort" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterDownloads()">
+                        <option value="progress-desc">Finishing Soon</option>
+                        <option value="progress-asc">Just Started</option>
+                        <option value="title-asc">Title A-Z</option>
+                        <option value="title-desc">Title Z-A</option>
+                        <option value="eta-asc">ETA Shortest</option>
+                    </select>
+                    <select id="downloads-filter-source" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="filterDownloads()">
+                        <option value="">All Sources</option>
+                        <option value="sonarr">📺 Sonarr</option>
+                        <option value="radarr">🎬 Radarr</option>
+                        <option value="sabnzbd">📥 SABnzbd</option>
+                    </select>
+                </div>
             </div>
             <div class="panel-body flush">
-                <div class="data-table-wrap" id="downloads-list" style="max-height:220px">
+                <div class="data-table-wrap" id="downloads-list" style="max-height:280px">
                     <div class="empty"><div class="empty-icon">📭</div><p>Nothing downloading</p></div>
                 </div>
             </div>
@@ -2048,26 +2066,89 @@
             renderActiveDownloads(data);
         }
         
+        // Store downloads data for filtering/sorting
+        let downloadsData = [];
+        let downloadsRefreshInterval = null;
+        
         function renderActiveDownloads(data) {
-            const el = document.getElementById('downloads-list');
             const panel = document.getElementById('downloads-panel');
-            const allDownloads = [
+            
+            // Merge downloads from all sources
+            downloadsData = [
                 ...(data.active_downloads || []),
                 ...(data.sabnzbd_downloads || [])
             ];
             
-            document.getElementById('downloads-count').textContent = `${allDownloads.length} items`;
-            
-            // Hide panel if no downloads
-            if (!allDownloads.length) {
-                panel.style.display = 'none';
-                return;
-            }
-            
+            // Always show panel (even if empty, so filters are visible)
             panel.style.display = 'block';
             
-            // Sort by progress descending (closest to completion first)
-            allDownloads.sort((a, b) => (b.progress || 0) - (a.progress || 0));
+            filterDownloads();
+            
+            // Start real-time refresh if downloads exist
+            if (downloadsData.length > 0 && !downloadsRefreshInterval) {
+                downloadsRefreshInterval = setInterval(refreshDownloads, 5000); // Every 5 seconds
+            } else if (downloadsData.length === 0 && downloadsRefreshInterval) {
+                clearInterval(downloadsRefreshInterval);
+                downloadsRefreshInterval = null;
+            }
+        }
+        
+        async function refreshDownloads() {
+            try {
+                const data = await api('queue');
+                downloadsData = [
+                    ...(data.active_downloads || []),
+                    ...(data.sabnzbd_downloads || [])
+                ];
+                filterDownloads();
+                
+                // Stop refreshing if nothing downloading
+                if (downloadsData.length === 0 && downloadsRefreshInterval) {
+                    clearInterval(downloadsRefreshInterval);
+                    downloadsRefreshInterval = null;
+                }
+            } catch (e) {
+                console.error('Downloads refresh failed:', e);
+            }
+        }
+        
+        function filterDownloads() {
+            const el = document.getElementById('downloads-list');
+            const filterText = (document.getElementById('downloads-filter-text')?.value || '').toLowerCase();
+            const filterSource = document.getElementById('downloads-filter-source')?.value || '';
+            const sortBy = document.getElementById('downloads-sort')?.value || 'progress-desc';
+            
+            // Filter
+            let filtered = downloadsData.filter(item => {
+                if (filterText && !item.title?.toLowerCase().includes(filterText)) return false;
+                if (filterSource && item.source !== filterSource) return false;
+                return true;
+            });
+            
+            // Sort
+            filtered.sort((a, b) => {
+                switch (sortBy) {
+                    case 'progress-desc':
+                        return (b.progress || 0) - (a.progress || 0);
+                    case 'progress-asc':
+                        return (a.progress || 0) - (b.progress || 0);
+                    case 'title-asc':
+                        return (a.title || '').localeCompare(b.title || '');
+                    case 'title-desc':
+                        return (b.title || '').localeCompare(a.title || '');
+                    case 'eta-asc':
+                        return parseETA(a.timeleft) - parseETA(b.timeleft);
+                    default:
+                        return 0;
+                }
+            });
+            
+            document.getElementById('downloads-count').textContent = `${filtered.length} of ${downloadsData.length} items`;
+            
+            if (!filtered.length) {
+                el.innerHTML = '<div class="empty"><div class="empty-icon">📭</div><p>Nothing downloading</p></div>';
+                return;
+            }
             
             el.innerHTML = `
                 <table class="data-table">
@@ -2078,21 +2159,35 @@
                             <th class="col-progress">Progress</th>
                             <th class="col-status">Status</th>
                             <th class="col-time">ETA</th>
+                            <th class="col-action">Action</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${allDownloads.map(item => {
+                        ${filtered.map((item, idx) => {
                             const progress = Math.round(item.progress || 0);
                             const progressColor = progress > 75 ? 'var(--success)' : progress > 25 ? 'var(--warn)' : 'var(--accent)';
                             const eta = item.timeleft || '-';
-                            const statusClass = item.status?.toLowerCase() === 'downloading' ? 'badge-success' : 
-                                                item.status?.toLowerCase() === 'paused' ? 'badge-warn' : 'badge-sec';
+                            const status = item.status || 'downloading';
+                            const statusLower = status.toLowerCase();
+                            const statusClass = statusLower === 'downloading' ? 'badge-success' : 
+                                                statusLower === 'paused' ? 'badge-warn' : 'badge-sec';
+                            
+                            // Build item data for action modal
+                            const itemData = JSON.stringify({
+                                source: item.source,
+                                title: item.title,
+                                queue_id: item.queue_id || item.id,
+                                instance: item.instance,
+                                series_id: item.series_id,
+                                episode_id: item.episode_id,
+                                movie_id: item.movie_id
+                            }).replace(/"/g, '&quot;');
                             
                             return `
                             <tr>
                                 <td class="col-source">
                                     <span class="badge badge-${item.source}">${item.source}</span>
-                                    ${item.instance ? `<small style="color:var(--text3);margin-left:4px">${item.instance}</small>` : ''}
+                                    ${item.instance ? `<small style="color:var(--text3);margin-left:4px">${esc(item.instance)}</small>` : ''}
                                 </td>
                                 <td class="col-title">
                                     <div class="title-main">${esc(item.title)}</div>
@@ -2106,15 +2201,132 @@
                                     </div>
                                 </td>
                                 <td class="col-status">
-                                    <span class="badge ${statusClass}">${item.status}</span>
+                                    <span class="badge ${statusClass}">${esc(status)}</span>
                                 </td>
-                                <td class="col-time">${eta}</td>
+                                <td class="col-time">${esc(eta)}</td>
+                                <td class="col-action">
+                                    <button class="btn btn-sm btn-sec" onclick="showDownloadActions(${itemData})">Actions</button>
+                                </td>
                             </tr>
                         `}).join('')}
                     </tbody>
                 </table>
             `;
         }
+        
+        function parseETA(eta) {
+            if (!eta || eta === '-') return 999999;
+            // Parse formats like "1:23:45" or "23:45" or "45"
+            const parts = eta.split(':').map(Number);
+            if (parts.length === 3) return parts[0] * 3600 + parts[1] * 60 + parts[2];
+            if (parts.length === 2) return parts[0] * 60 + parts[1];
+            return parts[0] || 999999;
+        }
+        
+        function showDownloadActions(item) {
+            const modal = document.getElementById('modal');
+            const serviceName = item.source === 'sonarr' ? 'Sonarr' : 
+                               item.source === 'radarr' ? 'Radarr' : 'SABnzbd';
+            
+            document.getElementById('modal-title').innerHTML = `
+                <span style="margin-right:8px">⬇️</span>${esc(item.title)}
+            `;
+            
+            document.getElementById('modal-desc').innerHTML = `
+                <div style="margin-bottom:16px;padding:12px;background:var(--bg);border-radius:8px;border-left:3px solid var(--accent)">
+                    <strong>Source:</strong> ${serviceName}${item.instance ? ` (${esc(item.instance)})` : ''}
+                </div>
+            `;
+            
+            document.getElementById('modal-details').innerHTML = `
+                <div style="margin-bottom:16px">
+                    <div style="font-weight:600;margin-bottom:8px">💡 Available Actions:</div>
+                    <ul style="margin:0;padding-left:20px;color:var(--text2);font-size:13px;line-height:1.8">
+                        <li>Remove from queue (cancel download)</li>
+                        <li>Blocklist and search for another release</li>
+                        <li>Open in ${serviceName} for more options</li>
+                    </ul>
+                </div>
+            `;
+            
+            const itemStr = JSON.stringify(item).replace(/'/g, "\\'");
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <div class="modal-actions-grid">
+                    <button class="btn btn-sm btn-pri modal-action-btn" onclick="downloadBlocklistRetry(${itemStr})">
+                        <span>🔄</span><span>Blocklist & Retry</span>
+                    </button>
+                    <button class="btn btn-sm btn-sec modal-action-btn" onclick="downloadOpenIn(${itemStr})">
+                        <span>🔗</span><span>Open in ${serviceName}</span>
+                    </button>
+                    <button class="btn btn-sm btn-sec modal-action-btn" onclick="downloadRemove(${itemStr})">
+                        <span>🗑️</span><span>Remove Only</span>
+                    </button>
+                    <button class="btn btn-sm btn-sec modal-action-btn" onclick="closeModal()">
+                        <span>❌</span><span>Cancel</span>
+                    </button>
+                </div>
+            `;
+            
+            modal.classList.add('show');
+        }
+        
+        async function downloadBlocklistRetry(item) {
+            if (!confirm(`Blocklist "${item.title}" and search for another release?`)) return;
+            closeModal();
+            updateActivityBar('searching', 'Blocklisting: ' + item.title.substring(0, 30) + '...', 'Removing and searching for alternative...');
+            
+            try {
+                const data = await api('resolve', 'POST', {
+                    source: item.source === 'sabnzbd' ? (item.series_id ? 'sonarr' : 'radarr') : item.source,
+                    queue_id: item.queue_id,
+                    action: 'blocklist_retry'
+                });
+                updateActivityBar('idle', 'Blocklisted', data.message || 'Searching for alternative...');
+                setTimeout(() => { loadQueue(); refreshDownloads(); }, 1500);
+            } catch (e) {
+                updateActivityBar('idle', 'Failed', e.message);
+            }
+        }
+        
+        async function downloadRemove(item) {
+            if (!confirm(`Remove "${item.title}" from download queue?`)) return;
+            closeModal();
+            updateActivityBar('searching', 'Removing: ' + item.title.substring(0, 30) + '...', 'Canceling download...');
+            
+            try {
+                const data = await api('resolve', 'POST', {
+                    source: item.source === 'sabnzbd' ? (item.series_id ? 'sonarr' : 'radarr') : item.source,
+                    queue_id: item.queue_id,
+                    action: 'remove'
+                });
+                updateActivityBar('idle', 'Removed', data.message || 'Download canceled');
+                setTimeout(() => { loadQueue(); refreshDownloads(); }, 1500);
+            } catch (e) {
+                updateActivityBar('idle', 'Failed', e.message);
+            }
+        }
+        
+        function downloadOpenIn(item) {
+            closeModal();
+            let url = '';
+            const baseUrl = ''; // Would need instance URLs from config
+            
+            if (item.source === 'sonarr' && item.series_id) {
+                // Try to open Sonarr series page
+                updateActivityBar('idle', 'Open in Sonarr', 'Check your Sonarr queue');
+            } else if (item.source === 'radarr' && item.movie_id) {
+                updateActivityBar('idle', 'Open in Radarr', 'Check your Radarr queue');
+            } else if (item.source === 'sabnzbd') {
+                updateActivityBar('idle', 'Open SABnzbd', 'Check your SABnzbd queue');
+            }
+            
+            // Use interventionOpenIn if available
+            if (typeof interventionOpenIn === 'function') {
+                interventionOpenIn(item.source, item.queue_id, item.instance);
+            }
+        }
+        
         
         function renderQueuePage() {
             const el = document.getElementById('stuck-list');
@@ -3241,7 +3453,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.72';
+        const CURRENT_VERSION = '1.0.73';
         
         async function checkVersionAndAutoSearch() {
             // Check with server if refresh/search should run
@@ -3335,6 +3547,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.72</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.73</div>
 </body>
 </html>
