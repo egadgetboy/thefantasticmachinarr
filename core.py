@@ -319,25 +319,38 @@ class MachinarrCore:
         import time
         time.sleep(5)  # Give arr services time to grab
         
-        # STEP 3: Check queues for items with TFM tags (DEFINITIVE FIND DETECTION)
-        new_finds = []
+        # STEP 3: Check queues for items with TFM tags (tracks pending finds)
         for name, client in self.sonarr_clients.items():
             try:
                 queue = client.get_queue()
-                finds = self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
-                new_finds.extend(finds)
+                self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
             except Exception as e:
                 self.log.debug(f"Could not check Sonarr ({name}) queue for finds: {e}")
         
         for name, client in self.radarr_clients.items():
             try:
                 queue = client.get_queue()
-                finds = self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
-                new_finds.extend(finds)
+                self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
             except Exception as e:
                 self.log.debug(f"Could not check Radarr ({name}) queue for finds: {e}")
         
-        # STEP 4: Cleanup old tags (removes tags from series/movies after 60 min)
+        # STEP 4: Verify any completed finds (check if files imported)
+        new_finds = []
+        for name, client in self.sonarr_clients.items():
+            try:
+                finds = self.find_tracker.verify_completed_finds('sonarr', name, client)
+                new_finds.extend(finds)
+            except Exception as e:
+                self.log.debug(f"Could not verify Sonarr ({name}) finds: {e}")
+        
+        for name, client in self.radarr_clients.items():
+            try:
+                finds = self.find_tracker.verify_completed_finds('radarr', name, client)
+                new_finds.extend(finds)
+            except Exception as e:
+                self.log.debug(f"Could not verify Radarr ({name}) finds: {e}")
+        
+        # STEP 5: Cleanup old tags (removes tags from series/movies after 60 min)
         try:
             self.find_tracker.cleanup_tags(self.sonarr_clients, self.radarr_clients, max_age_minutes=60)
         except Exception as e:
@@ -371,9 +384,12 @@ class MachinarrCore:
                     if stuck and self.queue_monitor.should_auto_resolve(stuck):
                         self.queue_monitor.resolve_stuck_item(stuck, client)
                 
-                # Check for finds (items from TFM-tagged series)
-                new_finds = self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
-                for find in new_finds:
+                # Check for new grabs (items from TFM-tagged series) - adds to pending
+                self.find_tracker.check_queue_for_finds(queue, 'sonarr', name, client)
+                
+                # Verify pending finds (check if files actually imported)
+                confirmed_finds = self.find_tracker.verify_completed_finds('sonarr', name, client)
+                for find in confirmed_finds:
                     self.notifier.notify_find(find.title, find.source, find.tier)
                     
             except Exception as e:
@@ -392,9 +408,12 @@ class MachinarrCore:
                     if stuck and self.queue_monitor.should_auto_resolve(stuck):
                         self.queue_monitor.resolve_stuck_item(stuck, client)
                 
-                # Check for finds (items from TFM-tagged movies)
-                new_finds = self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
-                for find in new_finds:
+                # Check for new grabs (items from TFM-tagged movies) - adds to pending
+                self.find_tracker.check_queue_for_finds(queue, 'radarr', name, client)
+                
+                # Verify pending finds (check if files actually imported)
+                confirmed_finds = self.find_tracker.verify_completed_finds('radarr', name, client)
+                for find in confirmed_finds:
                     self.notifier.notify_find(find.title, find.source, find.tier)
                     
             except Exception as e:
