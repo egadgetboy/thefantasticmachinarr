@@ -94,9 +94,18 @@ class MachinarrCore:
             }
     
     def get_activity(self) -> Dict[str, Any]:
-        """Get global activity state (thread-safe)."""
+        """Get global activity state with scheduler info (thread-safe)."""
         with self._activity_lock:
-            return self._activity_state.copy()
+            activity = self._activity_state.copy()
+        
+        # Add scheduler info for "next run" display
+        if hasattr(self, 'scheduler') and self.scheduler:
+            for task in self.scheduler.tasks.values():
+                if task.name == 'search_cycle' and task.next_run:
+                    activity['next_search'] = task.next_run.isoformat()
+                    break
+        
+        return activity
     
     def start_scheduler(self):
         """Start background tasks."""

@@ -1712,7 +1712,7 @@
             const apiRemaining = apiLimit - apiUsed;
             
             // Check if API exhausted
-            if (apiRemaining <= 0) {
+            if (apiRemaining <= 0 && apiLimit > 0) {
                 card.className = 'score-card status exhausted';
                 indicator.textContent = '💤';
                 // Calculate time until midnight reset
@@ -1721,7 +1721,7 @@
                 midnight.setHours(24, 0, 0, 0);
                 const hoursUntilReset = Math.ceil((midnight - now) / (1000 * 60 * 60));
                 text.textContent = `Resets in ${hoursUntilReset}h`;
-                updateActivityBar('sleeping', 'API limit reached', `Resets at midnight (${hoursUntilReset}h)`);
+                // Note: Don't call updateActivityBar here - let server state control it
                 return;
             }
             
@@ -1742,12 +1742,12 @@
                         card.className = 'score-card status active';
                         indicator.textContent = '🔍';
                         text.textContent = 'Searching...';
-                        updateActivityBar('searching', 'Running search cycle', 'Checking for missing content and upgrades...');
+                        // Note: Don't call updateActivityBar - let server state control it
                     } else {
                         card.className = 'score-card status';
                         indicator.textContent = '⏱️';
                         text.textContent = `Next: ${minsUntil}m`;
-                        updateActivityBar('idle', 'Waiting for next cycle', `Next search in ${minsUntil} minutes`);
+                        // Note: Don't call updateActivityBar - let server state control it
                     }
                     return;
                 }
@@ -1757,7 +1757,7 @@
             card.className = 'score-card status active';
             indicator.textContent = '✅';
             text.textContent = 'Active';
-            updateActivityBar('idle', 'Ready', 'Scheduler active');
+            // Note: Don't call updateActivityBar - let server state control it
         }
         
         function updateActivityBar(state, mainText, detail) {
@@ -1796,7 +1796,28 @@
         function applyActivityState(activity) {
             // Apply global activity state from server
             if (!activity) return;
-            updateActivityBar(activity.status, activity.message, activity.detail);
+            
+            let status = activity.status;
+            let message = activity.message;
+            let detail = activity.detail;
+            
+            // If idle and we have next_search time, show countdown
+            if (status === 'idle' && activity.next_search) {
+                let nextRunStr = activity.next_search;
+                if (!nextRunStr.endsWith('Z') && !nextRunStr.includes('+')) {
+                    nextRunStr += 'Z';
+                }
+                const nextRun = new Date(nextRunStr);
+                const now = new Date();
+                const minsUntil = Math.max(0, Math.round((nextRun - now) / 60000));
+                
+                if (minsUntil > 1) {
+                    message = 'Waiting for next cycle';
+                    detail = `Next search in ${minsUntil} minutes`;
+                }
+            }
+            
+            updateActivityBar(status, message, detail);
         }
         
         async function loadQueue() {
@@ -2623,6 +2644,6 @@
             setInterval(loadLogs, 30000);
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.44</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.45</div>
 </body>
 </html>
