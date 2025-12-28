@@ -2218,19 +2218,38 @@ class MachinarrCore:
                 return {'success': False, 'message': f'Instance {instance_name} not found'}
             
             try:
+                # Add series without auto-search (we'll trigger it manually for better control)
                 result = client.add_series(
                     tvdb_id=data.get('id'),
                     title=data.get('title'),
                     quality_profile_id=data.get('qualityProfileId'),
                     root_folder_path=data.get('rootFolderPath'),
                     monitored=data.get('monitored', True),
-                    search_on_add=data.get('searchOnAdd', True),
+                    search_on_add=False,  # Don't auto-search
                     monitor=data.get('monitor', 'all')
                 )
                 
-                # Track the search if searching on add
-                if data.get('searchOnAdd', True) and result.get('id'):
-                    self.log.info(f"Added series: {data.get('title')} (ID: {result.get('id')})")
+                series_id = result.get('id')
+                
+                # If search requested, trigger it explicitly and track it
+                if data.get('searchOnAdd', True) and series_id:
+                    self.log.info(f"Added series: {data.get('title')} (ID: {series_id}) - triggering search")
+                    
+                    # Track the search BEFORE triggering
+                    self.find_tracker.track_search(
+                        source='sonarr',
+                        instance_name=instance_name,
+                        item_id=series_id,
+                        title=data.get('title'),
+                        tier='hot',
+                        search_type='missing',
+                        series_id=series_id
+                    )
+                    
+                    # Trigger the search
+                    client.search_series(series_id)
+                else:
+                    self.log.info(f"Added series: {data.get('title')} (ID: {series_id}) - no search requested")
                 
                 return {'success': True, 'message': f"Added {data.get('title')}", 'data': result}
             except Exception as e:
@@ -2242,27 +2261,37 @@ class MachinarrCore:
                 return {'success': False, 'message': f'Instance {instance_name} not found'}
             
             try:
+                # Add movie without auto-search (we'll trigger it manually for better control)
                 result = client.add_movie(
                     tmdb_id=data.get('id'),
                     title=data.get('title'),
                     quality_profile_id=data.get('qualityProfileId'),
                     root_folder_path=data.get('rootFolderPath'),
                     monitored=data.get('monitored', True),
-                    search_on_add=data.get('searchOnAdd', True),
+                    search_on_add=False,  # Don't auto-search
                     minimum_availability=data.get('minimumAvailability', 'released')
                 )
                 
-                # Track the search if searching on add
-                if data.get('searchOnAdd', True) and result.get('id'):
+                movie_id = result.get('id')
+                
+                # If search requested, trigger it explicitly and track it
+                if data.get('searchOnAdd', True) and movie_id:
+                    self.log.info(f"Added movie: {data.get('title')} (ID: {movie_id}) - triggering search")
+                    
+                    # Track the search BEFORE triggering
                     self.find_tracker.track_search(
                         source='radarr',
                         instance_name=instance_name,
-                        item_id=result.get('id'),
+                        item_id=movie_id,
                         title=data.get('title'),
                         tier='hot',
                         search_type='missing'
                     )
-                    self.log.info(f"Added movie: {data.get('title')} (ID: {result.get('id')})")
+                    
+                    # Trigger the search
+                    client.search_movie(movie_id)
+                else:
+                    self.log.info(f"Added movie: {data.get('title')} (ID: {movie_id}) - no search requested")
                 
                 return {'success': True, 'message': f"Added {data.get('title')}", 'data': result}
             except Exception as e:
