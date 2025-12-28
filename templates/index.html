@@ -3816,18 +3816,24 @@
                 </div>
             `;
             
+            // Store current item for submit
+            window.currentQuickAddItem = item;
+            
             document.getElementById('modal-actions').innerHTML = `
                 <button class="btn btn-sec" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-pri" onclick="submitQuickAdd('${source}', ${item.id}, '${item.title.replace(/'/g, "\\'")}')">➕ Add ${source === 'sonarr' ? 'Series' : 'Movie'}</button>
+                <button class="btn btn-pri" onclick="submitQuickAdd('${source}')">➕ Add ${source === 'sonarr' ? 'Series' : 'Movie'}</button>
             `;
             
-            modal.style.display = 'flex';
+            modal.classList.add('show');
         }
         
-        async function submitQuickAdd(source, id, title) {
+        async function submitQuickAdd(source) {
+            const item = window.currentQuickAddItem;
+            if (!item) return;
+            
             const data = {
-                id: id,
-                title: title,
+                id: item.id,
+                title: item.title,
                 instance: document.getElementById('add-instance').value,
                 qualityProfileId: parseInt(document.getElementById('add-profile').value),
                 rootFolderPath: document.getElementById('add-folder').value,
@@ -3848,15 +3854,18 @@
             try {
                 const result = await api(`add/${source}`, 'POST', data);
                 if (result.success) {
-                    // Show success confirmation in modal - hide the action buttons
+                    // Show success confirmation in modal - hide the action buttons and details
                     document.getElementById('modal-actions').style.display = 'none';
+                    document.getElementById('modal-details').style.display = 'none';
                     modalDesc.innerHTML = `
-                        <div style="text-align:center;padding:40px">
-                            <div style="font-size:48px;margin-bottom:16px">✅</div>
+                        <div style="text-align:center;padding:20px">
+                            <img src="${item.poster || ''}" style="width:140px;border-radius:8px;margin-bottom:16px;box-shadow:0 4px 12px rgba(0,0,0,0.3)" onerror="this.style.display='none'">
+                            <div style="font-size:48px;margin-bottom:12px">✅</div>
                             <div style="font-size:18px;font-weight:600;color:var(--success)">Added Successfully!</div>
-                            <div style="font-size:16px;margin-top:12px">${title}</div>
-                            ${data.searchOnAdd ? '<div style="color:var(--text2);margin-top:8px">Search will begin shortly...</div>' : ''}
-                            <button class="btn btn-pri" onclick="closeModal();collapseQuickAdd();" style="margin-top:24px;padding:12px 40px">OK</button>
+                            <div style="font-size:16px;margin-top:8px;font-weight:500">${item.title}</div>
+                            <div style="color:var(--text2);font-size:14px">${item.year || ''}</div>
+                            ${data.searchOnAdd ? '<div style="color:var(--text2);margin-top:12px;font-size:13px">🔍 Search will begin shortly...</div>' : ''}
+                            <button class="btn btn-pri" onclick="closeQuickAddSuccess()" style="margin-top:24px;padding:12px 48px;font-size:15px">OK</button>
                         </div>
                     `;
                 } else {
@@ -4194,9 +4203,17 @@
         
         function closeModal() {
             document.getElementById('modal').classList.remove('show');
-            // Reset modal-actions visibility for next use
+            // Reset modal-actions and modal-details visibility for next use
             const actions = document.getElementById('modal-actions');
+            const details = document.getElementById('modal-details');
             if (actions) actions.style.display = '';
+            if (details) details.style.display = '';
+        }
+        
+        function closeQuickAddSuccess() {
+            closeModal();
+            collapseQuickAdd();
+            window.currentQuickAddItem = null;
         }
         
         async function openSettingsModal() {
@@ -4501,7 +4518,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.127';
+        const CURRENT_VERSION = '1.0.128';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4656,6 +4673,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.127</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.128</div>
 </body>
 </html>
