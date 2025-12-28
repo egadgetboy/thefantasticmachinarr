@@ -925,6 +925,60 @@
         
         .empty-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.6; }
         
+        /* Quick Add Poster Cards */
+        .poster-card {
+            background: var(--bg3);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all var(--transition);
+            border: 2px solid transparent;
+        }
+        .poster-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--pri);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+        }
+        .poster-card.exists {
+            opacity: 0.5;
+        }
+        .poster-card.exists::after {
+            content: '✓ In Library';
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            background: var(--success);
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 10px;
+            font-weight: 600;
+        }
+        .poster-card {
+            position: relative;
+        }
+        .poster-img {
+            width: 100%;
+            aspect-ratio: 2/3;
+            object-fit: cover;
+            background: var(--bg2);
+        }
+        .poster-info {
+            padding: 10px;
+        }
+        .poster-title {
+            font-weight: 600;
+            font-size: 13px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            margin-bottom: 4px;
+        }
+        .poster-year {
+            color: var(--text2);
+            font-size: 12px;
+        }
+        
         /* Logs */
         .log {
             padding: 10px 14px;
@@ -1675,7 +1729,31 @@
             </div>
         </div>
         
-        <!-- Row 2: Search History -->
+        <!-- Row 2: Quick Add -->
+        <div class="panel" id="quick-add-panel">
+            <div class="panel-head">
+                <span class="panel-title">➕ Quick Add</span>
+                <div style="display:flex;gap:12px;align-items:center">
+                    <select id="quick-add-source" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="loadQuickAddProfiles()">
+                        <option value="radarr">🎬 Movies (Radarr)</option>
+                        <option value="sonarr">📺 Series (Sonarr)</option>
+                    </select>
+                </div>
+            </div>
+            <div class="panel-body" style="padding:16px">
+                <div style="display:flex;gap:12px;margin-bottom:16px">
+                    <input type="text" id="quick-add-search" placeholder="Search for movies or series..." 
+                           style="flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px"
+                           onkeyup="if(event.key==='Enter')quickAddSearch()">
+                    <button class="btn btn-pri" onclick="quickAddSearch()" style="padding:10px 20px">🔍 Search</button>
+                </div>
+                <div id="quick-add-results" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:16px;max-height:400px;overflow-y:auto">
+                    <div class="empty" style="grid-column:1/-1"><div class="empty-icon">🎬</div><p>Search for content to add</p></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Row 3: Search History -->
         <div class="panel" id="search-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:12px">
@@ -3584,6 +3662,138 @@
             }
         }
         
+        // ==================== Quick Add Functions ====================
+        let quickAddProfiles = null;
+        
+        async function loadQuickAddProfiles() {
+            const source = document.getElementById('quick-add-source').value;
+            try {
+                quickAddProfiles = await api(`profiles/${source}`);
+            } catch (e) {
+                console.error('Failed to load profiles:', e);
+            }
+        }
+        
+        async function quickAddSearch() {
+            const source = document.getElementById('quick-add-source').value;
+            const term = document.getElementById('quick-add-search').value.trim();
+            const container = document.getElementById('quick-add-results');
+            
+            if (!term) return;
+            
+            container.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="spinner"></div><p>Searching...</p></div>';
+            
+            try {
+                const results = await api(`lookup/${source}?term=${encodeURIComponent(term)}`);
+                
+                if (!results || results.length === 0) {
+                    container.innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">😕</div><p>No results found</p></div>';
+                    return;
+                }
+                
+                container.innerHTML = results.map(item => `
+                    <div class="poster-card ${item.exists ? 'exists' : ''}" onclick="openQuickAddModal(${JSON.stringify(item).replace(/"/g, '&quot;')})">
+                        <img class="poster-img" src="${item.poster || 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23333%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2212%22>No Image</text></svg>'}" 
+                             onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 150%22><rect fill=%22%23333%22 width=%22100%22 height=%22150%22/><text x=%2250%22 y=%2275%22 text-anchor=%22middle%22 fill=%22%23666%22 font-size=%2212%22>No Image</text></svg>'">
+                        <div class="poster-info">
+                            <div class="poster-title" title="${item.title}">${item.title}</div>
+                            <div class="poster-year">${item.year || 'N/A'}${source === 'sonarr' ? ` • ${item.seasons || 0} seasons` : ''}</div>
+                        </div>
+                    </div>
+                `).join('');
+                
+            } catch (e) {
+                container.innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">❌</div><p>Search failed: ${e.message}</p></div>`;
+            }
+        }
+        
+        function openQuickAddModal(item) {
+            if (item.exists) {
+                alert('This item is already in your library.');
+                return;
+            }
+            
+            const source = document.getElementById('quick-add-source').value;
+            const profiles = quickAddProfiles?.profiles || [];
+            const rootFolders = quickAddProfiles?.rootFolders || [];
+            const instances = quickAddProfiles?.instances || [];
+            
+            const modal = document.getElementById('modal');
+            document.getElementById('modal-title').textContent = `Add: ${item.title}`;
+            document.getElementById('modal-desc').innerHTML = `
+                <div style="display:flex;gap:16px;margin-bottom:16px">
+                    <img src="${item.poster || ''}" style="width:120px;border-radius:8px" onerror="this.style.display='none'">
+                    <div>
+                        <p><strong>${item.title}</strong> (${item.year || 'N/A'})</p>
+                        <p style="color:var(--text2);font-size:13px;margin-top:8px">${item.overview || 'No description available.'}</p>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal-details').innerHTML = `
+                <div style="display:flex;flex-direction:column;gap:12px">
+                    <div>
+                        <label style="display:block;margin-bottom:4px;font-size:12px;color:var(--text2)">Instance</label>
+                        <select id="add-instance" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
+                            ${instances.map(i => `<option value="${i}">${i}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:4px;font-size:12px;color:var(--text2)">Quality Profile</label>
+                        <select id="add-profile" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
+                            ${profiles.map(p => `<option value="${p.id}">${p.name}</option>`).join('')}
+                        </select>
+                    </div>
+                    <div>
+                        <label style="display:block;margin-bottom:4px;font-size:12px;color:var(--text2)">Root Folder</label>
+                        <select id="add-folder" style="width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text)">
+                            ${rootFolders.map(f => `<option value="${f.path}">${f.path} (${Math.round(f.freeSpace/1073741824)} GB free)</option>`).join('')}
+                        </select>
+                    </div>
+                    <div style="display:flex;gap:12px">
+                        <label style="display:flex;align-items:center;gap:6px;font-size:13px">
+                            <input type="checkbox" id="add-search" checked> Search immediately
+                        </label>
+                    </div>
+                </div>
+            `;
+            
+            document.getElementById('modal-actions').innerHTML = `
+                <button class="btn btn-sec" onclick="closeModal()">Cancel</button>
+                <button class="btn btn-pri" onclick="submitQuickAdd('${source}', ${item.id}, '${item.title.replace(/'/g, "\\'")}')">➕ Add ${source === 'sonarr' ? 'Series' : 'Movie'}</button>
+            `;
+            
+            modal.style.display = 'flex';
+        }
+        
+        async function submitQuickAdd(source, id, title) {
+            const data = {
+                id: id,
+                title: title,
+                instance: document.getElementById('add-instance').value,
+                qualityProfileId: parseInt(document.getElementById('add-profile').value),
+                rootFolderPath: document.getElementById('add-folder').value,
+                searchOnAdd: document.getElementById('add-search').checked
+            };
+            
+            try {
+                const result = await api(`add/${source}`, 'POST', data);
+                if (result.success) {
+                    closeModal();
+                    alert(`Added: ${title}`);
+                    document.getElementById('quick-add-search').value = '';
+                    document.getElementById('quick-add-results').innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✅</div><p>Added successfully! Search for more content.</p></div>';
+                } else {
+                    alert(`Failed: ${result.message}`);
+                }
+            } catch (e) {
+                alert(`Error: ${e.message}`);
+            }
+        }
+        
+        // Load profiles on startup
+        loadQuickAddProfiles();
+        
         async function runSearchOnly() {
             closeManualUpdateModal();
             
@@ -4197,7 +4407,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.116';
+        const CURRENT_VERSION = '1.0.117';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4352,6 +4562,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.116</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.117</div>
 </body>
 </html>
