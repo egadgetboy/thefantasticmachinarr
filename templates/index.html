@@ -1845,12 +1845,12 @@
             </div>
         </div>
         
-        <!-- Row 4: Recently Grabbed -->
+        <!-- Row 4: Recent Finds -->
         <div class="panel" id="finds-panel">
             <div class="panel-head">
                 <div style="display:flex;align-items:center;gap:8px">
                     <button class="expand-btn" onclick="openExpandedPanel('finds')" title="Expand to full view">⛶</button>
-                    <span class="panel-title">✅ Recently Grabbed</span>
+                    <span class="panel-title">✅ Recent Finds</span>
                 </div>
                 <span id="finds-count" style="color:var(--text2);font-size:13px">0 items</span>
             </div>
@@ -2260,7 +2260,7 @@
             // Set title
             const titles = {
                 'search': '🔍 Search History',
-                'finds': '✅ Recently Grabbed',
+                'finds': '✅ Recent Finds',
                 'downloads': '⬇️ Downloading Now',
                 'problems': '⚠️ Download Problems',
                 'interventions': '🖐️ Needs Attention'
@@ -3497,14 +3497,22 @@
             const { pageItems, paginationHtml } = renderPagination('finds-list', state, null);
             
             const typeLabels = {
-                'auto': '🤖 Auto',
+                'tfm_search': '🔎 TFM Search',
+                'auto_resolve': '🤖 Auto Resolve',
                 'manual': '🖐️ Manual',
-                'rss': '📡 RSS',
+                'rss': '📡 RSS Sync',
                 'search': '🔎 Search'
             };
             
+            const tierEmojis = {
+                'hot': '🔥',
+                'warm': '☀️',
+                'cool': '❄️',
+                'cold': '🧊'
+            };
+            
             if (!pageItems.length) {
-                el.innerHTML = '<div class="empty"><div class="empty-icon">🔍</div><p>No finds yet</p></div>';
+                el.innerHTML = '<div class="empty"><div class="empty-icon">🎯</div><p>No finds yet - TFM is searching!</p></div>';
                 return;
             }
             
@@ -3512,25 +3520,37 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th class="col-time">Time</th>
-                            <th class="col-type">How Found</th>
+                            <th class="col-time">Found</th>
                             <th class="col-source">Source</th>
                             <th class="col-title">Title</th>
+                            <th class="col-type">How</th>
                             <th class="col-issue">Details</th>
                         </tr>
                     </thead>
                     <tbody>
-                        ${pageItems.map(f => `
+                        ${pageItems.map(f => {
+                            // Build details string
+                            const details = [];
+                            if (f.tier) details.push(tierEmojis[f.tier] || f.tier);
+                            if (f.search_type) details.push(f.search_type === 'missing' ? '🔍 Missing' : '⬆️ Upgrade');
+                            if (f.quality) details.push(f.quality);
+                            if (f.indexer) details.push(f.indexer);
+                            if (f.search_to_find_seconds > 0) {
+                                const mins = Math.round(f.search_to_find_seconds / 60);
+                                details.push(mins > 0 ? `${mins}m` : '<1m');
+                            }
+                            
+                            return `
                             <tr>
                                 <td class="col-time">${fmt(f.found_at)}</td>
-                                <td class="col-type">${typeLabels[f.resolution_type] || '✅ ' + f.resolution_type}</td>
-                                <td class="col-source"><span class="badge badge-${f.source}">${f.source}</span></td>
+                                <td class="col-source"><span class="badge badge-${f.source}">${f.source === 'sonarr' ? '📺' : '🎬'}</span></td>
                                 <td class="col-title">
                                     <div class="title-main">${esc(f.title)}</div>
                                 </td>
-                                <td class="col-issue">${f.resolution_detail ? esc(f.resolution_detail) : '-'}</td>
+                                <td class="col-type">${typeLabels[f.resolution_type] || f.resolution_type}</td>
+                                <td class="col-issue">${details.length ? details.join(' · ') : '-'}</td>
                             </tr>
-                        `).join('')}
+                        `}).join('')}
                     </tbody>
                 </table>
                 ${paginationHtml}
@@ -4519,7 +4539,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.129';
+        const CURRENT_VERSION = '1.0.130';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4674,6 +4694,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.129</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.130</div>
 </body>
 </html>
