@@ -153,6 +153,50 @@ class RadarrClient(BaseClient):
             'movieIds': [movie_id]
         })
     
+    # ==================== Lookup & Add ====================
+    
+    def lookup_movie(self, term: str) -> List[Dict]:
+        """Search for movies on TMDB by name."""
+        return self.get('movie/lookup', params={'term': term})
+    
+    def get_quality_profiles(self) -> List[Dict]:
+        """Get all quality profiles."""
+        return self.get('qualityprofile')
+    
+    def get_root_folders(self) -> List[Dict]:
+        """Get all root folders."""
+        return self.get('rootfolder')
+    
+    def add_movie(self, tmdb_id: int, title: str, quality_profile_id: int,
+                  root_folder_path: str, monitored: bool = True,
+                  search_on_add: bool = True, minimum_availability: str = 'released') -> Dict:
+        """Add a new movie to Radarr.
+        
+        Args:
+            tmdb_id: TMDB ID of the movie
+            title: Movie title
+            quality_profile_id: Quality profile ID
+            root_folder_path: Root folder path
+            monitored: Whether to monitor the movie
+            search_on_add: Search immediately
+            minimum_availability: 'announced', 'inCinemas', 'released', 'preDB'
+        """
+        # First lookup to get full movie info
+        results = self.lookup_movie(f"tmdb:{tmdb_id}")
+        if not results:
+            raise APIError(f"Movie with TMDB ID {tmdb_id} not found")
+        
+        movie_data = results[0]
+        movie_data['qualityProfileId'] = quality_profile_id
+        movie_data['rootFolderPath'] = root_folder_path
+        movie_data['monitored'] = monitored
+        movie_data['minimumAvailability'] = minimum_availability
+        movie_data['addOptions'] = {
+            'searchForMovie': search_on_add
+        }
+        
+        return self.post('movie', data=movie_data)
+    
     def get_releases(self, movie_id: int) -> List[Dict]:
         """Get available releases for a movie."""
         return self.get('release', params={'movieId': movie_id})
