@@ -1964,14 +1964,6 @@
             <h3>⚙️ Settings</h3>
             
             <div class="settings-field">
-                <label>🎨 Theme</label>
-                <div style="display: flex; gap: 10px;">
-                    <button class="btn btn-sec" id="theme-dark-btn" onclick="setTheme('dark')" style="flex:1;">🌙 Dark</button>
-                    <button class="btn btn-sec" id="theme-light-btn" onclick="setTheme('light')" style="flex:1;">☀️ Light</button>
-                </div>
-            </div>
-            
-            <div class="settings-field">
                 <label>📊 Daily API Limit</label>
                 <input type="number" id="settings-api-limit" value="500" min="50" max="50000" onchange="updateSettingsPacingPresets()">
                 <div class="hint">TFM spreads searches throughout the day to stay within this limit.</div>
@@ -4174,7 +4166,7 @@
                         <div style="font-size: 16px;">${p.emoji}</div>
                         <div style="font-weight: 500; font-size: 12px; margin: 2px 0;">${p.name}</div>
                         <div style="color: var(--text3); font-size: 10px;">${p.searches} / ${p.interval} min</div>
-                        <div style="color: var(--text3); font-size: 10px;">${p.hours} hours</div>
+                        <div style="color: var(--text3); font-size: 10px;">done in ${p.hours}h</div>
                         ${p.recommended ? '<div style="color: var(--success); font-size: 9px; margin-top: 2px;">✓ Recommended</div>' : ''}
                     </div>
                 `;
