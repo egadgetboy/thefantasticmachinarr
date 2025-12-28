@@ -2125,3 +2125,147 @@ class MachinarrCore:
         threading.Thread(target=reset_abort, daemon=True).start()
         
         return {'success': True, 'message': 'Stop requested'}
+    
+    # ==================== Lookup & Add ====================
+    
+    def lookup_content(self, source: str, term: str) -> List[Dict]:
+        """Search for series/movies to add."""
+        results = []
+        
+        if source == 'sonarr':
+            for name, client in self.sonarr_clients.items():
+                try:
+                    items = client.lookup_series(term)
+                    for item in items[:20]:  # Limit results
+                        results.append({
+                            'id': item.get('tvdbId'),
+                            'title': item.get('title', ''),
+                            'year': item.get('year'),
+                            'overview': item.get('overview', '')[:200],
+                            'poster': item.get('remotePoster') or (item.get('images', [{}])[0].get('remoteUrl') if item.get('images') else None),
+                            'status': item.get('status', ''),
+                            'seasons': len(item.get('seasons', [])),
+                            'network': item.get('network', ''),
+                            'instance': name,
+                            'exists': bool(item.get('id')),  # Already in library
+                        })
+                    break  # Only need one instance for lookup
+                except Exception as e:
+                    self.log.error(f"Sonarr lookup failed ({name}): {e}")
+        
+        elif source == 'radarr':
+            for name, client in self.radarr_clients.items():
+                try:
+                    items = client.lookup_movie(term)
+                    for item in items[:20]:
+                        results.append({
+                            'id': item.get('tmdbId'),
+                            'title': item.get('title', ''),
+                            'year': item.get('year'),
+                            'overview': item.get('overview', '')[:200],
+                            'poster': item.get('remotePoster') or (item.get('images', [{}])[0].get('remoteUrl') if item.get('images') else None),
+                            'status': item.get('status', ''),
+                            'runtime': item.get('runtime', 0),
+                            'studio': item.get('studio', ''),
+                            'instance': name,
+                            'exists': bool(item.get('id')),
+                        })
+                    break
+                except Exception as e:
+                    self.log.error(f"Radarr lookup failed ({name}): {e}")
+        
+        return results
+    
+    def get_profiles(self, source: str) -> Dict[str, Any]:
+        """Get quality profiles and root folders for adding content."""
+        profiles = []
+        root_folders = []
+        instances = []
+        
+        clients = self.sonarr_clients if source == 'sonarr' else self.radarr_clients
+        
+        for name, client in clients.items():
+            instances.append(name)
+            try:
+                for profile in client.get_quality_profiles():
+                    profiles.append({
+                        'id': profile.get('id'),
+                        'name': profile.get('name'),
+                        'instance': name
+                    })
+                for folder in client.get_root_folders():
+                    root_folders.append({
+                        'path': folder.get('path'),
+                        'freeSpace': folder.get('freeSpace', 0),
+                        'instance': name
+                    })
+            except Exception as e:
+                self.log.error(f"Failed to get profiles ({name}): {e}")
+        
+        return {
+            'profiles': profiles,
+            'rootFolders': root_folders,
+            'instances': instances
+        }
+    
+    def add_content(self, source: str, data: Dict) -> Dict[str, Any]:
+        """Add series/movie to Sonarr/Radarr."""
+        instance_name = data.get('instance')
+        
+        if source == 'sonarr':
+            client = self.sonarr_clients.get(instance_name)
+            if not client:
+                return {'success': False, 'message': f'Instance {instance_name} not found'}
+            
+            try:
+                result = client.add_series(
+                    tvdb_id=data.get('id'),
+                    title=data.get('title'),
+                    quality_profile_id=data.get('qualityProfileId'),
+                    root_folder_path=data.get('rootFolderPath'),
+                    monitored=data.get('monitored', True),
+                    search_on_add=data.get('searchOnAdd', True),
+                    monitor=data.get('monitor', 'all')
+                )
+                
+                # Track the search if searching on add
+                if data.get('searchOnAdd', True) and result.get('id'):
+                    self.log.info(f"Added series: {data.get('title')} (ID: {result.get('id')})")
+                
+                return {'success': True, 'message': f"Added {data.get('title')}", 'data': result}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+        
+        elif source == 'radarr':
+            client = self.radarr_clients.get(instance_name)
+            if not client:
+                return {'success': False, 'message': f'Instance {instance_name} not found'}
+            
+            try:
+                result = client.add_movie(
+                    tmdb_id=data.get('id'),
+                    title=data.get('title'),
+                    quality_profile_id=data.get('qualityProfileId'),
+                    root_folder_path=data.get('rootFolderPath'),
+                    monitored=data.get('monitored', True),
+                    search_on_add=data.get('searchOnAdd', True),
+                    minimum_availability=data.get('minimumAvailability', 'released')
+                )
+                
+                # Track the search if searching on add
+                if data.get('searchOnAdd', True) and result.get('id'):
+                    self.find_tracker.track_search(
+                        source='radarr',
+                        instance_name=instance_name,
+                        item_id=result.get('id'),
+                        title=data.get('title'),
+                        tier='hot',
+                        search_type='missing'
+                    )
+                    self.log.info(f"Added movie: {data.get('title')} (ID: {result.get('id')})")
+                
+                return {'success': True, 'message': f"Added {data.get('title')}", 'data': result}
+            except Exception as e:
+                return {'success': False, 'message': str(e)}
+        
+        return {'success': False, 'message': 'Invalid source'}
