@@ -691,7 +691,7 @@ class MachinarrCore:
             'finds_total': finds_total,
             'api_hits_today': self.searcher.api_hits_today,
             'api_limit': self.config.search.daily_api_limit,
-            'finds_by_source': find_stats.get('finds_by_tier', {}),  # Now by tier, more useful
+            'finds_by_source': find_stats.get('finds_by_source', {'sonarr': 0, 'radarr': 0}),
             'finds_by_type': find_stats.get('finds_by_type', {}),
             'avg_search_to_find_minutes': find_stats.get('avg_search_to_find_minutes', 0),
             'missing_episodes': missing_data['counts']['sonarr_missing'],
