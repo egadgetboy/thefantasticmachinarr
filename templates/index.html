@@ -3788,9 +3788,10 @@
                 const result = await api(`add/${source}`, 'POST', data);
                 if (result.success) {
                     closeModal();
-                    alert(`Added: ${title}`);
                     document.getElementById('quick-add-search').value = '';
                     document.getElementById('quick-add-results').innerHTML = '<div class="empty" style="grid-column:1/-1"><div class="empty-icon">✅</div><p>Added successfully! Search for more content.</p></div>';
+                    // Use setTimeout to ensure modal closes before alert
+                    setTimeout(() => alert(`Added: ${title}`), 50);
                 } else {
                     alert(`Failed: ${result.message}`);
                 }
@@ -4415,7 +4416,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.120';
+        const CURRENT_VERSION = '1.0.121';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4570,6 +4571,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.120</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.121</div>
 </body>
 </html>
