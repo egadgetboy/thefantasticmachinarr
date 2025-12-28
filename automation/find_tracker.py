@@ -259,7 +259,7 @@ class FindTracker:
             searched_at=datetime.utcnow(),
         )
         
-        self.log.debug(f"Tracking search: {title} ({key})")
+        self.log.info(f"🔎 Tracking search: {title} ({key})")
         self._save()
         return key
     
@@ -509,6 +509,15 @@ class FindTracker:
                 counts[search_type] += 1
         return counts
     
+    def get_finds_by_source(self) -> Dict[str, int]:
+        """Get find counts by source (sonarr vs radarr)."""
+        counts = {'sonarr': 0, 'radarr': 0}
+        for find in self.finds:
+            source = find.source.lower()
+            if source in counts:
+                counts[source] += 1
+        return counts
+    
     def get_stats(self) -> Dict[str, Any]:
         """Get find statistics."""
         self._reset_daily_counters()
@@ -524,6 +533,7 @@ class FindTracker:
             'finds_total': self.finds_total,
             'finds_by_tier': self.get_finds_by_tier(),
             'finds_by_type': self.get_finds_by_type(),
+            'finds_by_source': self.get_finds_by_source(),
             'tracked_searches': len(self.tracked_searches),
             'pending_finds': len(self.pending_finds),
             'avg_search_to_find_seconds': round(avg_time, 1),
