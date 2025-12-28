@@ -181,6 +181,53 @@ class SonarrClient(BaseClient):
             'seriesId': series_id
         })
     
+    # ==================== Lookup & Add ====================
+    
+    def lookup_series(self, term: str) -> List[Dict]:
+        """Search for series on TVDB/etc by name."""
+        return self.get('series/lookup', params={'term': term})
+    
+    def get_quality_profiles(self) -> List[Dict]:
+        """Get all quality profiles."""
+        return self.get('qualityprofile')
+    
+    def get_root_folders(self) -> List[Dict]:
+        """Get all root folders."""
+        return self.get('rootfolder')
+    
+    def add_series(self, tvdb_id: int, title: str, quality_profile_id: int, 
+                   root_folder_path: str, monitored: bool = True,
+                   season_folder: bool = True, search_on_add: bool = True,
+                   monitor: str = 'all') -> Dict:
+        """Add a new series to Sonarr.
+        
+        Args:
+            tvdb_id: TVDB ID of the series
+            title: Series title
+            quality_profile_id: Quality profile ID
+            root_folder_path: Root folder path
+            monitored: Whether to monitor the series
+            season_folder: Use season folders
+            search_on_add: Search for episodes immediately
+            monitor: 'all', 'future', 'missing', 'existing', 'pilot', 'firstSeason', 'none'
+        """
+        # First lookup to get full series info
+        results = self.lookup_series(f"tvdb:{tvdb_id}")
+        if not results:
+            raise APIError(f"Series with TVDB ID {tvdb_id} not found")
+        
+        series_data = results[0]
+        series_data['qualityProfileId'] = quality_profile_id
+        series_data['rootFolderPath'] = root_folder_path
+        series_data['monitored'] = monitored
+        series_data['seasonFolder'] = season_folder
+        series_data['addOptions'] = {
+            'searchForMissingEpisodes': search_on_add,
+            'monitor': monitor
+        }
+        
+        return self.post('series', data=series_data)
+    
     def get_releases(self, episode_id: int) -> List[Dict]:
         """Get available releases for an episode (from cache or search)."""
         return self.get('release', params={'episodeId': episode_id})
