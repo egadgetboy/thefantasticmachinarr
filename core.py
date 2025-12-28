@@ -2233,30 +2233,41 @@ class MachinarrCore:
                 
                 # If search requested, trigger it with delay to let Sonarr fetch metadata
                 if data.get('searchOnAdd', True) and series_id:
-                    self.log.info(f"Added series: {data.get('title')} (ID: {series_id}) - search will trigger in 5 seconds")
+                    self.log.info(f"Added series: {data.get('title')} (ID: {series_id}) - scheduling search in 5 seconds")
+                    
+                    # Capture variables for closure
+                    _client = client
+                    _series_id = series_id
+                    _title = data.get('title')
+                    _instance_name = instance_name
+                    _find_tracker = self.find_tracker
+                    _log = self.log
                     
                     def delayed_search():
                         import time
+                        _log.info(f"Delayed search thread started for: {_title}")
                         time.sleep(5)  # Wait for Sonarr to fetch metadata
                         try:
+                            _log.info(f"Triggering search for: {_title} (series_id={_series_id})")
                             # Track the search
-                            self.find_tracker.track_search(
+                            _find_tracker.track_search(
                                 source='sonarr',
-                                instance_name=instance_name,
-                                item_id=series_id,
-                                title=data.get('title'),
+                                instance_name=_instance_name,
+                                item_id=_series_id,
+                                title=_title,
                                 tier='hot',
                                 search_type='missing',
-                                series_id=series_id
+                                series_id=_series_id
                             )
                             # Trigger the search
-                            client.search_series(series_id)
-                            self.log.info(f"Search triggered for: {data.get('title')}")
+                            search_result = _client.search_series(_series_id)
+                            _log.info(f"Search triggered for: {_title} - result: {search_result}")
                         except Exception as e:
-                            self.log.error(f"Failed to trigger search for {data.get('title')}: {e}")
+                            _log.error(f"Failed to trigger search for {_title}: {e}")
                     
-                    # Run search in background thread
-                    threading.Thread(target=delayed_search, daemon=True).start()
+                    # Run search in background thread (non-daemon so it completes)
+                    t = threading.Thread(target=delayed_search)
+                    t.start()
                 else:
                     self.log.info(f"Added series: {data.get('title')} (ID: {series_id}) - no search requested")
                 
@@ -2285,29 +2296,40 @@ class MachinarrCore:
                 
                 # If search requested, trigger it with delay to let Radarr fetch metadata
                 if data.get('searchOnAdd', True) and movie_id:
-                    self.log.info(f"Added movie: {data.get('title')} (ID: {movie_id}) - search will trigger in 5 seconds")
+                    self.log.info(f"Added movie: {data.get('title')} (ID: {movie_id}) - scheduling search in 5 seconds")
+                    
+                    # Capture variables for closure
+                    _client = client
+                    _movie_id = movie_id
+                    _title = data.get('title')
+                    _instance_name = instance_name
+                    _find_tracker = self.find_tracker
+                    _log = self.log
                     
                     def delayed_search():
                         import time
+                        _log.info(f"Delayed search thread started for: {_title}")
                         time.sleep(5)  # Wait for Radarr to fetch metadata
                         try:
+                            _log.info(f"Triggering search for: {_title} (movie_id={_movie_id})")
                             # Track the search
-                            self.find_tracker.track_search(
+                            _find_tracker.track_search(
                                 source='radarr',
-                                instance_name=instance_name,
-                                item_id=movie_id,
-                                title=data.get('title'),
+                                instance_name=_instance_name,
+                                item_id=_movie_id,
+                                title=_title,
                                 tier='hot',
                                 search_type='missing'
                             )
                             # Trigger the search
-                            client.search_movie(movie_id)
-                            self.log.info(f"Search triggered for: {data.get('title')}")
+                            search_result = _client.search_movie(_movie_id)
+                            _log.info(f"Search triggered for: {_title} - result: {search_result}")
                         except Exception as e:
-                            self.log.error(f"Failed to trigger search for {data.get('title')}: {e}")
+                            _log.error(f"Failed to trigger search for {_title}: {e}")
                     
-                    # Run search in background thread
-                    threading.Thread(target=delayed_search, daemon=True).start()
+                    # Run search in background thread (non-daemon so it completes)
+                    t = threading.Thread(target=delayed_search)
+                    t.start()
                 else:
                     self.log.info(f"Added movie: {data.get('title')} (ID: {movie_id}) - no search requested")
                 
