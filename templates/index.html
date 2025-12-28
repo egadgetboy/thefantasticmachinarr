@@ -3840,13 +3840,14 @@
                 searchOnAdd: document.getElementById('add-search').checked
             };
             
-            // Show processing state in modal
+            // Show processing state in modal - hide form elements
             const modalDesc = document.getElementById('modal-desc');
-            const originalContent = modalDesc.innerHTML;
+            document.getElementById('modal-actions').style.display = 'none';
+            document.getElementById('modal-details').style.display = 'none';
             modalDesc.innerHTML = `
                 <div style="text-align:center;padding:40px">
                     <div class="spinner" style="margin:0 auto 16px"></div>
-                    <div style="font-size:16px;font-weight:500">Adding ${title}...</div>
+                    <div style="font-size:16px;font-weight:500">Adding ${item.title}...</div>
                     <div style="color:var(--text2);margin-top:8px">Please wait</div>
                 </div>
             `;
@@ -4518,7 +4519,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.128';
+        const CURRENT_VERSION = '1.0.129';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4673,6 +4674,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.128</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.129</div>
 </body>
 </html>
