@@ -3834,18 +3834,54 @@
                 searchOnAdd: document.getElementById('add-search').checked
             };
             
+            // Show processing state in modal
+            const modalDesc = document.getElementById('modal-desc');
+            const originalContent = modalDesc.innerHTML;
+            modalDesc.innerHTML = `
+                <div style="text-align:center;padding:40px">
+                    <div class="spinner" style="margin:0 auto 16px"></div>
+                    <div style="font-size:16px;font-weight:500">Adding ${title}...</div>
+                    <div style="color:var(--text2);margin-top:8px">Please wait</div>
+                </div>
+            `;
+            
             try {
                 const result = await api(`add/${source}`, 'POST', data);
                 if (result.success) {
-                    closeModal();
-                    collapseQuickAdd();
-                    // Use setTimeout to ensure modal closes before alert
-                    setTimeout(() => alert(`Added: ${title}`), 50);
+                    // Show success confirmation in modal
+                    modalDesc.innerHTML = `
+                        <div style="text-align:center;padding:40px">
+                            <div style="font-size:48px;margin-bottom:16px">✅</div>
+                            <div style="font-size:18px;font-weight:600;color:var(--success)">Added Successfully!</div>
+                            <div style="font-size:16px;margin-top:12px">${title}</div>
+                            ${data.searchOnAdd ? '<div style="color:var(--text2);margin-top:8px">Search will begin shortly...</div>' : ''}
+                        </div>
+                    `;
+                    // Auto-close after 2 seconds
+                    setTimeout(() => {
+                        closeModal();
+                        collapseQuickAdd();
+                    }, 2000);
                 } else {
-                    alert(`Failed: ${result.message}`);
+                    // Show error in modal
+                    modalDesc.innerHTML = `
+                        <div style="text-align:center;padding:40px">
+                            <div style="font-size:48px;margin-bottom:16px">❌</div>
+                            <div style="font-size:18px;font-weight:600;color:var(--error)">Failed to Add</div>
+                            <div style="color:var(--text2);margin-top:12px">${result.message}</div>
+                            <button class="btn btn-sec" onclick="closeModal()" style="margin-top:20px">Close</button>
+                        </div>
+                    `;
                 }
             } catch (e) {
-                alert(`Error: ${e.message}`);
+                modalDesc.innerHTML = `
+                    <div style="text-align:center;padding:40px">
+                        <div style="font-size:48px;margin-bottom:16px">❌</div>
+                        <div style="font-size:18px;font-weight:600;color:var(--error)">Error</div>
+                        <div style="color:var(--text2);margin-top:12px">${e.message}</div>
+                        <button class="btn btn-sec" onclick="closeModal()" style="margin-top:20px">Close</button>
+                    </div>
+                `;
             }
         }
         
@@ -4465,7 +4501,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.124';
+        const CURRENT_VERSION = '1.0.125';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4620,6 +4656,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.124</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.125</div>
 </body>
 </html>
