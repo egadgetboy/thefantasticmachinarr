@@ -1319,6 +1319,36 @@
             border-color: var(--accent);
         }
         
+        .toggle-group {
+            display: flex;
+            background: var(--bg);
+            border-radius: 8px;
+            padding: 3px;
+            gap: 2px;
+        }
+        
+        .toggle-btn {
+            padding: 6px 14px;
+            border: none;
+            background: transparent;
+            color: var(--text2);
+            font-size: 13px;
+            font-weight: 500;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .toggle-btn:hover {
+            background: var(--bg-hover);
+            color: var(--text);
+        }
+        
+        .toggle-btn.active {
+            background: var(--accent);
+            color: white;
+        }
+        
         .modal-actions-grid {
             display: grid;
             grid-template-columns: repeat(2, 1fr);
@@ -1731,16 +1761,18 @@
         
         <!-- Row 2: Quick Add -->
         <div class="panel" id="quick-add-panel">
-            <div class="panel-head">
-                <span class="panel-title">➕ Quick Add</span>
-                <div style="display:flex;gap:12px;align-items:center">
-                    <select id="quick-add-source" style="padding:6px 10px;border:1px solid var(--border);border-radius:6px;background:var(--bg);color:var(--text);font-size:12px" onchange="loadQuickAddProfiles()">
-                        <option value="radarr">🎬 Movies (Radarr)</option>
-                        <option value="sonarr">📺 Series (Sonarr)</option>
-                    </select>
+            <div class="panel-head" style="cursor:pointer" onclick="toggleQuickAddPanel(event)">
+                <div style="display:flex;align-items:center;gap:12px">
+                    <button class="expand-btn" id="quick-add-collapse-btn" onclick="event.stopPropagation();toggleQuickAddPanel()" title="Collapse/Expand">▼</button>
+                    <span class="panel-title">➕ Quick Add</span>
+                    <div class="toggle-group" onclick="event.stopPropagation()">
+                        <button class="toggle-btn active" id="qa-radarr-btn" onclick="setQuickAddSource('radarr')">🎬 Movies</button>
+                        <button class="toggle-btn" id="qa-sonarr-btn" onclick="setQuickAddSource('sonarr')">📺 Series</button>
+                    </div>
                 </div>
             </div>
-            <div class="panel-body" style="padding:16px">
+            <div class="panel-body" id="quick-add-body" style="padding:16px">
+                <input type="hidden" id="quick-add-source" value="radarr">
                 <div style="display:flex;gap:12px;margin-bottom:16px">
                     <input type="text" id="quick-add-search" placeholder="Search for movies or series..." 
                            style="flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text);font-size:14px"
@@ -3672,6 +3704,30 @@
         
         // ==================== Quick Add Functions ====================
         let quickAddProfiles = null;
+        let quickAddCollapsed = false;
+        
+        function toggleQuickAddPanel(event) {
+            if (event && event.target.closest('.toggle-group')) return;
+            quickAddCollapsed = !quickAddCollapsed;
+            const body = document.getElementById('quick-add-body');
+            const btn = document.getElementById('quick-add-collapse-btn');
+            if (quickAddCollapsed) {
+                body.style.display = 'none';
+                btn.textContent = '▶';
+            } else {
+                body.style.display = 'block';
+                btn.textContent = '▼';
+            }
+        }
+        
+        function setQuickAddSource(source) {
+            document.getElementById('quick-add-source').value = source;
+            document.getElementById('qa-radarr-btn').classList.toggle('active', source === 'radarr');
+            document.getElementById('qa-sonarr-btn').classList.toggle('active', source === 'sonarr');
+            loadQuickAddProfiles();
+            // Clear results when switching
+            document.getElementById('quick-add-results').innerHTML = `<div class="empty" style="grid-column:1/-1"><div class="empty-icon">${source === 'radarr' ? '🎬' : '📺'}</div><p>Search for ${source === 'radarr' ? 'movies' : 'series'} to add</p></div>`;
+        }
         
         async function loadQuickAddProfiles() {
             const source = document.getElementById('quick-add-source').value;
@@ -4416,7 +4472,7 @@
             }
         }
         
-        const CURRENT_VERSION = '1.0.122';
+        const CURRENT_VERSION = '1.0.123';
         const UPDATE_CHECK_INTERVAL = 6 * 60 * 60 * 1000; // Check every 6 hours
         const DISMISSED_UPDATE_KEY = 'tfm_dismissed_update';
         
@@ -4571,6 +4627,6 @@
             startAdaptivePolling();
         }, 5000);
     </script>
-    <div class="version-footer">The Fantastic Machinarr v1.0.122</div>
+    <div class="version-footer">The Fantastic Machinarr v1.0.123</div>
 </body>
 </html>
