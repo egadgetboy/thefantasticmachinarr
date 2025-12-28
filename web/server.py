@@ -174,6 +174,26 @@ class WebServer:
             """Stop any in-progress library update or search."""
             return jsonify(self.core.stop_operations())
         
+        # ============ Lookup & Add ====================
+        @self.app.route('/api/lookup/<source>')
+        def api_lookup(source):
+            """Search for series/movies to add."""
+            term = request.args.get('term', '')
+            if not term:
+                return jsonify([])
+            return jsonify(self.core.lookup_content(source, term))
+        
+        @self.app.route('/api/profiles/<source>')
+        def api_profiles(source):
+            """Get quality profiles and root folders for a source."""
+            return jsonify(self.core.get_profiles(source))
+        
+        @self.app.route('/api/add/<source>', methods=['POST'])
+        def api_add(source):
+            """Add series/movie to Sonarr/Radarr."""
+            data = request.get_json() or {}
+            return jsonify(self.core.add_content(source, data))
+        
         # ============ Logs ============
         @self.app.route('/api/logs')
         def api_logs():
